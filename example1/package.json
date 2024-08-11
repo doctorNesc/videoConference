@@ -1,0 +1,26 @@
+{
+  "name": "example1",
+  "version": "1.0.0",
+  "description": "mediasoup demo",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js",
+    "watch": "watchify public/index.js -o public/bundle.js -v"
+  },
+  "author": "mykhailo vasko",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.19.2",
+    "httpolyglot": "^0.1.2",
+    "mediasoup": "^3.14.9",
+    "mediasoup-client": "^3.7.14",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "watchify": "^4.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
