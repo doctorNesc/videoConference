@@ -73,6 +73,7 @@ peers.on("connection", async (socket) => {
   console.log(socket.id);
   socket.emit("connection-success", {
     socketId: socket.id,
+    existsProducer: producer ? true : false,
   });
 
   socket.on("disconnect", () => {
@@ -80,16 +81,31 @@ peers.on("connection", async (socket) => {
     console.log("socket disconnected");
   });
 
-  router = await worker.createRouter({ mediaCodecs });
+  socket.on("createRoom", async (callback) => {
+    if (router == undefined) {
+      //router represents the room, now i can only have 1 room
+      router = await worker.createRouter({ mediaCodecs });
+      console.log("Router ID:", router.id);
+    }
 
-  socket.on("getRtpCapabilities", (callback) => {
+    getRtpCapabilities(callback);
+  });
+
+  const getRtpCapabilities = (callback) => {
     const rtpCapabilities = router.rtpCapabilities;
 
-    console.log("rtp Capabilities", rtpCapabilities);
-
-    // call callback from the client and send back the rtpCapabilities
     callback({ rtpCapabilities });
-  });
+  };
+  // router = await worker.createRouter({ mediaCodecs });
+
+  // socket.on("getRtpCapabilities", (callback) => {
+  //   const rtpCapabilities = router.rtpCapabilities;
+
+  //   console.log("rtp Capabilities", rtpCapabilities);
+
+  //   // call callback from the client and send back the rtpCapabilities
+  //   callback({ rtpCapabilities });
+  // });
 
   socket.on("createWebRtcTransport", async ({ sender }, callback) => {
     console.log(`Is this a sender request?: ${sender}`);
