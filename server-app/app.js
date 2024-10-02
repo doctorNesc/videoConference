@@ -83,6 +83,8 @@ const createWorker = async () => {
 worker = createWorker();
 
 connections.on("connection", async (socket) => {
+  //The "connection" event is triggered whenever a client successfully connects to the /mediasoup namespace
+  //after connection, new socket object is created for that specific client connection
   console.log(socket.id);
 
   socket.emit("connection-success", {
@@ -93,6 +95,7 @@ connections.on("connection", async (socket) => {
     // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
     const router1 = await createRoom(roomName, socket.id);
 
+    console.log("Joined room " + roomName);
     peers[socket.id] = {
       socket,
       roomName, // name for the Router this Peer joined
@@ -383,18 +386,22 @@ connections.on("connection", async (socket) => {
 
   socket.on("disconnect", () => {
     console.log("peer disconnected");
+
+    if (peers[socket.id]) {
+      const { roomName } = peers[socket.id];
+      delete peers[socket.id];
+      // remove socket from room
+      rooms[roomName] = {
+        router: rooms[roomName].router,
+        peers: rooms[roomName].peers.filter(
+          (socketId) => socketId !== socket.id
+        ),
+      };
+    }
+
     consumers = removeItems(consumers, socket.id, "consumer");
     producers = removeItems(producers, socket.id, "producer");
     transports = removeItems(transports, socket.id, "transport");
-
-    const { roomName } = peers[socket.id];
-    delete peers[socket.id];
-
-    // remove socket from room
-    rooms[roomName] = {
-      router: rooms[roomName].router,
-      peers: rooms[roomName].peers.filter((socketId) => socketId !== socket.id),
-    };
   });
 });
 
