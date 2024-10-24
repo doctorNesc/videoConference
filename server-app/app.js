@@ -16,7 +16,7 @@ app.get("*", (req, res, next) => {
     return next();
 
   res.send(
-    `You need to specify a room name in the path e.g. 'https://127.0.0.1/sfu/room'`
+    `You need to specify a room name in the path e.g. 'https://demo1.meetroom.xyz/sfu/room'`
   );
 });
 
@@ -63,10 +63,7 @@ let producers = []; // [ { socketId1, roomName1, producer, }, ... ]
 let consumers = []; // [ { socketId1, roomName1, consumer, }, ... ]
 
 const createWorker = async () => {
-  worker = await mediasoup.createWorker({
-    rtcMinPort: 2000,
-    rtcMaxPort: 3000,
-  });
+  worker = await mediasoup.createWorker({logLevel:'debug',logTags:['info','ice','dtls','rtp','rtcp','rtx','simulcast','sctp']});
 
   console.log(`worker pid ${worker.pid}`);
 
@@ -412,8 +409,9 @@ const createWebRtcTransport = async (router) => {
       const webRtcTransport_options = {
         listenIps: [
           {
-            ip: "0.0.0.0", // replace with relevant IP address
-            announcedIp: "192.168.56.1",
+            ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
+            announcedIp: "192.168.56.1", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
+
           },
         ],
         enableUdp: true,
