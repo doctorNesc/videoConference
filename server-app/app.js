@@ -23,10 +23,10 @@ app.get("*", (req, res, next) => {
 app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
 
 // SSL cert for HTTPS access
-const options = {
-  key: fs.readFileSync("./server/ssl/key.pem", "utf-8"),
-  cert: fs.readFileSync("./server/ssl/cert.pem", "utf-8"),
-};
+// const options = {
+//   key: fs.readFileSync("./server/ssl/key.pem", "utf-8"),
+//   cert: fs.readFileSync("./server/ssl/cert.pem", "utf-8"),
+// };
 // https://mediasoup.org/documentation/v3/mediasoup/rtp-parameters-and-capabilities/#RtpCodecCapability
 const mediaCodecs = [
   {
@@ -45,7 +45,7 @@ const mediaCodecs = [
   },
 ];
 
-const httpsServer = https.createServer(options, app);
+const httpsServer = https.createServer(app);
 httpsServer.listen(3000, () => {
   console.log("listening on port " + 3000);
 });
@@ -410,7 +410,7 @@ const createWebRtcTransport = async (router) => {
         listenIps: [
           {
             ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.56.1", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
+            announcedIp: "16.170.244.236", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
 
           },
         ],

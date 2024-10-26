@@ -45,6 +45,15 @@ let params = {
     videoGoogleStartBitrate: 1000
   }
 }
+const iceServers = [
+  { urls: 'stun:stun.l.google.com:19302' }, // Public STUN server
+  // Optional TURN server configuration for production:
+  // {
+  //   urls: 'turn:your-turn-server-url',
+  //   username: 'turn-username',
+  //   credential: 'turn-password'
+  // }
+];
 
 const streamSuccess = (stream) => {
   localVideo.srcObject = stream
@@ -127,11 +136,15 @@ const createSendTransport = () => {
     }
 
     console.log(params)
+    const transportOptions = {
+      ...params,
+      iceServers: iceServers,
+    };
 
     // creates a new WebRTC Transport to send media
     // based on the server's producer transport params
     // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
-    producerTransport = device.createSendTransport(params)
+    producerTransport = device.createSendTransport(transportOptions)
 
     // https://mediasoup.org/documentation/v3/communication-between-client-and-server/#producing-media
     // this event is raised when a first call to transport.produce() is made
@@ -212,8 +225,14 @@ const signalNewConsumerTransport = async (remoteProducerId) => {
     console.log(`PARAMS... ${params}`)
 
     let consumerTransport
+
+    const transportOptions = {
+      ...params,
+      iceServers: iceServers,
+    };
+
     try {
-      consumerTransport = device.createRecvTransport(params)
+      consumerTransport = device.createRecvTransport(transportOptions)
     } catch (error) {
       // exceptions: 
       // {InvalidStateError} if not loaded
