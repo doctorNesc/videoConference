@@ -9,8 +9,12 @@ const __dirname = path.resolve();
 import { Server } from "socket.io";
 import mediasoup from "mediasoup";
 
+// app.use(express.static(path.join(__dirname, '../client-app/dist')));
+
 app.get("*", (req, res, next) => {
   const path = "/sfu/";
+
+  // res.sendFile(path.join(__dirname, '../client-app/dist'));
 
   if (req.path.indexOf(path) == 0 && req.path.length > path.length)
     return next();

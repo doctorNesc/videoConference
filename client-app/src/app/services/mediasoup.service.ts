@@ -1,153 +1,173 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { io } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
+import { Router } from '@angular/router';
+import { isPlatformBrowser } from '@angular/common';
+import { Socket } from 'socket.io';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class MediasoupService {
-  private socket: any;
-  private device: any;
+  private socket: Socket;
+  private device!: mediasoupClient.Device;
   private rtpCapabilities: any;
   private producerTransport: any;
-  private consumerTransports: any[] = [];
   private producer: any;
-  private roomName: string = '';
-
-  constructor() {
-    console.log('Mediasoup service instantiated');
-    this.roomName = window.location.pathname.split('/')[2];
-    this.socket = io('/mediasoup');
-
-    this.socket.on('connection-success', ({ socketId }: any) => {
-      console.log(socketId);
-      this.getLocalStream();
-    });
-  }
-
-  getLocalStream() {
-    navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        width: { min: 640, max: 1920 },
-        height: { min: 400, max: 1080 },
-      }
-    }).then(this.streamSuccess.bind(this))
-      .catch((error) => {
-        console.log(error.message);
-      });
-  }
-
-  streamSuccess(stream: MediaStream) {
-    const track = stream.getVideoTracks()[0];
-    let params = {
-      track,
-      encodings: [
-        { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
-        { rid: 'r1', maxBitrate: 300000, scalabilityMode: 'S1T3' },
-        { rid: 'r2', maxBitrate: 900000, scalabilityMode: 'S1T3' },
-      ],
-      codecOptions: {
-        videoGoogleStartBitrate: 1000
-      }
-    };
-
-    this.joinRoom(params);
-  }
-
-  joinRoom(params: any) {
-    this.socket.emit('joinRoom', { roomName: this.roomName }, (data: any) => {
-      this.rtpCapabilities = data.rtpCapabilities;
-      this.createDevice(params);
-    });
-  }
-
-  async createDevice(params: any) {
-    try {
-      this.device = new mediasoupClient.Device();
-      await this.device.load({
-        routerRtpCapabilities: this.rtpCapabilities
-      });
-      console.log('Device RTP Capabilities', this.device.rtpCapabilities);
-      this.createSendTransport(params);
-    } catch (error: any) {
-      console.error(error);
-      if (error.name === 'UnsupportedError') {
-        console.warn('browser not supported');
-      }
+  private consumerTransports: any[] = [];
+  private roomName: string;
+  public isBrowser: boolean;
+  private params = {
+    // mediasoup params
+    encodings: [
+      {
+        rid: 'r0',
+        maxBitrate: 100000,
+        scalabilityMode: 'S1T3',
+      },
+      {
+        rid: 'r1',
+        maxBitrate: 300000,
+        scalabilityMode: 'S1T3',
+      },
+      {
+        rid: 'r2',
+        maxBitrate: 900000,
+        scalabilityMode: 'S1T3',
+      },
+    ],
+    // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerCodecOptions
+    codecOptions: {
+      videoGoogleStartBitrate: 1000
     }
   }
 
-  createSendTransport(params: any) {
+  constructor(private router: Router,@Inject(PLATFORM_ID) private platformId: Object) {
+    this.roomName = this.router.url.split('/')[2];
+    console.log('This roomname:', this.roomName);
+    this.isBrowser = isPlatformBrowser(this.platformId);
+
+    this.socket = io('http://localhost:3000'); // Assumes SFU server is at the same domain/port
+
+
+    this.socket.on('connection-success', ({ socketId }: any) => {
+      console.log(`Connected with socket ID: ${socketId}`);
+      // this.getLocalStream();
+    });
+
+    // Handle new producers joining
+    this.socket.on('new-producer', ({ producerId }: any) => {
+      console.log('New producer joined', producerId);
+      this.signalNewConsumerTransport(producerId);
+    });
+
+    // Handle when a producer is closed
+    this.socket.on('producer-closed', ({ remoteProducerId }: any) => {
+      console.log(`Producer closed: ${remoteProducerId}`);
+      this.closeConsumerTransport(remoteProducerId);
+    });
+  }
+  
+  async getLocalStream() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { width: { min: 640, max: 1920 }, height: { min: 400, max: 1080 } },
+      });
+      this.handleStream(stream);
+    } catch (error) {
+      console.error('Error getting local stream', error);
+    }
+  }
+
+  private handleStream(stream: MediaStream) {
+    const localVideo = document.getElementById('local-video') as HTMLVideoElement;
+    localVideo.srcObject = stream;
+    const track = stream.getVideoTracks()[0];
+
+    this.joinRoom(track);
+  }
+
+  private joinRoom(track: MediaStreamTrack) {
+    // const roomName = 'your-room-name'; // Set your desired room name
+    this.socket.emit('joinRoom', { roomName: this.roomName }, async (data: any) => {
+      console.log(`Router RTP Capabilities: ${data.rtpCapabilities}`);
+      this.rtpCapabilities = data.rtpCapabilities;
+      await this.createDevice();
+      this.createSendTransport(track);
+    });
+  }
+
+  private async createDevice() {
+    try {
+      this.device = new mediasoupClient.Device();
+      await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
+      console.log('Device loaded successfully');
+    } catch (error) {
+      console.error('Failed to create device', error);
+    }
+  }
+
+  private createSendTransport(track: MediaStreamTrack) {
     this.socket.emit('createWebRtcTransport', { consumer: false }, ({ params }: any) => {
       if (params.error) {
-        console.log(params.error);
+        console.error(params.error);
         return;
       }
 
       this.producerTransport = this.device.createSendTransport(params);
-
-      this.producerTransport.on('connect', async ({ dtlsParameters }: any, callback: any, errback: any) => {
+      this.producerTransport.on('connect', async ({ dtlsParameters }: any, callback: any) => {
         try {
           await this.socket.emit('transport-connect', { dtlsParameters });
           callback();
         } catch (error) {
-          errback(error);
+          console.error(error);
         }
       });
 
-      this.producerTransport.on('produce', async (parameters: any, callback: any, errback: any) => {
+      this.producerTransport.on('produce', async (parameters: any, callback: any) => {
         try {
-          await this.socket.emit('transport-produce', {
-            kind: parameters.kind,
-            rtpParameters: parameters.rtpParameters,
-            appData: parameters.appData,
-          }, ({ id, producersExist }: any) => {
-            callback({ id });
-            if (producersExist) this.getProducers();
-          });
+          await this.socket.emit(
+            'transport-produce',
+            { kind: parameters.kind, rtpParameters: parameters.rtpParameters },
+            ({ id, producersExist }: any) => {
+              callback({ id });
+              if (producersExist) this.getProducers();
+            }
+          );
         } catch (error) {
-          errback(error);
+          console.error(error);
         }
       });
 
-      this.connectSendTransport(params);
+      this.createProducer(track);
     });
   }
 
-  async connectSendTransport(params: any) {
-    this.producer = await this.producerTransport.produce(params);
-    this.producer.on('trackended', () => {
-      console.log('track ended');
-    });
-
-    this.producer.on('transportclose', () => {
-      console.log('transport ended');
-    });
+  private async createProducer(track: MediaStreamTrack) {
+    try {
+      this.producer = await this.producerTransport.produce({ track });
+      console.log('Producer created:', this.producer);
+    } catch (error) {
+      console.error('Error creating producer', error);
+    }
   }
 
-  getProducers() {
+  private getProducers() {
     this.socket.emit('getProducers', (producerIds: any) => {
-      producerIds.forEach((id: any) => this.signalNewConsumerTransport(id));
+      producerIds.forEach((id: string) => this.signalNewConsumerTransport(id));
     });
   }
 
-  signalNewConsumerTransport(remoteProducerId: any) {
-    this.socket.emit('createWebRtcTransport', { consumer: true }, async ({ params }: any) => {
+  public signalNewConsumerTransport(remoteProducerId: string) {
+    this.socket.emit('createWebRtcTransport', { consumer: true }, ({ params }: any) => {
       if (params.error) {
-        console.log(params.error);
+        console.error('Error creating consumer transport:', params.error);
         return;
       }
 
-      let consumerTransport;
-      try {
-        consumerTransport = this.device.createRecvTransport(params);
-      } catch (error) {
-        console.log(error);
-        return;
-      }
-
-      consumerTransport.on('connect', async ({ dtlsParameters }: any, callback: any, errback: any) => {
+      const consumerTransport = this.device.createRecvTransport(params);
+      consumerTransport.on('connect', async ({ dtlsParameters }: any, callback: any) => {
         try {
           await this.socket.emit('transport-recv-connect', {
             dtlsParameters,
@@ -155,7 +175,7 @@ export class MediasoupService {
           });
           callback();
         } catch (error) {
-          errback(error);
+          console.error(error);
         }
       });
 
@@ -163,36 +183,58 @@ export class MediasoupService {
     });
   }
 
-  async connectRecvTransport(consumerTransport: any, remoteProducerId: any, serverConsumerTransportId: any) {
-    this.socket.emit('consume', {
-      rtpCapabilities: this.device.rtpCapabilities,
-      remoteProducerId,
-      serverConsumerTransportId,
-    }, async ({ params }: any) => {
-      if (params.error) {
-        console.log('Cannot Consume');
-        return;
+  private async connectRecvTransport(
+    consumerTransport: any,
+    remoteProducerId: string,
+    serverConsumerTransportId: string
+  ) {
+    this.socket.emit(
+      'consume',
+      {
+        rtpCapabilities: this.device.rtpCapabilities,
+        remoteProducerId,
+        serverConsumerTransportId,
+      },
+      async ({ params }: any) => {
+        if (params.error) {
+          console.error(params.error);
+          return;
+        }
+
+        const consumer = await consumerTransport.consume(params);
+        const remoteVideo = document.getElementById(`remote-video-${remoteProducerId}`) as HTMLVideoElement;
+        remoteVideo.srcObject = new MediaStream([consumer.track]);
+
+        this.consumerTransports = [
+          ...this.consumerTransports,
+          {
+            consumerTransport,
+            serverConsumerTransportId: params.id,
+            producerId: remoteProducerId,
+            consumer,
+          },
+        ];
       }
+    );
+  }
 
-      const consumer = await consumerTransport.consume({
-        id: params.id,
-        producerId: params.producerId,
-        kind: params.kind,
-        rtpParameters: params.rtpParameters,
-      });
+  public closeConsumerTransport(remoteProducerId: string) {
+    const producerToClose = this.consumerTransports.find(
+      (transportData) => transportData.producerId === remoteProducerId
+    );
 
-      this.consumerTransports.push({
-        consumerTransport,
-        serverConsumerTransportId: params.id,
-        producerId: remoteProducerId,
-        consumer,
-      });
+    if (producerToClose) {
+      producerToClose.consumerTransport.close();
+      producerToClose.consumer.close();
+      this.consumerTransports = this.consumerTransports.filter(
+        (transportData) => transportData.producerId !== remoteProducerId
+      );
 
-      // Play the remote stream
-      const videoElement = document.getElementById(remoteProducerId) as HTMLVideoElement;
-      videoElement.srcObject = new MediaStream([consumer.track]);
-
-      this.socket.emit('consumer-resume', { serverConsumerId: params.serverConsumerId });
-    });
+      const videoContainer = document.getElementById(`remote-video-container`);
+      const videoElement = document.getElementById(`remote-video-${remoteProducerId}`);
+      if (videoContainer && videoElement) {
+        videoContainer.removeChild(videoElement);
+      }
+    }
   }
 }
