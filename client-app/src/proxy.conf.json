@@ -1,0 +1,11 @@
+{
+  "/sfu": {
+    "target": "http://localhost:3000",
+    "secure": false
+  },
+  "/mediasoup": {
+    "target": "http://localhost:3000",
+    "ws": true,
+    "secure": false
+  }
+}

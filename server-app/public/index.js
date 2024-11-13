@@ -130,7 +130,7 @@ const createSendTransport =  () => {
     // based on the server's producer transport params
     // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
     producerTransport = device.createSendTransport(params);
-
+    
     // https://mediasoup.org/documentation/v3/communication-between-client-and-server/#producing-media
     // this event is raised when a first call to transport.produce() is made
     // see connectSendTransport() below

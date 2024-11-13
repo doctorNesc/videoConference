@@ -7,28 +7,17 @@ import mediasoup from "mediasoup";
 const app = express();
 const __dirname = path.resolve();
 
-// app.use(express.static(path.join(__dirname, '../client-app/dist')));
+app.use(
+  express.static(path.join(__dirname, "../client-app/dist/client-app/browser"))
+);
 
 app.get("*", (req, res, next) => {
-  const path = "/sfu/";
-
-  // res.sendFile(path.join(__dirname, '../client-app/dist'));
-
-  if (req.path.indexOf(path) == 0 && req.path.length > path.length)
-    return next();
-
-  res.send(
-    `You need to specify a room name in the path e.g. 'https://demo1.meetroom.xyz/sfu/room'`
+  res.sendFile(
+    path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
   );
 });
 
-app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
-
-// SSL cert for HTTPS access
-// const options = {
-//   key: fs.readFileSync("./server/ssl/key.pem", "utf-8"),
-//   cert: fs.readFileSync("./server/ssl/cert.pem", "utf-8"),
-// };
+// app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
 
 // Media codecs configuration
 const mediaCodecs = [
@@ -339,11 +328,11 @@ connections.on("connection", async (socket) => {
 
   socket.on("consumer-resume", async ({ serverConsumerId }) => {
     // console.log("consumer resume");
-    try{
-    const { consumer } = consumers.find(
-      (consumerData) => consumerData.consumer.id === serverConsumerId
-    );
-    await consumer.resume();
+    try {
+      const { consumer } = consumers.find(
+        (consumerData) => consumerData.consumer.id === serverConsumerId
+      );
+      await consumer.resume();
     } catch (error) {
       console.error("Error resuming consumer:", error);
     }

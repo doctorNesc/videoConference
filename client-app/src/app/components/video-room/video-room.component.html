@@ -1,7 +1,15 @@
 <h1>Meetroom videoconference</h1>
 <div>
-  <video id="local-video" autoplay playsinline></video>
+  <video id="localVideo" autoplay playsinline muted></video>
 </div>
 <div id="remote-video-container">
   <!-- Remote video elements will be appended dynamically here -->
+</div>
+<div *ngFor="let participant of participants">
+  <video 
+    [id]="participant.id" 
+    [attr.autoplay]="true" 
+    [attr.controls]="false" 
+    #videoElement
+  ></video>
 </div>

@@ -1,0 +1,104 @@
+{
+    "root": true,
+    "ignorePatterns": ["projects/**/*"],
+    "overrides": [
+      {
+        "files": ["*.ts"],
+        "parserOptions": {
+          "project": ["tsconfig.json"],
+          "createDefaultProgram": true
+        },
+        "extends": [
+          "plugin:@angular-eslint/recommended",
+          "eslint:recommended"
+        ],
+        "rules": {
+            "@angular-eslint/component-selector": [
+                "error",
+                {
+                  "type": "element",
+                  "prefix": "lib",
+                  "style": "kebab-case"
+                }
+              ],
+              "@angular-eslint/directive-selector": [
+                "error",
+                {
+                  "type": "attribute",
+                  "prefix": "lib",
+                  "style": "camelCase"
+                }
+              ],
+              "@typescript-eslint/explicit-member-accessibility": [
+                "off",
+                {
+                  "accessibility": "explicit"
+                }
+              ],
+              "@typescript-eslint/member-ordering": "off",
+              "@typescript-eslint/no-empty-interface": "off",
+              "@typescript-eslint/no-explicit-any": "off",
+              "@typescript-eslint/no-unused-vars": [
+                "error",
+                {
+                  "args": "none",
+                  "ignoreRestSiblings": true
+                }
+              ],
+              "@typescript-eslint/no-empty-function": "error",
+              "arrow-parens": [
+                "error",
+                "always"
+              ],
+              "dot-notation": "error",
+              "eqeqeq": [
+                "off",
+                "always"
+              ],
+              "indent": [
+                "warn",
+                2,
+                {
+                  "SwitchCase": 1
+                }
+              ],
+              "max-len": [
+                "error",
+                {
+                  "code": 180
+                }
+              ],
+              "no-bitwise": "off",
+              "no-cond-assign": "error",
+              "no-empty-function": "off",
+              "no-shadow": "error",
+              "no-use-before-define": "off",
+              "no-debugger": "error",
+              "prefer-const": [
+                "error",
+                {
+                  "destructuring": "all"
+                }
+              ],
+              "no-var":"error",
+              "quotes": [
+                2,
+                "single",
+                "avoid-escape"
+              ],
+              "semi": "error",
+              "prefer-arrow-callback": "error",
+              "quote-props": ["error", "as-needed"],
+              "object-shorthand": "error"
+            }
+      },
+      {
+        "files": ["*.html"],
+        "extends": ["plugin:@angular-eslint/template/recommended"],
+        "rules": {
+            "@angular-eslint/template/eqeqeq": "off"
+        }
+      }
+    ]
+  }
+  

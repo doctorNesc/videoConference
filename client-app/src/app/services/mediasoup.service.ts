@@ -1,9 +1,8 @@
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
-import { Socket } from 'socket.io';
 
 @Injectable({
   providedIn: 'root',
@@ -15,8 +14,8 @@ export class MediasoupService {
   private producerTransport: any;
   private producer: any;
   private consumerTransports: any[] = [];
-  private roomName: string;
-  public isBrowser: boolean;
+  private roomName!: string | null;
+  public isBrowser!: boolean;
   private params = {
     // mediasoup params
     encodings: [
@@ -42,17 +41,13 @@ export class MediasoupService {
     }
   }
 
-  constructor(private router: Router,@Inject(PLATFORM_ID) private platformId: Object) {
-    this.roomName = this.router.url.split('/')[2];
-    console.log('This roomname:', this.roomName);
-    this.isBrowser = isPlatformBrowser(this.platformId);
-
-    this.socket = io('http://localhost:3000'); // Assumes SFU server is at the same domain/port
-
+  constructor(private route: ActivatedRoute, @Inject(PLATFORM_ID) private platformId: Object) {
+debugger;
+    this.socket = io('/mediasoup'); // Assumes SFU server is at the same domain/port
 
     this.socket.on('connection-success', ({ socketId }: any) => {
       console.log(`Connected with socket ID: ${socketId}`);
-      // this.getLocalStream();
+      this.getLocalStream();
     });
 
     // Handle new producers joining
@@ -67,7 +62,7 @@ export class MediasoupService {
       this.closeConsumerTransport(remoteProducerId);
     });
   }
-  
+
   async getLocalStream() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -84,13 +79,13 @@ export class MediasoupService {
     const localVideo = document.getElementById('local-video') as HTMLVideoElement;
     localVideo.srcObject = stream;
     const track = stream.getVideoTracks()[0];
-
-    this.joinRoom(track);
+    return localVideo;
+    // this.joinRoom(track,);
   }
 
-  private joinRoom(track: MediaStreamTrack) {
+  public joinRoom(track:any, roomName: string) {
     // const roomName = 'your-room-name'; // Set your desired room name
-    this.socket.emit('joinRoom', { roomName: this.roomName }, async (data: any) => {
+    this.socket.emit('joinRoom', { roomName }, async (data: any) => {
       console.log(`Router RTP Capabilities: ${data.rtpCapabilities}`);
       this.rtpCapabilities = data.rtpCapabilities;
       await this.createDevice();
@@ -238,3 +233,101 @@ export class MediasoupService {
     }
   }
 }
+// import { Injectable } from '@angular/core';
+// import { io, Socket } from 'socket.io-client';
+// import * as mediasoupClient from 'mediasoup-client';
+
+// @Injectable({
+//   providedIn: 'root'
+// })
+// export class MediasoupService {
+//   private socket: Socket;
+//   private device!: mediasoupClient.Device;
+//   private rtpCapabilities: any;
+//   private producerTransport: any;
+//   private producer: any;
+//   private params: any = {
+//     encodings: [
+//       { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
+//       { rid: 'r1', maxBitrate: 300000, scalabilityMode: 'S1T3' },
+//       { rid: 'r2', maxBitrate: 900000, scalabilityMode: 'S1T3' }
+//     ],
+//     codecOptions: { videoGoogleStartBitrate: 1000 }
+//   };
+
+//   constructor() {
+//     this.socket = io('/mediasoup');
+//     console.log('Connected');
+//   }
+
+//   connectToServer(roomName: string) {
+//     this.socket.emit('joinRoom', { roomName }, (data: any) => {
+//       this.rtpCapabilities = data.rtpCapabilities;
+//       this.createDevice();
+//     });
+//   }
+
+//   private async createDevice() {
+//     try {
+//       this.device = new mediasoupClient.Device();
+//       await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
+//       this.createSendTransport();
+//     } catch (error) {
+//       console.error('Device creation error:', error);
+//     }
+//   }
+
+//   private createSendTransport() {
+//     this.socket.emit('createWebRtcTransport', { consumer: false }, async ({ params }: any) => {
+//       if (params.error) {
+//         console.error(params.error);
+//         return;
+//       }
+
+//       this.producerTransport = this.device.createSendTransport(params);
+
+//       this.producerTransport.on('connect', async ({ dtlsParameters }: any, callback: any, errback: any) => {
+//         try {
+//           await this.socket.emit('transport-connect', { dtlsParameters });
+//           callback();
+//         } catch (error) {
+//           errback(error);
+//         }
+//       });
+
+//       this.producerTransport.on('produce', async (parameters: any, callback: any, errback: any) => {
+//         try {
+//           await this.socket.emit('transport-produce', {
+//             kind: parameters.kind,
+//             rtpParameters: parameters.rtpParameters,
+//             appData: parameters.appData
+//           }, ({ id, producersExist }: any) => {
+//             callback({ id });
+//           });
+//         } catch (error) {
+//           errback(error);
+//         }
+//       });
+
+//       this.connectSendTransport();
+//     });
+//   }
+
+//   private async connectSendTransport() {
+//     try {
+//       const stream = await navigator.mediaDevices.getUserMedia({
+//         audio: false,
+//         video: { width: { min: 640, max: 1920 }, height: { min: 400, max: 1080 } }
+//       });
+
+//       const track: any = stream.getVideoTracks()[0];
+//       this.params = { track, ...this.params };
+//       this.producer = await this.producerTransport.produce(this.params);
+
+//       this.producer.on('trackended', () => console.log('Track ended'));
+//       this.producer.on('transportclose', () => console.log('Transport closed'));
+//     } catch (error) {
+//       console.error('Error connecting transport:', error);
+//     }
+//   }
+// }
