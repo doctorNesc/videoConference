@@ -4,3 +4,57 @@ video {
     padding: 10;
     margin: 1px 1px;
   }
+
+  .meetroom-container {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  .participants-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    height: calc(100vh - 100px); /* Adjust based on header height */
+  }
+  
+  .participant-video {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .local-video-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 200px;
+    height: 120px;
+    border: 2px solid #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .local-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  @media (min-width: 768px) {
+    .local-video-container {
+      width: 260px;
+      height: 160px;
+    }
+  }
+  
+  @media (min-width: 1200px) {
+    .local-video-container {
+      width: 320px;
+      height: 200px;
+    }
+  }
+  

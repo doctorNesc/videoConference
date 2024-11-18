@@ -13,6 +13,7 @@
   "type": "module",
   "dependencies": {
     "express": "^4.19.2",
+    "helmet": "^8.0.0",
     "httpolyglot": "^0.1.2",
     "mediasoup": "^3.14.9",
     "mediasoup-client": "^3.7.14",

@@ -3,11 +3,12 @@ import { RouterOutlet } from '@angular/router';
 import { VideoRoomComponent } from './components/video-room/video-room.component';
 import { HomeComponent } from './components/home/home.component';
 import { LocationStrategy, PathLocationStrategy } from '@angular/common';
+import { AdminComponent } from './components/admin/admin.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, VideoRoomComponent, HomeComponent],
+  imports: [RouterOutlet, VideoRoomComponent, HomeComponent, AdminComponent],
   providers:[
     { provide: LocationStrategy, useClass: PathLocationStrategy }
   ],

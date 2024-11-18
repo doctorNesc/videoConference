@@ -3,16 +3,19 @@ import { ActivatedRoute } from '@angular/router';
 import { io } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
 import { CommonModule } from '@angular/common';
+import { ParticipantComponent } from '../participant/participant.component';
 
 @Component({
   selector: 'app-video-room',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule,ParticipantComponent],
   templateUrl: './video-room.component.html',
   styleUrls: ['./video-room.component.scss']
 })
 export class VideoRoomComponent implements OnInit {
   public participants: { id: string, stream: MediaStream }[] = [];
+  // public localVideo: { id: string, stream: MediaStream }[] = [];
+
   private socket: any;
   private device: any;
   private producerTransport: any;
@@ -112,7 +115,6 @@ export class VideoRoomComponent implements OnInit {
       console.log('Create WebRTC Transport params:', params);
 
       this.producerTransport = this.device.createSendTransport(params);
-      debugger;
 
       this.producerTransport.on('connect', async ({ dtlsParameters }: any, callback: Function, errback: Function) => {
         try {
@@ -215,8 +217,7 @@ export class VideoRoomComponent implements OnInit {
       // document.querySelector('#remote-video-container')?.appendChild(newElem);
 
       const { track } = consumer;
-      this.addParticipant(remoteProducerId, track);
-      // (document.getElementById(remoteProducerId) as HTMLVideoElement).srcObject = new MediaStream([track]);
+      this.addParticipant(remoteProducerId, new MediaStream([track]));
 
       this.socket.emit('consumer-resume', { serverConsumerId: params.serverConsumerId });
     });
@@ -229,7 +230,6 @@ export class VideoRoomComponent implements OnInit {
       producerToClose.consumer.close();
       this.consumerTransports = this.consumerTransports.filter(transportData => transportData.producerId !== remoteProducerId);
       this.participants = this.participants.filter(particicipant => particicipant.id != remoteProducerId);
-      // document.querySelector('#videoContainer')?.removeChild(document.getElementById(`td-${remoteProducerId}`));
     }
   }
 
@@ -240,16 +240,13 @@ export class VideoRoomComponent implements OnInit {
   }
 
   addParticipant(remoteProducerId: string, stream: MediaStream) {
-    // Add participant to the array to render in the template
     this.participants.push({ id: remoteProducerId, stream });
-
-    // Assign the stream to the video element once rendered
-    setTimeout(() => {
-      const videoElement = document.getElementById(remoteProducerId) as HTMLVideoElement;
-      if (videoElement) {
-        videoElement.srcObject = stream;
-      }
-    }, 0);
+    // setTimeout(() => {
+    //   const videoElement = document.getElementById(remoteProducerId) as HTMLVideoElement;
+    //   if (videoElement) {
+    //     videoElement.srcObject = stream;
+    //   }
+    // }, 0);
   }
 
 }

@@ -3,6 +3,7 @@ import http from "http";
 import path from "path";
 import { Server } from "socket.io";
 import mediasoup from "mediasoup";
+import helmet from "helmet";
 
 const app = express();
 const __dirname = path.resolve();
@@ -11,10 +12,39 @@ app.use(
   express.static(path.join(__dirname, "../client-app/dist/client-app/browser"))
 );
 
-app.get("*", (req, res, next) => {
-  res.sendFile(
-    path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
-  );
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Use this carefully
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+      },
+    },
+  })
+);
+
+app.get('/roomUsers', (req, res) => {
+  // Optional: Parse room name from query params, e.g., /roomUsers?room=room1
+  // const room = req.query.room;
+
+  // if (room) {
+  //   // Return peers of a specific room
+  //   if (peers[room]) {
+  //     res.json({ room, users: peers[room] });
+  //   } else {
+  //     res.status(404).json({ message: `Room '${room}' not found.` });
+  //   }
+  // } else {
+  //   // Return all rooms and their peers
+  //   res.json(peers);
+  // }
+  res.json(JSON.parse(peers));
+
 });
 
 // app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
@@ -82,7 +112,7 @@ connections.on("connection", async (socket) => {
 
   socket.on("joinRoom", async ({ roomName }, callback) => {
     // const router = rooms[roomName] && rooms[roomName].get('data').router || await ceateRoom(roomName, socket.id)
-    const router = await getOrCreateRoom(roomName, socket.id);
+    const { router, isAdmin } = await getOrCreateRoom(roomName, socket.id);
 
     console.log("Joined room " + roomName);
     peers[socket.id] = {
@@ -93,7 +123,7 @@ connections.on("connection", async (socket) => {
       consumers: [],
       peerDetails: {
         name: "",
-        isAdmin: false,
+        isAdmin, //admin if joined the room first
       },
     };
 
@@ -104,12 +134,14 @@ connections.on("connection", async (socket) => {
   const getOrCreateRoom = async (roomName, socketId) => {
     // creates router for the roomName using worker.createRouter(options)
     let router;
+    let isAdmin = false;
     let peers = [];
     if (rooms[roomName]) {
       router = rooms[roomName].router;
       peers = rooms[roomName].peers || [];
     } else {
       router = await worker.createRouter({ mediaCodecs });
+      isAdmin = true;
     }
 
     console.log(`Router ID: ${router.id}`, peers.length);
@@ -119,7 +151,7 @@ connections.on("connection", async (socket) => {
       peers: [...peers, socketId],
     };
 
-    return router;
+    return { router, isAdmin };
   };
 
   // client emits a request to create server side Transport
