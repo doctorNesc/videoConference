@@ -43,8 +43,14 @@ app.get('/roomUsers', (req, res) => {
   //   // Return all rooms and their peers
   //   res.json(peers);
   // }
-  res.json(JSON.parse(peers));
+  console.log('Peers sent:', peers);
 
+  res.json(peers);
+
+});
+
+app.get('*', (req, res) => {
+  path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
 });
 
 // app.use("/sfu/:room", express.static(path.join(__dirname, "public")));

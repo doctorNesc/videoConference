@@ -16,9 +16,14 @@ export class AdminComponent {
   }
 
   getRoomUsers(room: string) {
-    this.http.get(`/roomUsers`).subscribe((response: any) => {
-      this.roomUsers = response;
-    });
-  }
+    this.http.get('/roomUsers').subscribe(
+      (response: any) => {
+        this.roomUsers = response;
+      },
+      (error) => {
+        console.error('Error fetching room users:', error);
+      }
+    );
+    }
 
 }
