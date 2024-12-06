@@ -44,13 +44,13 @@ app.get('/roomUsers', (req, res) => {
   //   res.json(peers);
   // }
   console.log('Peers sent:', peers);
-
-  res.json(peers);
+  const data = peers.map(item=>(item.roomName,item.transports,item.producers,item.consumers,peerDetails));
+  res.json(data);
 
 });
 
 app.get('*', (req, res) => {
-  path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
+  res.sendFile(path.join(__dirname, "../client-app/dist/client-app/browser/index.html"));
 });
 
 // app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
@@ -429,7 +429,7 @@ const createWebRtcTransport = async (router) => {
         listenIps: [
           {
             ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.56.1", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
+            announcedIp: "192.168.1.250", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
           },
         ],
         enableUdp: true,
