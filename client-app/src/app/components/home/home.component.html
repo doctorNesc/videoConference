@@ -1,4 +1,26 @@
-<p>home works!</p>
-<li><a routerLink="/sfu/room1" routerLinkActive="active" ariaCurrentWhenActive="page">First Component</a></li>
-<li><a routerLink="/sfu/room2" routerLinkActive="active" ariaCurrentWhenActive="page">Second Component</a></li>
-<li><a routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page">Admin</a></li>
+<header class="d-flex">
+    <li>
+        <a routerLink="/sfu/room1" routerLinkActive="active" ariaCurrentWhenActive="page" >First Component</a>
+      </li>
+      <li>
+        <a routerLink="/sfu/room2" routerLinkActive="active" ariaCurrentWhenActive="page">Second Component</a>
+      </li>
+      <li>
+        <a routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page">Admin</a>
+      </li>
+</header>
+
+<input type="text" [(ngModel)]="roomName" placeholder="Enter Room Name" style="width: 300px; padding: 10px"/>
+
+<button (click)="joinConference()"style="margin-left: 10px; padding: 10px 20px; cursor: pointer">
+  Join Conference
+</button>
+
+<!-- Button to create a new room -->
+<div style="margin-top: 20px">
+  <button
+    (click)="createNewConference()"
+    style="padding: 10px 20px; cursor: pointer">
+    Create New Conference
+  </button>
+</div>

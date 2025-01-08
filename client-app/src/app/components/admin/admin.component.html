@@ -1,1 +1,22 @@
-<p>{{ roomUsers }}</p>
+<div *ngIf="allRooms.length > 0; else noRooms">
+    <div *ngFor="let room of allRooms" class="room">
+      <h2 style="color: blue;">Room: {{ room.room }}</h2>
+      <p>User Count: {{ room.userCount }}</p>
+      <h3>Peers:</h3>
+      <ul>
+        <li *ngFor="let peer of room.peers">
+          <p><strong>Socket ID:</strong> {{ peer.socketId }}</p>
+          <p><strong>Transports:</strong> {{ peer.transports.join(', ') }}</p>
+          <p><strong>Producers:</strong> {{ peer.producers.join(', ') }}</p>
+          <p><strong>Consumers:</strong> {{ peer.consumers.join(', ') }}</p>
+          <p><strong>IsAdmin:</strong> {{ peer.peerDetails.isAdmin }}</p>
+          <p><strong>Name:</strong> {{ peer.peerDetails.name }}</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+  
+  <ng-template #noRooms>
+    <p>No rooms available.</p>
+  </ng-template>
+  

@@ -11,21 +11,41 @@ video {
     overflow: hidden;
   }
   
-  .participants-grid {
+  .video-grid {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    height: calc(100vh - 100px); /* Adjust based on header height */
-  }
-  
-  .participant-video {
+    align-items: center;
+    gap: 10px;
     width: 100%;
-    height: auto;
-    border-radius: 8px;
-    object-fit: cover;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    height: 100vh; /* Full screen */
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  app-participant {
+    flex: 1 1 calc(25% - 10px); /* 3 videos per row by default */
+    max-width: calc(25% - 10px); /* Prevents videos from growing too large */
+    // aspect-ratio: 16 / 9; /* Keep aspect ratio */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: black; /* Matches Discord's dark theme */
+    border-radius: 5px;
+  }
+  @media (max-width: 1024px) {
+    app-participant {
+      flex: 1 1 calc(50% - 10px); /* 2 videos per row for smaller screens */
+      max-width: calc(50% - 10px);
+    }
   }
   
+  @media (max-width: 768px) {
+    app-participant {
+      flex: 1 1 calc(100% - 10px); /* 1 video per row for very small screens */
+      max-width: calc(100% - 10px);
+    }
+  }
+    
   .local-video-container {
     position: fixed;
     bottom: 20px;

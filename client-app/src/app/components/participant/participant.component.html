@@ -1,4 +1,5 @@
-<div class="participant-container">
+  <div class="video-container" #resizableElement>
     <video [srcObject]="stream" controls autoplay></video>
-    <button (click)="detachWindow()">Open in New Window</button>
+    <div class="resize-handle" (mousedown)="onCornerClick($event)"></div>
   </div>
+  

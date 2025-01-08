@@ -1,18 +1,17 @@
 <div class="container-fluid meetroom-container">
   <h1 class="text-center my-3">Meetroom Videoconference</h1>
 
-  <!-- Grid for participants' videos -->
-  <div class="participants-grid row gx-2 gy-2">
-    <!-- <div class="col-6 col-md-4 col-lg-3" *ngFor="let participant of participants">
-      <video 
+  <div class="video-grid">
+    <!-- <div class="col-6 col-md-4 col-lg-3" *ngFor="let participant of participants"> -->
+      <!-- <video 
         [id]="participant.id" 
         class="participant-video" 
         autoplay 
         playsinline
         #videoElement>
-      </video>
-    </div> -->
-    <app-participant *ngFor="let participant of participants" [stream]="participant.stream"></app-participant>
+      </video> -->
+      <app-participant *ngFor="let participant of participants" [stream]="participant.stream"></app-participant>
+    <!-- </div> -->
   </div>
 
   <!-- Local video pinned at the bottom right -->

@@ -1,29 +1,26 @@
+import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { RoomDataService } from '../../services/room-data.service';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [],
+  imports: [CommonModule],
   templateUrl: './admin.component.html',
-  styleUrl: './admin.component.scss'
+  styleUrl: './admin.component.scss',
 })
-export class AdminComponent {
-  roomUsers: any[] = [];
+export class AdminComponent implements OnInit {
+  allRooms: any[] = [];
+  constructor(private roomService: RoomDataService) {}
 
-  constructor(private http: HttpClient) {
-    this.getRoomUsers('room1'); // Replace 'room1' with the actual room name if needed
-  }
-
-  getRoomUsers(room: string) {
-    this.http.get('/roomUsers').subscribe(
-      (response: any) => {
-        this.roomUsers = response;
+  ngOnInit(): void {
+    this.roomService.getAllUsers().subscribe({
+      next: (data) => {
+        this.allRooms = data;
       },
-      (error) => {
-        console.error('Error fetching room users:', error);
-      }
-    );
-    }
-
+      error: (err) => console.error('Failed to fetch rooms:', err),
+      complete: ()=>console.log('complete')
+    });
+  }
 }

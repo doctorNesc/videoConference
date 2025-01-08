@@ -3,7 +3,6 @@ import http from "http";
 import path from "path";
 import { Server } from "socket.io";
 import mediasoup from "mediasoup";
-import helmet from "helmet";
 
 const app = express();
 const __dirname = path.resolve();
@@ -12,45 +11,43 @@ app.use(
   express.static(path.join(__dirname, "../client-app/dist/client-app/browser"))
 );
 
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // Use this carefully
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'"],
-        imgSrc: ["'self'", "data:"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-      },
-    },
-  })
-);
-
-app.get('/roomUsers', (req, res) => {
+app.get("/api/roomUsers", (req, res) => {
   // Optional: Parse room name from query params, e.g., /roomUsers?room=room1
-  // const room = req.query.room;
+  const room = req.query.room;
+  const allRooms = Object.values(peers).reduce((rooms, peer) => {
+    const { roomName, transports, producers, consumers, peerDetails } = peer;
 
-  // if (room) {
-  //   // Return peers of a specific room
-  //   if (peers[room]) {
-  //     res.json({ room, users: peers[room] });
-  //   } else {
-  //     res.status(404).json({ message: `Room '${room}' not found.` });
-  //   }
-  // } else {
-  //   // Return all rooms and their peers
-  //   res.json(peers);
-  // }
-  console.log('Peers sent:', peers);
-  const data = peers.map(item=>(item.roomName,item.transports,item.producers,item.consumers,peerDetails));
-  res.json(data);
+    if (!rooms[roomName]) {
+      rooms[roomName] = {
+        room: roomName,
+        userCount: 0,
+        peers: [],
+      };
+    }
 
+    rooms[roomName].userCount += 1;
+    rooms[roomName].peers.push({
+      transports,
+      producers,
+      consumers,
+      peerDetails,
+      socketId: peer.socket.id,
+    });
+
+    return rooms;
+  }, {});
+
+  if (room && allRooms[room]) {
+    res.json(Object.values(allRooms[room]));
+  } else {
+    res.json(Object.values(allRooms));
+  }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, "../client-app/dist/client-app/browser/index.html"));
+app.get("*", (req, res) => {
+  res.sendFile(
+    path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
+  );
 });
 
 // app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
@@ -78,7 +75,7 @@ const connections = io.of("/mediasoup");
 
 let worker;
 let rooms = {}; // { roomName1: { Router, rooms: [ sicketId1, ... ] }, ...}
-let peers = {}; // { socketId1: { roomName1, socket, transports = [id1, id2,] }, producers = [id1, id2,] }, consumers = [id1, id2,], peerDetails }, ...}
+let peers = {}; // { socketId1: { roomName1, socket, transports = [id1, id2,], producers = [id1, id2,], consumers = [id1, id2,], peerDetails }, ...}
 let transports = []; // [ { socketId1, roomName1, transport, consumer }, ... ]
 let producers = []; // [ { socketId1, roomName1, producer, }, ... ]
 let consumers = []; // [ { socketId1, roomName1, consumer, }, ... ]

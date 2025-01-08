@@ -1,13 +1,45 @@
+import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+
+import { Router, RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterModule],
+  imports: [RouterModule, CommonModule,FormsModule],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
 })
 export class HomeComponent {
+
+  roomName: string = '';
+
+  constructor(private router: Router) {}
+
+  // Redirect to the entered room
+  joinConference() {
+    if (this.roomName.trim()) {
+      this.router.navigate([`/sfu/${this.roomName.trim()}`]);
+    } else {
+      alert('Please enter a room name!');
+    }
+  }
+
+  // Generate a random 8-character room name and navigate to it
+  createNewConference() {
+    const generatedRoomName = this.generateRoomName();
+    this.router.navigate([`/sfu/${generatedRoomName}`]);
+  }
+
+  // Helper function to generate an 8-character random room name
+  private generateRoomName(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let roomName = '';
+    for (let i = 0; i < 8; i++) {
+      roomName += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return roomName;
+  }
 
 }
