@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { io } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
@@ -10,11 +10,16 @@ import { ResizableDirective } from '../../directives/app-resizable.directive';
 @Component({
   selector: 'app-video-room',
   standalone: true,
-  imports: [CommonModule, ParticipantComponent, VideoOptionsComponent, ResizableDirective],
+  imports: [
+    CommonModule,
+    ParticipantComponent,
+    VideoOptionsComponent,
+    ResizableDirective,
+  ],
   templateUrl: './video-room.component.html',
   styleUrls: ['./video-room.component.scss'],
 })
-export class VideoRoomComponent implements OnInit {
+export class VideoRoomComponent implements OnInit, OnDestroy {
   public participants: { id: string; stream: MediaStream }[] = [];
   public mainParticipant!: { id: string; stream: MediaStream };
   public mainView: boolean = false;
@@ -278,6 +283,28 @@ export class VideoRoomComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    // Clean up socket connection
+    if (this.socket) {
+      this.socket.disconnect();
+      console.log('Socket disconnected');
+    }
+    // Stop local media tracks
+    if (this.localVideo?.srcObject) {
+      const stream = this.localVideo.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    // Clean up Mediasoup transports
+    if (this.producerTransport) {
+      this.producerTransport.close();
+    }
+    this.consumerTransports.forEach((transportData) => {
+      transportData.consumerTransport.close();
+      transportData.consumer.close();
+    });
+  }
+
   getProducers() {
     this.socket.emit('getProducers', (producerIds: string[]) => {
       producerIds.forEach((id: string) => this.signalNewConsumerTransport(id));
@@ -286,7 +313,7 @@ export class VideoRoomComponent implements OnInit {
 
   addParticipant(remoteProducerId: string, stream: MediaStream) {
     this.participants.push({ id: remoteProducerId, stream });
-    if (this.participants.length > 9 && !this.mainParticipant) {
+    if (this.participants.length > 12 && !this.mainParticipant) {
       this.mainParticipant = this.participants[0];
       this.mainView = true;
     }
@@ -302,7 +329,7 @@ export class VideoRoomComponent implements OnInit {
     // }
   }
   removeMainParticipant() {
-    if (this.participants.length < 9) {
+    if (this.participants.length < 12) {
       this.mainView = false;
     }
   }

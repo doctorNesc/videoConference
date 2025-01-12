@@ -1,21 +1,21 @@
 <div class="d-flex flex-column bg-dark text-white room-container">
 
   <!-- Big video -->
-  <div *ngIf="mainView || participants.length > 9" class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container" (click)="removeMainParticipant()">
+  <div *ngIf="mainView || participants.length > 12" class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container" (click)="removeMainParticipant()">
     <video id="mainVideo" class="main-video" autoplay playsinline [srcObject]="mainParticipant.stream"></video>
   </div>
 
   <!-- Video grid -->
    <div class="grid-content">
-    <div *ngIf="!mainView" class="d-flex flex-wrap video-grid">
-      <app-participant *ngFor="let participant of participants" [stream]="participant.stream" class="video-item" 
-       appResizable></app-participant>
+    <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
+      <app-participant style="width: 400px;" *ngFor="let participant of participants" [stream]="participant.stream" class="video-item" 
+      (setMainParticipant)="setMainParticipant(participant)" appResizable></app-participant>
   </div>
 
    </div>
 
   <!-- Scrollable bar -->
-  <div *ngIf="mainView || participants.length > 9" class="video-bar">
+  <div *ngIf="mainView || participants.length > 12" class="video-bar">
     <div class="video-thumbnail" *ngFor="let participant of participants">
       <app-participant [stream]="participant.stream" (setMainParticipant)="setMainParticipant(participant)"></app-participant>
     </div>
