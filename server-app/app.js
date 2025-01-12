@@ -269,7 +269,7 @@ connections.on("connection", async (socket) => {
   // see client's socket.emit('transport-produce', ...)
   socket.on(
     "transport-produce",
-    async ({ kind, rtpParameters, appData }, callback) => {
+    async ({ kind, rtpParameters }, callback) => {
       // call produce based on the prameters from the client
       const transport = getTransport(socket.id);
       const producer = await transport.produce({ kind, rtpParameters });

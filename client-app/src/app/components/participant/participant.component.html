@@ -1,5 +1,7 @@
-  <div class="video-container" #resizableElement>
-    <video [srcObject]="stream" controls autoplay></video>
-    <div class="resize-handle" (mousedown)="onCornerClick($event)"></div>
+<div class="video-container">
+  <video [srcObject]="stream" autoplay></video>
+  <div class="d-flex justify-content-between align-items-end">
+    <span class="material-symbols-outlined" (click)="setMainParticipant.emit($event)">{{'fullscreen'}}</span>
+  </div>
   </div>
   

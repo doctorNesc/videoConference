@@ -1,80 +1,64 @@
-video {
-    width: 360px;
-    background-color: black;
-    padding: 10;
-    margin: 1px 1px;
-  }
+.room-container {
+  height: 95vh;
+}
 
-  .meetroom-container {
-    position: relative;
-    height: 100vh;
+.main-video-container {
+  background-color: #000;
+  margin-bottom: 10px;
+}
+.grid-content{
     overflow: hidden;
-  }
-  
-  .video-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    height: 100vh; /* Full screen */
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  app-participant {
-    flex: 1 1 calc(25% - 10px); /* 3 videos per row by default */
-    max-width: calc(25% - 10px); /* Prevents videos from growing too large */
-    // aspect-ratio: 16 / 9; /* Keep aspect ratio */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: black; /* Matches Discord's dark theme */
-    border-radius: 5px;
-  }
-  @media (max-width: 1024px) {
-    app-participant {
-      flex: 1 1 calc(50% - 10px); /* 2 videos per row for smaller screens */
-      max-width: calc(50% - 10px);
-    }
-  }
-  
-  @media (max-width: 768px) {
-    app-participant {
-      flex: 1 1 calc(100% - 10px); /* 1 video per row for very small screens */
-      max-width: calc(100% - 10px);
-    }
-  }
-    
-  .local-video-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 200px;
-    height: 120px;
-    border: 2px solid #ffffff;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-  
-  .local-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  
-  @media (min-width: 768px) {
-    .local-video-container {
-      width: 260px;
-      height: 160px;
-    }
-  }
-  
-  @media (min-width: 1200px) {
-    .local-video-container {
-      width: 320px;
-      height: 200px;
-    }
-  }
-  
+}
+
+.main-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.video-grid {
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 90vh; /* Full screen */
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.video-bar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 10px;
+  background-color: #222;
+  border-top: 1px solid #444;
+  border-bottom: 1px solid #444;
+}
+.video-thumbnail {
+  flex: 0 0 120px;
+  height: 90px;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.local-video-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 200px;
+  height: 120px;
+  border: 2px solid #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.local-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

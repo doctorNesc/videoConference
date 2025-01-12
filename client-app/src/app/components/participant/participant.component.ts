@@ -1,8 +1,10 @@
 import {
   Component,
   ElementRef,
+  EventEmitter,
   HostListener,
   Input,
+  Output,
   ViewChild,
 } from '@angular/core';
 
@@ -15,7 +17,9 @@ import {
 })
 export class ParticipantComponent {
   @Input() stream!: MediaStream;
-  @ViewChild('resizableElement', { static: true }) resizableElement!: ElementRef;
+  @Input() isMain: boolean = false;
+
+  @Output() setMainParticipant = new EventEmitter();
 
   resizing = false;
   initialWidth = 0;
@@ -23,54 +27,62 @@ export class ParticipantComponent {
   initialMouseX = 0;
   initialMouseY = 0;
 
-  onResizeStart(event: MouseEvent): void {
-    this.resizing = true;
+  // onResizeStart(event: MouseEvent): void {
+  //   this.resizing = true;
 
-    const element = this.resizableElement.nativeElement;
+  //   const element = this.resizableElement.nativeElement;
 
-    // Capture the initial dimensions and mouse position
-    this.initialWidth = element.offsetWidth;
-    this.initialHeight = element.offsetHeight;
-    this.initialMouseX = event.clientX;
-    this.initialMouseY = event.clientY;
+  //   // Capture the initial dimensions and mouse position
+  //   this.initialWidth = element.offsetWidth;
+  //   this.initialHeight = element.offsetHeight;
+  //   this.initialMouseX = event.clientX;
+  //   this.initialMouseY = event.clientY;
 
-    // Prevent default to avoid unwanted behavior during drag
-    event.preventDefault();
-  }
+  //   // Prevent default to avoid unwanted behavior during drag
+  //   event.preventDefault();
+  // }
 
-  @HostListener('window:mousemove', ['$event'])
-  onResizing(event: MouseEvent): void {
-    if (!this.resizing) return;
+  // // Resize the video while dragging
+  // @HostListener('window:mousemove', ['$event'])
+  // onResizing(event: MouseEvent): void {
+  //   if (!this.resizing) return;
 
-    const element = this.resizableElement.nativeElement;
+  //   const element = this.resizableElement.nativeElement;
 
-    // Calculate new dimensions
-    const deltaX = event.clientX - this.initialMouseX;
-    const deltaY = event.clientY - this.initialMouseY;
+  //   // Calculate new dimensions
+  //   const deltaX = event.clientX - this.initialMouseX;
+  //   const deltaY = event.clientY - this.initialMouseY;
 
-    const newWidth = Math.max(150, this.initialWidth + deltaX); // Minimum width
-    const newHeight = Math.max(150, this.initialHeight + deltaY); // Minimum height
+  //   // New dimensions with boundaries
+  //   const newWidth = Math.max(150, this.initialWidth + deltaX); // Minimum width
+  //   const newHeight = Math.max(150, this.initialHeight + deltaY); // Minimum height
 
-    element.style.width = `${newWidth}px`;
-    element.style.height = `${newHeight}px`;
-  }
-  @HostListener('window:mouseup')
-  onResizeEnd(): void {
-    this.resizing = false;
-  }
+  //   // Update the size of the video
+  //   element.style.width = `${newWidth}px`;
+  //   element.style.height = `${newHeight}px`;
 
-  onCornerClick(event: MouseEvent, side?: any) {
-    this.resizing = true;
-    const element = this.resizableElement.nativeElement;
+  //   // Emit new size
+  //   this.resize.emit({ width: newWidth, height: newHeight });
+  // }
 
-    // Capture the initial dimensions and mouse position
-    this.initialWidth = element.offsetWidth;
-    this.initialHeight = element.offsetHeight;
-    this.initialMouseX = event.clientX;
-    this.initialMouseY = event.clientY;
+  // // End resizing
+  // @HostListener('window:mouseup')
+  // onResizeEnd(): void {
+  //   this.resizing = false;
+  // }
 
-    // Prevent default to avoid unwanted behavior during drag
-    event.preventDefault();
+  // // Trigger resizing action when the corner is clicked
+  // onCornerClick(event: MouseEvent): void {
+  //   this.resizing = true;
+  //   const element = this.resizableElement.nativeElement;
 
-  }
+  //   // Capture the initial dimensions and mouse position
+  //   this.initialWidth = element.offsetWidth;
+  //   this.initialHeight = element.offsetHeight;
+  //   this.initialMouseX = event.clientX;
+  //   this.initialMouseY = event.clientY;
+
+  //   // Prevent default to avoid unwanted behavior during drag
+  //   event.preventDefault();
+  // }
 }

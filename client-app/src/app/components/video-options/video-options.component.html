@@ -1,0 +1,13 @@
+<div class="d-flex justify-content-between align-items-end">
+  <strong class="-start">{{ roomName }}</strong>
+
+    <div>
+        <span class="material-symbols-rounded" (click)="toggleVideo()">{{videoEnabled? 'videocam' : 'videocam_off'}}</span> 
+        <span class="material-symbols-rounded" (click)="toggleAudio()">{{audioEnabled? 'mic' : 'mic_off'}}</span>
+    </div>
+
+    <div>
+        <span class="material-symbols-rounded" (click)="showUsersPanel.emit(true)">group</span> 
+    </div>
+
+</div>

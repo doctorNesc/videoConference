@@ -1,21 +1,30 @@
-<div class="container-fluid meetroom-container">
-  <h1 class="text-center my-3">Meetroom Videoconference</h1>
+<div class="d-flex flex-column bg-dark text-white room-container">
 
-  <div class="video-grid">
-    <!-- <div class="col-6 col-md-4 col-lg-3" *ngFor="let participant of participants"> -->
-      <!-- <video 
-        [id]="participant.id" 
-        class="participant-video" 
-        autoplay 
-        playsinline
-        #videoElement>
-      </video> -->
-      <app-participant *ngFor="let participant of participants" [stream]="participant.stream"></app-participant>
-    <!-- </div> -->
+  <!-- Big video -->
+  <div *ngIf="mainView || participants.length > 9" class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container" (click)="removeMainParticipant()">
+    <video id="mainVideo" class="main-video" autoplay playsinline [srcObject]="mainParticipant.stream"></video>
+  </div>
+
+  <!-- Video grid -->
+   <div class="grid-content">
+    <div *ngIf="!mainView" class="d-flex flex-wrap video-grid">
+      <app-participant *ngFor="let participant of participants" [stream]="participant.stream" class="video-item" 
+       appResizable></app-participant>
+  </div>
+
+   </div>
+
+  <!-- Scrollable bar -->
+  <div *ngIf="mainView || participants.length > 9" class="video-bar">
+    <div class="video-thumbnail" *ngFor="let participant of participants">
+      <app-participant [stream]="participant.stream" (setMainParticipant)="setMainParticipant(participant)"></app-participant>
+    </div>
   </div>
 
   <!-- Local video pinned at the bottom right -->
   <div class="local-video-container">
     <video id="localVideo" class="local-video" autoplay playsinline muted></video>
   </div>
+
+  <app-video-options (videoToggle)="toggleLocalVideo()" (audioToggle)="toggleLocalAudio()"></app-video-options>
 </div>
