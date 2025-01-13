@@ -1,7 +1,5 @@
 <div class="video-container">
   <video [srcObject]="stream" autoplay></video>
-  <span class="material-symbols-outlined button" (click)="setMainParticipant.emit($event)">{{'fullscreen'}}</span>
-  <div class="d-flex justify-content-between align-items-end">
-  </div>
-  </div>
-  
+  <span class="material-symbols-outlined button full-btn" (click)="setMainParticipant.emit($event)">{{'fullscreen'}}</span>
+  <span class="material-symbols-outlined button detach-btn" (click)="detach.emit($event)">{{'open_in_browser'}}</span>
+</div>  

@@ -20,6 +20,7 @@ export class ParticipantComponent {
   @Input() isMain: boolean = false;
 
   @Output() setMainParticipant = new EventEmitter();
+  @Output() detach = new EventEmitter();
 
   resizing = false;
   initialWidth = 0;

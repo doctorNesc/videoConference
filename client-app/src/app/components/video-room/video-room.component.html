@@ -2,14 +2,14 @@
 
   <!-- Big video -->
   <div *ngIf="mainView || participants.length > 12" class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container" (click)="removeMainParticipant()">
-    <video id="mainVideo" class="main-video" autoplay playsinline [srcObject]="mainParticipant.stream"></video>
+    <video id="mainVideo" class="main-video mb-3 mt-3" autoplay playsinline [srcObject]="mainParticipant.stream"></video>
   </div>
 
   <!-- Video grid -->
    <div class="grid-content">
     <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
       <app-participant style="width: 400px;" *ngFor="let participant of participants" [stream]="participant.stream" class="video-item" 
-      (setMainParticipant)="setMainParticipant(participant)" appResizable></app-participant>
+      (setMainParticipant)="setMainParticipant(participant)" (detach)="detachParticipant(participant)" appResizable></app-participant>
   </div>
 
    </div>
@@ -26,5 +26,5 @@
     <video id="localVideo" class="local-video" autoplay playsinline muted></video>
   </div>
 
-  <app-video-options (videoToggle)="toggleLocalVideo()" (audioToggle)="toggleLocalAudio()"></app-video-options>
+  <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()"></app-video-options>
 </div>
