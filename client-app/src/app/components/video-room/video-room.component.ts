@@ -45,8 +45,8 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   }
 
   setMainParticipant(participant: { id: string; stream: MediaStream }) {
-      this.mainParticipant = participant;
-      this.mainView = true;
+    this.mainParticipant = participant;
+    this.mainView = true;
   }
   removeMainParticipant() {
     if (this.participants.length < 12) {
@@ -54,7 +54,37 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  detachParticipant(participant: { id: string; stream: MediaStream }){
-    console.log('id: ',participant.id)
+  detachParticipant(participant: { id: string; stream: MediaStream }) {
+    this.videoService.detachParticipant(participant.id);
+
+    const detachedTab = window.open('', '_blank', 'width=800,height=600');
+    if (detachedTab) {
+      const videoHTML = `
+        <html>
+          <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;background:black;">
+            <video playsinline autoplay muted loop controls style="width:100%;height:100%;"></video>
+          </body>
+        </html>`;
+      setTimeout(() => {
+        detachedTab.document.write(videoHTML);
+        const videoElement = detachedTab.document.querySelector(
+          'video'
+        ) as HTMLVideoElement;
+        videoElement.srcObject = participant.stream;
+        // videoElement.play();
+        // videoElement.muted = false;
+      }, 0);
+      // setTimeout(() => {
+      //   const videoElement = detachedTab.document.querySelector(
+      //     'video'
+      //   ) as HTMLVideoElement;
+      //   // videoElement.play();
+      //   videoElement.muted = false;
+      // }, 1000);
+
+      detachedTab.onbeforeunload = () => {
+        this.videoService.reattachParticipant(participant.id);
+      };
+    }
   }
 }

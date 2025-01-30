@@ -279,9 +279,11 @@ export class VideoRoomService {
   }
 
   detachParticipant(id: string) {
+
     const participants = this.participant$.value.filter(p => p.id !== id);
     const detached = this.participant$.value.find(p => p.id === id);
-  
+    
+    console.log('participants:',participants,'/nDetached: ', detached);
     if (detached) {
       this.detachedParticipant$.next([...this.detachedParticipant$.value, detached]);
       this.participant$.next(participants);
@@ -290,6 +292,7 @@ export class VideoRoomService {
   
   reattachParticipant(id: string) {
     const detached = this.detachedParticipant$.value.find(p => p.id === id);
+    console.log('Detached:', detached,'/n id: ', id);
     if (detached) {
       const updatedDetached = this.detachedParticipant$.value.filter(p => p.id !== id);
       this.detachedParticipant$.next(updatedDetached);
