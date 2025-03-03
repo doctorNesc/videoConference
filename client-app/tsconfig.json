@@ -7,7 +7,6 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "~":["src/app/*"],
       "@node-modules":["node_modules/*"]
     },
     "noImplicitOverride": true,

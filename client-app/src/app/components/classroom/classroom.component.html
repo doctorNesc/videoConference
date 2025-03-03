@@ -1,0 +1,8 @@
+<select (change)="onCameraChange($event)">
+    <option *ngFor="let camera of cameras" [value]="camera.deviceId">
+      {{ camera.label || 'Camera ' + (cameras.indexOf(camera) + 1) }}
+    </option>
+  </select>
+  
+  <video #videoElement autoplay playsinline></video>
+  
