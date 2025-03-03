@@ -25,15 +25,15 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public mainParticipant!: { id: string; stream: MediaStream };
   public mainView: boolean = false;
   public localVideo: any;
-
+  public roomName!:string;
   constructor(
     private route: ActivatedRoute,
     protected videoService: VideoRoomService
   ) {}
 
   ngOnInit(): void {
-    let roomName = this.route.snapshot.paramMap.get('roomName') || '';
-    this.videoService.initializeSocket(roomName);
+    this.roomName = this.route.snapshot.paramMap.get('roomName') || '';
+    this.videoService.initializeSocket(this.roomName);
 
     this.videoService.getParticipants().subscribe((participants) => {
       this.participants = participants;

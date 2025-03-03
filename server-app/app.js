@@ -50,8 +50,6 @@ app.get("*", (req, res) => {
   );
 });
 
-// app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
-
 // Media codecs configuration
 const mediaCodecs = [
   { kind: "audio", mimeType: "audio/opus", clockRate: 48000, channels: 2 },
@@ -68,7 +66,15 @@ httpServer.listen(3000, () => {
   console.log("listening on port: " + 3000);
 });
 
-const io = new Server(httpServer);
+const io = new Server(httpServer,
+   {
+  cors: {
+    origin: "http://localhost:4200",
+    // methods: ["GET", "POST"],
+    // credentials: true,
+  },
+}
+);
 
 // socket.io namespace for connecting server and client sockets
 const connections = io.of("/mediasoup");
@@ -144,7 +150,7 @@ connections.on("connection", async (socket) => {
       peers = rooms[roomName].peers || [];
     } else {
       router = await worker.createRouter({ mediaCodecs });
-      isAdmin = true;
+      isAdmin = true; //if room is new, first user to create it will be an admin
     }
 
     console.log(`Router ID: ${router.id}`, peers.length);
@@ -249,11 +255,17 @@ connections.on("connection", async (socket) => {
     });
   };
 
+  // const getTransport = (socketId) => {
+  //   const [producerTransport] = transports.filter(
+  //     (transport) => transport.socketId === socketId && !transport.consumer
+  //   );
+  //   return producerTransport.transport;
+  // };
   const getTransport = (socketId) => {
-    const [producerTransport] = transports.filter(
+    const producerTransport = transports.find(
       (transport) => transport.socketId === socketId && !transport.consumer
     );
-    return producerTransport.transport;
+    return producerTransport?.transport; // Optional chaining to avoid errors if not found
   };
 
   // see client's socket.emit('transport-connect', ...)
@@ -267,25 +279,22 @@ connections.on("connection", async (socket) => {
   });
 
   // see client's socket.emit('transport-produce', ...)
-  socket.on(
-    "transport-produce",
-    async ({ kind, rtpParameters }, callback) => {
-      // call produce based on the prameters from the client
-      const transport = getTransport(socket.id);
-      const producer = await transport.produce({ kind, rtpParameters });
-      const roomName = peers[socket.id].roomName;
+  socket.on("transport-produce", async ({ kind, rtpParameters }, callback) => {
+    // call produce based on the prameters from the client
+    const transport = getTransport(socket.id);
+    const producer = await transport.produce({ kind, rtpParameters });
+    const roomName = peers[socket.id].roomName;
 
-      console.log("Producer ID: ", producer.id, producer.kind);
+    console.log("Producer ID: ", producer.id, producer.kind);
 
-      addProducer(producer, roomName);
-      informConsumers(roomName, socket.id, producer.id);
-      // Send back to the client the Producer's id
-      callback({
-        id: producer.id,
-        producersExist: producers.length > 1 ? true : false,
-      });
-    }
-  );
+    addProducer(producer, roomName);
+    informConsumers(roomName, socket.id, producer.id);
+    // Send back to the client the Producer's id
+    callback({
+      id: producer.id,
+      producersExist: producers.length > 1 ? true : false,
+    });
+  });
 
   socket.on(
     "consume",
@@ -426,7 +435,7 @@ const createWebRtcTransport = async (router) => {
         listenIps: [
           {
             ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.1.250", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
+            announcedIp: "147.175.122.168", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
           },
         ],
         enableUdp: true,

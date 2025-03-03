@@ -11,8 +11,8 @@ export class VideoRoomService {
     { id: string; stream: MediaStream }[]
   >([]);
   private detachedParticipant$ = new BehaviorSubject<
-  { id: string; stream: MediaStream }[]
->([]);
+    { id: string; stream: MediaStream }[]
+  >([]);
 
   public mainParticipant = new BehaviorSubject<{
     id: string;
@@ -41,7 +41,7 @@ export class VideoRoomService {
 
   initializeSocket(roomName: string) {
     this.roomName = roomName;
-    this.socket = io('/mediasoup');
+    this.socket = io('http://localhost:3000/mediasoup');
 
     this.socket.on('connection-success', ({ socketId }: any) => {
       console.log('Connected with socket ID:', socketId);
@@ -279,31 +279,34 @@ export class VideoRoomService {
   }
 
   detachParticipant(id: string) {
+    const participants = this.participant$.value.filter((p) => p.id !== id);
+    const detached = this.participant$.value.find((p) => p.id === id);
 
-    const participants = this.participant$.value.filter(p => p.id !== id);
-    const detached = this.participant$.value.find(p => p.id === id);
-    
-    console.log('participants:',participants,'/nDetached: ', detached);
+    console.log('participants:', participants, '/nDetached: ', detached);
     if (detached) {
-      this.detachedParticipant$.next([...this.detachedParticipant$.value, detached]);
+      this.detachedParticipant$.next([
+        ...this.detachedParticipant$.value,
+        detached,
+      ]);
       this.participant$.next(participants);
     }
   }
-  
+
   reattachParticipant(id: string) {
-    const detached = this.detachedParticipant$.value.find(p => p.id === id);
-    console.log('Detached:', detached,'/n id: ', id);
+    const detached = this.detachedParticipant$.value.find((p) => p.id === id);
+    console.log('Detached:', detached, '/n id: ', id);
     if (detached) {
-      const updatedDetached = this.detachedParticipant$.value.filter(p => p.id !== id);
+      const updatedDetached = this.detachedParticipant$.value.filter(
+        (p) => p.id !== id
+      );
       this.detachedParticipant$.next(updatedDetached);
       this.participant$.next([...this.participant$.value, detached]);
     }
   }
-  
+
   getDetachedParticipants(): Observable<{ id: string; stream: MediaStream }[]> {
     return this.detachedParticipant$.asObservable();
   }
-  
 
   disconnectAndCleanUp() {
     // Clean up socket connection
@@ -335,10 +338,7 @@ export class VideoRoomService {
 
   addParticipant(remoteProducerId: string, stream: MediaStream) {
     const participant = this.participant$.value;
-    this.participant$.next([
-      ...participant,
-      { id: remoteProducerId, stream },
-    ]);
+    this.participant$.next([...participant, { id: remoteProducerId, stream }]);
     // if (this.participant.length > 12 && !this.mainParticipant) {
     //   this.mainParticipant = this.participant[0];
     //   this.mainView = true;

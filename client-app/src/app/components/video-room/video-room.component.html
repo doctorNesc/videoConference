@@ -26,5 +26,5 @@
     <video id="localVideo" class="local-video" autoplay playsinline muted></video>
   </div>
 
-  <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()"></app-video-options>
+  <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()" [roomName]="roomName"></app-video-options>
 </div>

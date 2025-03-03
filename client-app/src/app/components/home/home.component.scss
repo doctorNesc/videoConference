@@ -1,0 +1,38 @@
+main {
+  display: flex;
+  flex-direction: row; /* Stack items vertically */
+  align-items: center; /* Center horizontally */
+  justify-content: center; /* Center vertically */
+  height: 100vh; /* Make it take the full viewport height */
+}
+
+input {
+  padding-left: 40px;
+}
+
+.input-icon {
+  position: absolute;
+  padding: 9px;
+}
+
+.join-btn {
+  cursor: pointer;
+  border: 0;
+  color: blue;
+  background-color: transparent;
+  margin-left: 10px;
+  &:disabled {
+    color: lightgray;
+  }
+}
+
+.create-btn {
+  padding: 9px 20px;
+  margin-right: 10px;
+  padding-left: 40px;
+  cursor: pointer;
+  background-color: blue;
+  color: #fff;
+  border: 0;
+  border-radius: 20px;
+}
