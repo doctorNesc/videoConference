@@ -4,11 +4,13 @@ import { HomeComponent } from './components/home/home.component';
 import { AppComponent } from './app.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { ClassroomComponent } from './components/classroom/classroom.component';
+import { RealSpaceComponent } from './components/real-space/real-space.component';
 
 export const routes: Routes = [
   { path: 'admin', component: AdminComponent },
   { path: 'hello', component: HomeComponent },
   { path: 'classRoom', component: ClassroomComponent },
   { path: 'sfu/:roomName', component: VideoRoomComponent },
+  { path: 'B405', component: RealSpaceComponent },
   { path: '**', redirectTo: '/hello', pathMatch: 'full' },
 ];

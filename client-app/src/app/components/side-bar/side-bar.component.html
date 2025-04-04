@@ -1,0 +1,10 @@
+<div class="sidebar" [ngClass]="{ 'sidebar-collapsed': isSidebarCollapsed }">
+    <div class="sidebar-header">
+      <h6>People on this conference</h6>
+      <a (click)="sidebarToggle.emit()" class="create-btn">
+        <span class="material-symbols-outlined">close</span>
+      </a>
+    </div>
+    <ng-content></ng-content>
+  </div>
+  

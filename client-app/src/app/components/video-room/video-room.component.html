@@ -1,30 +1,57 @@
-<div class="d-flex flex-column bg-dark text-white room-container">
+<div class="d-flex flex-row bg-dark text-white h-100">
 
-  <!-- Big video -->
-  <div *ngIf="mainView || participants.length > 12" class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container" (click)="removeMainParticipant()">
-    <video id="mainVideo" class="main-video mb-3 mt-3" autoplay playsinline [srcObject]="mainParticipant.stream"></video>
-  </div>
+  <div class="main-content d-flex flex-column flex-grow-1">
 
-  <!-- Video grid -->
-   <div class="grid-content">
-    <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
-      <app-participant style="width: 400px;" *ngFor="let participant of participants" [stream]="participant.stream" class="video-item" 
-      (setMainParticipant)="setMainParticipant(participant)" (detach)="detachParticipant(participant)" appResizable></app-participant>
-  </div>
-
-   </div>
-
-  <!-- Scrollable bar -->
-  <div *ngIf="mainView || participants.length > 12" class="video-bar">
-    <div class="video-thumbnail" *ngFor="let participant of participants">
-      <app-participant [stream]="participant.stream" (setMainParticipant)="setMainParticipant(participant)"></app-participant>
+    <!-- Big video -->
+    <div *ngIf="mainView || participants.length > 12"
+      class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container"
+      (click)="removeMainParticipant()">
+      <video id="mainVideo" class="main-video mb-3 mt-3" autoplay playsinline
+        [srcObject]="mainParticipant.stream"></video>
     </div>
+
+    <!-- Video grid -->
+    <div class="grid-content">
+      <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
+        <app-participant style="width: 400px;" *ngFor="let participant of participants" [stream]="participant.stream"
+          class="video-item" (setMainParticipant)="setMainParticipant(participant)"
+          (detach)="detachParticipant(participant)" appResizable></app-participant>
+      </div>
+
+    </div>
+
+    <!-- Scrollable bar -->
+    <div *ngIf="mainView || participants.length > 12" class="video-bar">
+      <div class="video-thumbnail" *ngFor="let participant of participants">
+        <app-participant [stream]="participant.stream" (setMainParticipant)="setMainParticipant(participant)"
+          (detach)="detachParticipant(participant)"></app-participant>
+      </div>
+    </div>
+
+    <!-- Local video pinned at the bottom right -->
+    <div class="local-video-container">
+      <video id="localVideo" class="local-video" autoplay playsinline muted></video>
+    </div>
+
+    <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()"
+      [roomName]="roomName" (showUsersPanel)="onSidebarToggle()"></app-video-options>
+
   </div>
 
-  <!-- Local video pinned at the bottom right -->
-  <div class="local-video-container">
-    <video id="localVideo" class="local-video" autoplay playsinline muted></video>
-  </div>
+  <app-side-bar class="sidebar" [isSidebarCollapsed]="isSidebarCollapsed" (sidebarToggle)="onSidebarToggle()">
+    <div class="chat-container">
+      <div class="messages">
+        <div *ngFor="let msg of messages">
+          <p><strong>{{ msg.sender }}:</strong> {{ msg.message }}</p>
+        </div>
+      </div>
 
-  <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()" [roomName]="roomName"></app-video-options>
+      <form [formGroup]="messageForm" (ngSubmit)="onSubmit()" class="msg-input">
+        <input type="text" formControlName="message" placeholder="Type a message..." />
+        <button type="submit" [disabled]="!messageForm.valid">Send</button>
+      </form>
+    </div>
+
+  </app-side-bar>
+
 </div>

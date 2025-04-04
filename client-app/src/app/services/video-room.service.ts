@@ -1,7 +1,12 @@
 import { Injectable } from '@angular/core';
 import * as mediasoupClient from 'mediasoup-client';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
+export interface ChatMessage {
+  sender: string;
+  message: string;
+  timestamp: string;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -19,7 +24,7 @@ export class VideoRoomService {
     stream: MediaStream;
   }>({} as { id: string; stream: MediaStream });
   public mainView: boolean = false;
-  private socket: any;
+  private socket!: Socket;
   private device: any;
   private producerTransport: any;
   private consumerTransports: any[] = [];
@@ -28,6 +33,10 @@ export class VideoRoomService {
   private rtpCapabilities: any;
   public isProducer: boolean = false;
   public localVideo: any;
+  private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
+  public messages$: Observable<ChatMessage[]> = this.messagesSubject.asObservable();
+  private screenStream!: MediaStream;
+  private isSharingScreen = false;
   public params: any = {
     encodings: [
       { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
@@ -37,7 +46,7 @@ export class VideoRoomService {
     codecOptions: { videoGoogleStartBitrate: 1000 },
   };
 
-  constructor() {}
+  constructor() { }
 
   initializeSocket(roomName: string) {
     this.roomName = roomName;
@@ -51,6 +60,12 @@ export class VideoRoomService {
     this.socket.on('new-producer', ({ producerId }: any) => {
       this.signalNewConsumerTransport(producerId);
     });
+
+    this.socket.on("receiveMessage", (msg: ChatMessage) => {
+      const currentMessages = this.messagesSubject.value;
+      this.messagesSubject.next([...currentMessages, msg]);
+    });
+
 
     this.socket.on('producer-closed', ({ remoteProducerId }: any) => {
       this.handleProducerClosed(remoteProducerId);
@@ -257,6 +272,23 @@ export class VideoRoomService {
     );
   }
 
+  sendMessage(message: string , sender: string, roomName: string) {
+    const chatMessage: ChatMessage = {
+      sender,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.socket.emit('sendMessage', { roomName, message });
+
+    const currentMessages = this.messagesSubject.value;
+    this.messagesSubject.next([...currentMessages, chatMessage]);
+  }
+
+  getMessages(): Observable<ChatMessage[]> {
+    return this.messages$;
+  }
+
   handleProducerClosed(remoteProducerId: string) {
     const producerToClose = this.consumerTransports.find(
       (transportData) => transportData.producerId === remoteProducerId
@@ -385,4 +417,45 @@ export class VideoRoomService {
       audioTrack.enabled = !audioTrack.enabled; // Toggle audio track
     }
   }
+
+  async startScreenShare(userId: string) {
+    try {
+      this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+        // video: { cursor: 'always' },
+        audio: false, // Disable audio for screen sharing
+      });
+
+      this.isSharingScreen = true;
+
+      // Notify server about new screen share stream
+      this.socket.emit('newScreenStream', { userId });
+
+      // Send screen share as a new participant stream
+      this.addParticipantStream(userId + '_screen', this.screenStream);
+    } catch (error) {
+      console.error('Error starting screen share:', error);
+    }
+  }
+  stopScreenShare(userId: string) {
+    if (!this.isSharingScreen) return;
+
+    this.screenStream.getTracks().forEach(track => track.stop());
+    this.isSharingScreen = false;
+
+    // Notify server
+    this.socket.emit('screenStreamStopped', { userId });
+
+    // Remove screen stream from participants list
+    this.removeParticipantStream(userId + '_screen');
+  }
+
+  private addParticipantStream(participantId: string, stream: MediaStream) {
+    this.participant$.next([...this.participant$.value, { id: participantId, stream }]);
+  }
+
+  // Function to remove a participant (used for screen share stopping)
+  private removeParticipantStream(participantId: string) {
+    this.participant$.next(this.participant$.value.filter(p => p.id !== participantId));
+  }
+
 }

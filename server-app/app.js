@@ -67,20 +67,20 @@ httpServer.listen(3000, () => {
 });
 
 const io = new Server(httpServer,
-   {
-  cors: {
-    origin: "http://localhost:4200",
-    // methods: ["GET", "POST"],
-    // credentials: true,
-  },
-}
+  {
+    cors: {
+      origin: "http://localhost:4200",
+      // methods: ["GET", "POST"],
+      // credentials: true,
+    },
+  }
 );
 
 // socket.io namespace for connecting server and client sockets
 const connections = io.of("/mediasoup");
 
 let worker;
-let rooms = {}; // { roomName1: { Router, rooms: [ sicketId1, ... ] }, ...}
+let rooms = {}; // { roomName1: { Router, rooms: [ socketId1, ... ] }, ...}
 let peers = {}; // { socketId1: { roomName1, socket, transports = [id1, id2,], producers = [id1, id2,], consumers = [id1, id2,], peerDetails }, ...}
 let transports = []; // [ { socketId1, roomName1, transport, consumer }, ... ]
 let producers = []; // [ { socketId1, roomName1, producer, }, ... ]
@@ -255,12 +255,6 @@ connections.on("connection", async (socket) => {
     });
   };
 
-  // const getTransport = (socketId) => {
-  //   const [producerTransport] = transports.filter(
-  //     (transport) => transport.socketId === socketId && !transport.consumer
-  //   );
-  //   return producerTransport.transport;
-  // };
   const getTransport = (socketId) => {
     const producerTransport = transports.find(
       (transport) => transport.socketId === socketId && !transport.consumer
@@ -309,7 +303,7 @@ connections.on("connection", async (socket) => {
           (transportData) =>
             transportData.consumer &&
             transportData.transport.id == serverConsumerTransportId
-        ).transport;
+        )?.transport;
 
         // check if the router can consume the specified producer
         if (
@@ -395,6 +389,23 @@ connections.on("connection", async (socket) => {
     }
   );
 
+  socket.on("sendMessage", ({ roomName, message }) => {
+    if (!roomName || !peers[socket.id]) return;
+
+    const senderName = peers[socket.id].peerDetails.name || "Unknown";
+
+    for (let peer of Object.values(peers)) {
+        if (peer.roomName === roomName) {
+          peer.socket.id != socket.id && connections.to(peer.socket.id).emit("receiveMessage", {
+                sender: senderName,
+                message,
+                timestamp: new Date().toISOString(),
+            });
+        }
+    }
+});
+
+
   socket.on("disconnect", () => {
     console.log("peer disconnected");
 
@@ -435,7 +446,7 @@ const createWebRtcTransport = async (router) => {
         listenIps: [
           {
             ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "147.175.122.168", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
+            announcedIp: "192.168.1.250", //PUBLIC_IP_OF_INSTANCE : 16.170.244.236
           },
         ],
         enableUdp: true,

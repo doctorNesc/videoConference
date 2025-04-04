@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { io } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
@@ -6,7 +6,9 @@ import { CommonModule } from '@angular/common';
 import { ParticipantComponent } from '../participant/participant.component';
 import { VideoOptionsComponent } from '../video-options/video-options.component';
 import { ResizableDirective } from '../../directives/app-resizable.directive';
-import { VideoRoomService } from '../../services/video-room.service';
+import { ChatMessage, VideoRoomService } from '../../services/video-room.service';
+import { SideBarComponent } from '../side-bar/side-bar.component';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 
 @Component({
   selector: 'app-video-room',
@@ -16,6 +18,8 @@ import { VideoRoomService } from '../../services/video-room.service';
     ParticipantComponent,
     VideoOptionsComponent,
     ResizableDirective,
+    SideBarComponent,
+    ReactiveFormsModule
   ],
   templateUrl: './video-room.component.html',
   styleUrls: ['./video-room.component.scss'],
@@ -25,11 +29,24 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public mainParticipant!: { id: string; stream: MediaStream };
   public mainView: boolean = false;
   public localVideo: any;
-  public roomName!:string;
+  public roomName!: string;
+  public messages: ChatMessage[] = [];
+  public newMessage: string = '';
+  public isSidebarCollapsed = false;
+  public messageForm = new FormGroup({
+    message: new FormControl('', Validators.min(1))
+  });
+
   constructor(
     private route: ActivatedRoute,
     protected videoService: VideoRoomService
-  ) {}
+  ) { }
+
+  // @HostListener('window:beforeunload', ['$event'])
+  // handleClose(e: BeforeUnloadEvent): void {
+  //   console.log('test');
+  //   e.preventDefault();
+  // }
 
   ngOnInit(): void {
     this.roomName = this.route.snapshot.paramMap.get('roomName') || '';
@@ -38,6 +55,11 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.videoService.getParticipants().subscribe((participants) => {
       this.participants = participants;
     });
+
+    this.videoService.getMessages().subscribe((messages) => {
+      this.messages = messages;
+    });
+
   }
 
   ngOnDestroy(): void {
@@ -74,17 +96,24 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         // videoElement.play();
         // videoElement.muted = false;
       }, 0);
-      // setTimeout(() => {
-      //   const videoElement = detachedTab.document.querySelector(
-      //     'video'
-      //   ) as HTMLVideoElement;
-      //   // videoElement.play();
-      //   videoElement.muted = false;
-      // }, 1000);
+      const interval = setInterval(() => {
+        if (detachedTab.closed) {
+          console.log("reattached");
+          this.videoService.reattachParticipant(participant.id);
+          clearInterval(interval);
+        }
+      }, 500);
 
-      detachedTab.onbeforeunload = () => {
-        this.videoService.reattachParticipant(participant.id);
-      };
     }
   }
+
+  onSubmit() {
+    this.messageForm.value && this.videoService.sendMessage(this.messageForm.value.message as any, 'Me', this.roomName);
+    this.messageForm.reset(); // Clear input field
+  }
+
+  onSidebarToggle() {
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+  }
+
 }

@@ -3,5 +3,12 @@
     "target": "http://localhost:3000",
     "secure": false,
     "logLevel": "debug"
+  },
+  "/mediasoup":{
+    "target":"http://localhost:3000",
+    "secure":false,
+    "logLevel":"debug",
+    "websocket":true,
+    "changeOrigin":true
   }
 }

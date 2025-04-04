@@ -22,6 +22,7 @@
     "@angular/platform-server": "^18.1.0",
     "@angular/router": "^18.1.0",
     "@angular/ssr": "^18.1.4",
+    "@types/three": "^0.174.0",
     "bootstrap": "^5.3.3",
     "express": "^4.18.2",
     "httpolyglot": "^0.1.2",
@@ -31,6 +32,7 @@
     "rxjs": "~7.8.0",
     "socket.io": "^4.8.0",
     "socket.io-client": "^4.8.0",
+    "three": "^0.174.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.14.3"
   },
