@@ -28,11 +28,11 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public participants: { id: string; stream: MediaStream }[] = [];
   public mainParticipant!: { id: string; stream: MediaStream };
   public mainView: boolean = false;
-  public localVideo: any;
+  // public localVideo: any;
   public roomName!: string;
   public messages: ChatMessage[] = [];
   public newMessage: string = '';
-  public isSidebarCollapsed = false;
+  public isSidebarCollapsed = true;
   public messageForm = new FormGroup({
     message: new FormControl('', Validators.min(1))
   });
@@ -109,7 +109,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
   onSubmit() {
     this.messageForm.value && this.videoService.sendMessage(this.messageForm.value.message as any, 'Me', this.roomName);
-    this.messageForm.reset(); // Clear input field
+    this.messageForm.reset();
   }
 
   onSidebarToggle() {

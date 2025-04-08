@@ -82,7 +82,7 @@ const connections = io.of("/mediasoup");
 let worker;
 let rooms = {}; // { roomName1: { Router, rooms: [ socketId1, ... ] }, ...}
 let peers = {}; // { socketId1: { roomName1, socket, transports = [id1, id2,], producers = [id1, id2,], consumers = [id1, id2,], peerDetails }, ...}
-let transports = []; // [ { socketId1, roomName1, transport, consumer }, ... ]
+let transports = []; // [ { socketId1, roomName1, transport, isConsumer }, ... ]
 let producers = []; // [ { socketId1, roomName1, producer, }, ... ]
 let consumers = []; // [ { socketId1, roomName1, consumer, }, ... ]
 
@@ -109,7 +109,6 @@ const createWorker = async () => {
   worker = await createWorker();
 })();
 
-// Handle socket connections
 connections.on("connection", async (socket) => {
   //The "connection" event is triggered whenever a client successfully connects to the /mediasoup namespace
   //after connection, new socket object is created for that specific client connection
@@ -165,7 +164,7 @@ connections.on("connection", async (socket) => {
 
   // client emits a request to create server side Transport
   // need to differentiate between the producer and consumer transports
-  socket.on("createWebRtcTransport", async ({ consumer }, callback) => {
+  socket.on("createWebRtcTransport", async ({ isConsumer }, callback) => {
     try {
       // get room name from peer's props
       const roomName = peers[socket.id].roomName;
@@ -173,7 +172,7 @@ connections.on("connection", async (socket) => {
 
       const transport = await createWebRtcTransport(router);
       // add transport to Peer's props
-      addTransport(transport, roomName, consumer);
+      addTransport(transport, roomName, isConsumer);
 
       callback({
         params: {
@@ -188,10 +187,10 @@ connections.on("connection", async (socket) => {
     }
   });
 
-  const addTransport = (transport, roomname, consumer) => {
+  const addTransport = (transport, roomname, isConsumer) => {
     transports = [
       ...transports,
-      { socketId: socket.id, transport, roomname, consumer },
+      { socketId: socket.id, transport, roomname, isConsumer },
     ];
 
     peers[socket.id] = {
@@ -301,7 +300,7 @@ connections.on("connection", async (socket) => {
         const router = rooms[roomName].router;
         let consumerTransport = transports.find(
           (transportData) =>
-            transportData.consumer &&
+            transportData.isConsumer &&
             transportData.transport.id == serverConsumerTransportId
         )?.transport;
 
@@ -382,7 +381,7 @@ connections.on("connection", async (socket) => {
       console.log(`DTLS PARAMS: ${dtlsParameters}`);
       const consumerTransport = transports.find(
         (transportData) =>
-          transportData.consumer &&
+          transportData.isConsumer &&
           transportData.transport.id == serverConsumerTransportId
       ).transport;
       await consumerTransport.connect({ dtlsParameters });

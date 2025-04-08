@@ -25,7 +25,7 @@ export class VideoRoomService {
   }>({} as { id: string; stream: MediaStream });
   public mainView: boolean = false;
   private socket!: Socket;
-  private device: any;
+  private device!: mediasoupClient.Device;
   private producerTransport: any;
   private consumerTransports: any[] = [];
   protected producer: any;
@@ -33,8 +33,10 @@ export class VideoRoomService {
   private rtpCapabilities: any;
   public isProducer: boolean = false;
   public localVideo: any;
+  public localStream!: MediaStream;
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   public messages$: Observable<ChatMessage[]> = this.messagesSubject.asObservable();
+  public videoStream!: MediaStream;
   private screenStream!: MediaStream;
   private isSharingScreen = false;
   public params: any = {
@@ -74,7 +76,7 @@ export class VideoRoomService {
 
   async getLocalStream() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      this.videoStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           width: { min: 640, max: 1920 },
@@ -84,10 +86,10 @@ export class VideoRoomService {
 
       this.localVideo = document.querySelector('#localVideo');
       if (this.localVideo) {
-        this.localVideo.srcObject = stream;
+        this.localVideo.srcObject = this.videoStream;
       }
-      const track = stream.getVideoTracks()[0];
-      this.params = { track, ...this.params };
+      // const track = this.videoStream.getVideoTracks()[0];
+      // this.params = { track, ...this.params };
 
       this.joinRoom();
     } catch (error) {
@@ -118,64 +120,63 @@ export class VideoRoomService {
   }
 
   createSendTransport() {
-    this.socket.emit(
-      'createWebRtcTransport',
-      { consumer: false },
-      ({ params }: any) => {
-        if (params.error) {
-          console.error(params.error);
-          return;
-        }
-
-        console.log('Create WebRTC Transport params:', params);
-
-        this.producerTransport = this.device.createSendTransport(params);
-
-        this.producerTransport.on(
-          'connect',
-          async (
-            { dtlsParameters }: any,
-            callback: Function,
-            errback: Function
-          ) => {
-            try {
-              await this.socket.emit('transport-connect', { dtlsParameters });
-              callback();
-            } catch (error) {
-              errback(error);
-            }
-          }
-        );
-
-        this.producerTransport.on(
-          'produce',
-          async (parameters: any, callback: Function, errback: Function) => {
-            try {
-              await this.socket.emit(
-                'transport-produce',
-                {
-                  kind: parameters.kind,
-                  rtpParameters: parameters.rtpParameters,
-                  appData: parameters.appData,
-                },
-                ({ id, producersExist }: any) => {
-                  callback({ id });
-                  if (producersExist) this.getProducers();
-                }
-              );
-            } catch (error) {
-              errback(error);
-            }
-          }
-        );
-
-        this.connectSendTransport();
+    this.socket.emit('createWebRtcTransport', { isConsumer: false }, ({ params }: any) => {
+      if (params.error) {
+        console.error(params.error);
+        return;
       }
+
+      console.log('Create WebRTC Transport params:', params);
+
+      this.producerTransport = this.device.createSendTransport(params);
+
+      this.producerTransport.on(
+        'connect',
+        async (
+          { dtlsParameters }: any,
+          callback: Function,
+          errback: Function
+        ) => {
+          try {
+            await this.socket.emit('transport-connect', { dtlsParameters });
+            callback();
+          } catch (error) {
+            errback(error);
+          }
+        }
+      );
+
+      this.producerTransport.on(
+        'produce',
+        async (parameters: any, callback: Function, errback: Function) => {
+          try {
+            await this.socket.emit(
+              'transport-produce',
+              {
+                kind: parameters.kind,
+                rtpParameters: parameters.rtpParameters,
+                appData: parameters.appData,
+              },
+              ({ id, producersExist }: any) => {
+                callback({ id });
+                if (producersExist) this.getProducers();
+              }
+            );
+          } catch (error) {
+            errback(error);
+          }
+        }
+      );
+
+      this.connectSendTransport();
+    }
     );
   }
 
   async connectSendTransport() {
     try {
+      const track  =await this.videoStream.getVideoTracks()[0];
+      this.params = { track, ...this.params };
       this.producer = await this.producerTransport.produce(this.params);
       this.producer.on('trackended', () => console.log('Track ended'));
       this.producer.on('transportclose', () => console.log('Transport closed'));
@@ -187,7 +188,7 @@ export class VideoRoomService {
   async signalNewConsumerTransport(remoteProducerId: string) {
     await this.socket.emit(
       'createWebRtcTransport',
-      { consumer: true },
+      { isConsumer: true },
       ({ params }: any) => {
         if (params.error) {
           console.error(params.error);
@@ -272,7 +273,7 @@ export class VideoRoomService {
     );
   }
 
-  sendMessage(message: string , sender: string, roomName: string) {
+  sendMessage(message: string, sender: string, roomName: string) {
     const chatMessage: ChatMessage = {
       sender,
       message,
@@ -369,12 +370,7 @@ export class VideoRoomService {
   }
 
   addParticipant(remoteProducerId: string, stream: MediaStream) {
-    const participant = this.participant$.value;
-    this.participant$.next([...participant, { id: remoteProducerId, stream }]);
-    // if (this.participant.length > 12 && !this.mainParticipant) {
-    //   this.mainParticipant = this.participant[0];
-    //   this.mainView = true;
-    // }
+    this.participant$.next([...this.participant$.value, { id: remoteProducerId, stream }]);
     console.log('Participants:', this.participant$.value);
   }
 
@@ -417,45 +413,24 @@ export class VideoRoomService {
       audioTrack.enabled = !audioTrack.enabled; // Toggle audio track
     }
   }
+  private screenTransport!: any;
+  private screenProducer!: any;
 
-  async startScreenShare(userId: string) {
-    try {
-      this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-        // video: { cursor: 'always' },
-        audio: false, // Disable audio for screen sharing
-      });
 
-      this.isSharingScreen = true;
+  async startScreenShare() {
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
 
-      // Notify server about new screen share stream
-      this.socket.emit('newScreenStream', { userId });
-
-      // Send screen share as a new participant stream
-      this.addParticipantStream(userId + '_screen', this.screenStream);
-    } catch (error) {
-      console.error('Error starting screen share:', error);
-    }
-  }
-  stopScreenShare(userId: string) {
-    if (!this.isSharingScreen) return;
-
-    this.screenStream.getTracks().forEach(track => track.stop());
-    this.isSharingScreen = false;
-
-    // Notify server
-    this.socket.emit('screenStreamStopped', { userId });
-
-    // Remove screen stream from participants list
-    this.removeParticipantStream(userId + '_screen');
+    this.createSendTransport();
   }
 
-  private addParticipantStream(participantId: string, stream: MediaStream) {
-    this.participant$.next([...this.participant$.value, { id: participantId, stream }]);
-  }
+  // stopScreenShare() {
+  //   this.socket.emit('stopScreenShare', { roomId: this.roomId, userId: this.userId });
 
-  // Function to remove a participant (used for screen share stopping)
-  private removeParticipantStream(participantId: string) {
-    this.participant$.next(this.participant$.value.filter(p => p.id !== participantId));
-  }
+  //   if (this.screenProducer) {
+  //     this.screenProducer.close();
+  //     this.screenProducer = null;
+  //   }
+  // }
+
 
 }
