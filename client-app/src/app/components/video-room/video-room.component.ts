@@ -42,12 +42,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     protected videoService: VideoRoomService
   ) { }
 
-  // @HostListener('window:beforeunload', ['$event'])
-  // handleClose(e: BeforeUnloadEvent): void {
-  //   console.log('test');
-  //   e.preventDefault();
-  // }
-
   ngOnInit(): void {
     this.roomName = this.route.snapshot.paramMap.get('roomName') || '';
     this.videoService.initializeSocket(this.roomName);
@@ -115,5 +109,14 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   onSidebarToggle() {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
   }
+
+  startScreenShare() {
+    this.videoService.startScreenShare();
+  }
+
+  stopScreenShare() {
+    this.videoService.stopScreenShare();
+  }
+
 
 }

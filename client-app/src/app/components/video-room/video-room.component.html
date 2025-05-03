@@ -33,6 +33,8 @@
       <video id="localVideo" class="local-video" autoplay playsinline muted></video>
     </div>
 
+    <button (click)="startScreenShare()">Start Screen Sharing</button>
+    <button (click)="stopScreenShare()">Stop Screen Sharing</button>
     <app-video-options (videoToggle)="videoService.toggleLocalVideo()" (audioToggle)="videoService.toggleLocalAudio()"
       [roomName]="roomName" (showUsersPanel)="onSidebarToggle()"></app-video-options>
 
