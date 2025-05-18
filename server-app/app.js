@@ -436,8 +436,6 @@ connections.on("connection", async (socket) => {
   });
 
   socket.on("stopScreenShare", ({ roomName }) => {
-    console.log("stopped");
-
     transports = transports.filter(t => {
       if (t.socketId === socket.id && !t.isConsumer && t.isScreen) {
         t.transport.close();
@@ -470,7 +468,7 @@ connections.on("connection", async (socket) => {
       return true;
     });
 
-    socket.to(roomName).emit('screenShareStopped', { socketId: socket.id });
+    // socket.to(roomName).emit('screenShareStopped', { socketId: socket.id });
   });
 
 

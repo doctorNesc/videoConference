@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import * as mediasoupClient from 'mediasoup-client';
+import { Device, Transport, Consumer, Producer, RtpCapabilities } from 'mediasoup-client/lib/types';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
+
 export interface ChatMessage {
   sender: string;
   message: string;
@@ -25,24 +26,24 @@ export class VideoRoomService {
   }>({} as { id: string; stream: MediaStream });
   public mainView: boolean = false;
   private socket!: Socket;
-  private device!: mediasoupClient.Device;
-  private producerTransport: any;
-  private screenProducerTransport: any;
-  private consumerTransports: any[] = [];
+  private device!: Device;
+  private producerTransport!: Transport;
+  private screenProducerTransport!: Transport;
+  private consumerTransports: { consumerTransport: Transport, serverConsumerTransportId: string, producerId: string, consumer: Consumer; }[] = [];
   // private screenConsumerTransports: any[] = [];
-  protected producer: any;
-  private screenProducer: any;
+  protected producer!: Producer;
+  private screenProducer!: Producer;
   private roomName!: string;
-  private rtpCapabilities: any;
+  private rtpCapabilities!: RtpCapabilities;
   public isProducer: boolean = false;
-  public localVideo: any;
+  public localVideo!: any;
   public localStream!: MediaStream;
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   public messages$: Observable<ChatMessage[]> = this.messagesSubject.asObservable();
   public videoStream!: MediaStream;
   private screenStream!: MediaStream;
   private consumedProducerIds = new Set<string>();
-  private isSharingScreen = false;
+  private isSharingScreen: boolean = false;
   public params: any = {
     encodings: [
       { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
@@ -76,6 +77,12 @@ export class VideoRoomService {
     this.socket.on('producer-closed', ({ remoteProducerId }: any) => {
       this.handleProducerClosed(remoteProducerId);
     });
+
+    // this.socket.on('screenShareStopped', ({ socketId }) => {
+    //   // remove that participant’s screen stream from your UI
+    //   this.screenStreams = this.screenStreams.filter(s => s.id !== socketId);
+    // });
+
   }
 
   async getLocalStream() {
@@ -111,7 +118,7 @@ export class VideoRoomService {
 
   async createDevice() {
     try {
-      this.device = new mediasoupClient.Device();
+      this.device = new Device();
       await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
       console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
       this.createSendTransport('video');
@@ -290,7 +297,7 @@ export class VideoRoomService {
     );
   }
 
-  async connectRecvTransport(consumerTransport: any, remoteProducerId: string, serverConsumerTransportId: string, mediaType: streamType) {
+  async connectRecvTransport(consumerTransport: Transport, remoteProducerId: string, serverConsumerTransportId: string, mediaType: streamType) {
     await this.socket.emit('consume', { rtpCapabilities: this.device.rtpCapabilities, remoteProducerId, serverConsumerTransportId, mediaType },
       async ({ params }: any) => {
         if (params.error) {
@@ -405,7 +412,7 @@ export class VideoRoomService {
     // Clean up Mediasoup transports
     this.producerTransport && this.producerTransport.close();
     this.producer && this.producer.close();
-    
+
     this.consumerTransports.forEach((transportData) => {
       transportData.consumerTransport.close();
       transportData.consumer.close();
@@ -488,10 +495,9 @@ export class VideoRoomService {
 
   stopScreenShare() {
     this.screenProducer.close();
-    this.screenProducer = null;
 
     this.screenProducerTransport.close();
-    this.screenProducerTransport = null;
+    // this.screenProducerTransport = null;
 
     this.isSharingScreen = false;
 
