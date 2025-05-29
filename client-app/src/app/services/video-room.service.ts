@@ -501,11 +501,11 @@ export class VideoRoomService {
 
     this.isSharingScreen = false;
 
-    this.socket.emit('stopScreenShare', { roomName: this.roomName });
-    const participant = this.participant$.value.filter(
+    this.socket.emit('stopScreenShare', { roomName: this.roomName, producerId: this.screenProducer.id });
+    const participants = this.participant$.value.filter(
       (particicipant) => particicipant.id != 'screen'
     );
-    this.participant$.next(participant);    //stop local video stream display
+    this.participant$.next(participants);    //stop local video stream display
   }
 
 
