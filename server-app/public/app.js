@@ -62,7 +62,7 @@ const mediaCodecs = [
 ];
 
 const httpServer = http.createServer(app);
-httpServer.listen(3000,'0.0.0.0', () => {
+httpServer.listen(3000, "0.0.0.0", () => {
   console.log("listening on port: " + 3000);
 });
 
@@ -86,6 +86,8 @@ let producers = []; // [ { socketId1, roomName1, producer, }, ... ]
 let consumers = []; // [ { socketId1, roomName1, consumer, }, ... ]
 let _screenProducerTransports = {};
 // Will map from producerId (string) → { socketId, transport }
+// const mainRoomDevices = new Map(); // Maps userId to an array of device info
+// DeviceInfo: { socketId, peerId, ... }
 
 const createWorker = async () => {
   try {
@@ -500,7 +502,7 @@ connections.on("connection", async (socket) => {
       }
       return true;
     });
-    console.log('closed screen transport:', screenTransport.id);
+    console.log("closed screen transport:", screenTransport.id);
     // 3) Close and remove its send‐Transport
     screenTransport.close();
     transports = transports.filter((t) => {
