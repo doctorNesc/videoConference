@@ -6,9 +6,11 @@ import { CommonModule } from '@angular/common';
 import { ParticipantComponent } from '../participant/participant.component';
 import { VideoOptionsComponent } from '../video-options/video-options.component';
 import { ResizableDirective } from '../../directives/app-resizable.directive';
-import { ChatMessage, VideoRoomService } from '../../services/video-room.service';
+import { ChatMessage, VideoRoomService} from '../../services/video-room.service';
 import { SideBarComponent } from '../side-bar/side-bar.component';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormControl,FormGroup,FormsModule,ReactiveFormsModule,Validators,
+} from '@angular/forms';
 
 @Component({
   selector: 'app-video-room',
@@ -19,7 +21,7 @@ import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
     VideoOptionsComponent,
     ResizableDirective,
     SideBarComponent,
-    ReactiveFormsModule
+    ReactiveFormsModule,
   ],
   templateUrl: './video-room.component.html',
   styleUrls: ['./video-room.component.scss'],
@@ -34,13 +36,12 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public newMessage: string = '';
   public isSidebarCollapsed = true;
   public messageForm = new FormGroup({
-    message: new FormControl('', Validators.min(1))
+    message: new FormControl('', Validators.min(1)),
   });
-
   constructor(
     private route: ActivatedRoute,
     protected videoService: VideoRoomService
-  ) { }
+  ) {}
 
   ngOnInit(): void {
     this.roomName = this.route.snapshot.paramMap.get('roomName') || '';
@@ -53,7 +54,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.videoService.getMessages().subscribe((messages) => {
       this.messages = messages;
     });
-
   }
 
   ngOnDestroy(): void {
@@ -92,17 +92,21 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       }, 0);
       const interval = setInterval(() => {
         if (detachedTab.closed) {
-          console.log("reattached");
+          console.log('reattached');
           this.videoService.reattachParticipant(participant.id);
           clearInterval(interval);
         }
       }, 500);
-
     }
   }
 
   onSubmit() {
-    this.messageForm.value && this.videoService.sendMessage(this.messageForm.value.message as any, 'Me', this.roomName);
+    this.messageForm.value &&
+      this.videoService.sendMessage(
+        this.messageForm.value.message as any,
+        'Me',
+        this.roomName
+      );
     this.messageForm.reset();
   }
 
@@ -117,6 +121,4 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   stopScreenShare() {
     this.videoService.stopScreenShare();
   }
-
-
 }
