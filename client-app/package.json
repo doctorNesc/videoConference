@@ -10,6 +10,9 @@
     "serve:ssr:client-app": "node dist/client-app/server/server.mjs",
     "lint": "ng lint"
   },
+    "imports": {
+    "#*": "./src/*"
+  },
   "private": true,
   "dependencies": {
     "@angular/animations": "^18.1.0",
@@ -40,11 +43,13 @@
     "@angular-devkit/build-angular": "^18.1.4",
     "@angular/cli": "^18.1.4",
     "@angular/compiler-cli": "^18.1.0",
+    "@eslint/js": "^9.27.0",
     "@types/express": "^4.17.21",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^18.18.0",
     "angular-eslint": "18.4.0",
-    "eslint": "^9.13.0",
+    "eslint": "^9.27.0",
+    "eslint-plugin-perfectionist": "^4.13.0",
     "jasmine-core": "~5.1.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
@@ -52,6 +57,6 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "typescript": "~5.5.2",
-    "typescript-eslint": "8.10.0"
+    "typescript-eslint": "^8.10.0"
   }
 }

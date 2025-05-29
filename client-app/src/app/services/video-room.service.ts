@@ -19,17 +19,9 @@ export type streamType = 'video' | 'screen';
   providedIn: 'root',
 })
 export class VideoRoomService {
-  private participant$ = new BehaviorSubject<
-    { id: string; stream: MediaStream }[]
-  >([]);
-  private detachedParticipant$ = new BehaviorSubject<
-    { id: string; stream: MediaStream }[]
-  >([]);
-
-  public mainParticipant = new BehaviorSubject<{
-    id: string;
-    stream: MediaStream;
-  }>({} as { id: string; stream: MediaStream });
+  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream }[]>([]);
+  private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream }[]>([]);
+  public mainParticipant = new BehaviorSubject<{ id: string; stream: MediaStream; }>({} as { id: string; stream: MediaStream });
   public mainView: boolean = false;
   private socket!: Socket;
   private device!: Device;
@@ -66,7 +58,7 @@ export class VideoRoomService {
     codecOptions: { videoGoogleStartBitrate: 1000 },
   };
 
-  constructor() {}
+  constructor() { }
 
   initializeSocket(roomName: string) {
     this.roomName = roomName;
@@ -110,8 +102,6 @@ export class VideoRoomService {
       if (this.localVideo) {
         this.localVideo.srcObject = this.videoStream;
       }
-      // const track = this.videoStream.getVideoTracks()[0];
-      // this.params = { track, ...this.params };
 
       this.joinRoom();
     } catch (error) {

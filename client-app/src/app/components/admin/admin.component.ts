@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
-import { RoomDataService } from '../../services/room-data.service';
+import { RoomDataService } from 'src/app/services/room-data.service';
 
 @Component({
   selector: 'app-admin',

@@ -1,16 +1,16 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { io } from 'socket.io-client';
-import * as mediasoupClient from 'mediasoup-client';
+// import * as mediasoupClient from 'mediasoup-client';
 import { CommonModule } from '@angular/common';
 import { ParticipantComponent } from '../participant/participant.component';
 import { VideoOptionsComponent } from '../video-options/video-options.component';
 import { ResizableDirective } from '../../directives/app-resizable.directive';
-import { ChatMessage, VideoRoomService} from '../../services/video-room.service';
 import { SideBarComponent } from '../side-bar/side-bar.component';
 import {
   FormControl,FormGroup,FormsModule,ReactiveFormsModule,Validators,
 } from '@angular/forms';
+import { ChatMessage, VideoRoomService } from 'src/app/services/video-room.service';
 
 @Component({
   selector: 'app-video-room',
