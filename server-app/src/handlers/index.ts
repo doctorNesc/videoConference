@@ -1,0 +1,22 @@
+import { Server, Socket } from "socket.io";
+import { registerRoomHandlers } from "./roomHandlers";
+import { SharedState } from "../types";
+import { registerTransportHandlers } from "./transportHandlers";
+import { registerConsumerHandlers } from "./consumerHandlers";
+import { registerProducerHandlers } from "./producerHandlers";
+import { registerChatHandlers } from "./chatHandlers";
+
+export function registerSocketHandlers(io: Server, state: SharedState) {
+  io.of("/mediasoup").on("connection", (socket: Socket) => {
+    
+    socket.emit("connection-success", {
+      socketId: socket.id,
+    });
+
+    registerRoomHandlers(socket, state);
+    registerTransportHandlers(socket, state);
+    registerProducerHandlers(socket, state);
+    registerConsumerHandlers(socket, state);
+    registerChatHandlers(socket, state);
+  });
+}

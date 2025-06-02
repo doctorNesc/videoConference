@@ -16,7 +16,7 @@ export const webRtcTransport_options = {
     listenIps: [
         {
             ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.1.199", //PUBLIC_IP_OF_INSTANCE : 147.175.123.135 / 192.168.1.250
+            announcedIp: "192.168.1.241", //PUBLIC_IP_OF_INSTANCE : 147.175.123.135 / 192.168.1.250
         },
     ],
     enableUdp: true,

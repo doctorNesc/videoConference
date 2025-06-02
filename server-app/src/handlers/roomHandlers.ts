@@ -1,39 +1,32 @@
 import { Socket } from "socket.io";
 // import { Server } from "socket.io";
 import { SharedState } from "../types"; // Define your shared state interface
+import { getOrCreateRoom } from "../mediasoup/utils";
 
 export function registerRoomHandlers(socket: Socket, state: SharedState) {
   // Join Room
   socket.on("joinRoom", async ({ roomName }, callback) => {
-    if (!roomName) {
-      callback({ error: "Room name is required" });
-      return;
-    }
+    const { router, isAdmin } = await getOrCreateRoom(state,roomName, socket.id);
 
-    // Create room if it doesn't exist
-    if (!state.rooms[roomName]) {
-      // You may want to create a Mediasoup router here
-      state.rooms[roomName] = {
-        router: await state.worker.createRouter({ mediaCodecs: state.mediaCodecs }),
-        peers: [],
-      };
-    }
-
-    // Add peer to room
-    state.rooms[roomName].peers.push(socket.id);
+    console.log("Socket ", socket.id, " joined room " + roomName);
     state.peers[socket.id] = {
       socket,
-      roomName,
-      peerDetails: { name: "" }, // Fill in as needed
+      roomName, // name for the Router this Peer joined
+      transports: [],
+      producers: [],
+      consumers: [],
+      peerDetails: {
+        name: "",
+        isAdmin, //admin if joined the room first
+      },
     };
 
-    // Return router RTP capabilities to client
+    // call callback from the client and send back the rtpCapabilities
     callback({
-      rtpCapabilities: state.rooms[roomName].router.rtpCapabilities,
+      rtpCapabilities: router.rtpCapabilities,
     });
   });
 
-  // Leave Room (optional)
   socket.on("leaveRoom", () => {
     const peer = state.peers[socket.id];
     if (peer) {

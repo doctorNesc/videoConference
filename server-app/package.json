@@ -4,11 +4,11 @@
   "description": "mediasoup demo",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon app.js",
+    "dev": "nodemon server.js",
     "watch": "watchify public/index.js -o public/bundle.js -v",
-    "start": "nodemon src/app.ts",
+    "start": "nodemon src/server.ts",
     "build": "tsc",
-    "serve": "node dist/app.js"
+    "serve": "node dist/server.js"
   },
   "author": "mykhailo vasko",
   "license": "ISC",
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@eslint/js": "^9.27.0",
     "@types/express": "^5.0.2",
-    "@types/node": "^22.15.24",
+    "@types/node": "^22.15.29",
     "eslint": "^9.27.0",
     "eslint-plugin-perfectionist": "^4.13.0",
     "express": "^5.1.0",

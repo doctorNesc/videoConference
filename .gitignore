@@ -1,3 +1,3 @@
 node_modules
-.env
-dist
+server-app/.env
+server-app/dist
