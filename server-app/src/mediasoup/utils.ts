@@ -2,7 +2,7 @@
 import { createWorker } from "mediasoup";
 import { Router, WebRtcTransport, Worker } from "mediasoup/node/lib/types";
 import { SharedState } from "../types";
-import { mediaCodecs, webRtcTransport_options } from "../../config/mediasoup.config";
+import { mediaCodecs, webRtcTransport_options } from "../config/mediasoup.config";
 import { SocketId } from "socket.io-adapter";
 
 export const creatMediasoupWorker = async (): Promise<Worker | undefined> => {

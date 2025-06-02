@@ -14,7 +14,7 @@ import {
 } from "mediasoup/node/lib/types";
 import dotenv from 'dotenv';
 // import { env } from "../config/env";
-import { mediaCodecs, webRtcTransport_options } from "../config/mediasoup.config";
+import { mediaCodecs, webRtcTransport_options } from "./config/mediasoup.config";
 const app = express();
 dotenv.config();
 
