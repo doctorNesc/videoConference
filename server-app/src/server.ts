@@ -22,7 +22,7 @@ const io = new IOServer(httpServer,
 
 app.get("/", (req: Request, res: Response) => {
   res.sendFile(
-    path.join(__dirname, "../client-app/dist/client-app/browser/index.html")
+    path.join(__dirname, "../../client-app/dist/client-app/browser/index.html")
   );
 });
 

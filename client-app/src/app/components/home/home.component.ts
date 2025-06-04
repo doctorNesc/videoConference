@@ -7,15 +7,16 @@ import { Router, RouterModule } from '@angular/router';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterModule, CommonModule,FormsModule],
+  imports: [RouterModule, CommonModule, FormsModule],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
 })
 export class HomeComponent {
 
   roomName: string = '';
-
-  constructor(private router: Router) {}
+  inTheRoom: boolean = false;
+  userName: string = '';
+  constructor(private router: Router) { }
 
   // Redirect to the entered room
   joinConference() {
@@ -29,7 +30,7 @@ export class HomeComponent {
   // Generate a random 8-character room name and navigate to it
   createNewConference() {
     const generatedRoomName = this.generateRoomName();
-    this.router.navigate([`/sfu/${generatedRoomName}`]);
+    this.router.navigate([`/sfu/${generatedRoomName}`], { queryParams: { userName: this.userName, inTheRoom: this.inTheRoom} });
   }
 
   // Helper function to generate an 8-character random room name

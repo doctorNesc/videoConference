@@ -5,7 +5,7 @@ import { getOrCreateRoom } from "../mediasoup/utils";
 
 export function registerRoomHandlers(socket: Socket, state: SharedState) {
   // Join Room
-  socket.on("joinRoom", async ({ roomName }, callback) => {
+  socket.on("joinRoom", async ({ roomName, userName, isMainRoom }, callback) => {
     const { router, isAdmin } = await getOrCreateRoom(state,roomName, socket.id);
 
     console.log("Socket ", socket.id, " joined room " + roomName);
@@ -16,8 +16,9 @@ export function registerRoomHandlers(socket: Socket, state: SharedState) {
       producers: [],
       consumers: [],
       peerDetails: {
-        name: "",
+        name: userName,
         isAdmin, //admin if joined the room first
+        isMainRoom
       },
     };
 
@@ -26,7 +27,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState) {
       rtpCapabilities: router.rtpCapabilities,
     });
   });
-
+  //unused
   socket.on("leaveRoom", () => {
     const peer = state.peers[socket.id];
     if (peer) {

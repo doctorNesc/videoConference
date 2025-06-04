@@ -8,7 +8,7 @@ import { VideoOptionsComponent } from '../video-options/video-options.component'
 import { ResizableDirective } from '../../directives/app-resizable.directive';
 import { SideBarComponent } from '../side-bar/side-bar.component';
 import {
-  FormControl,FormGroup,FormsModule,ReactiveFormsModule,Validators,
+  FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators,
 } from '@angular/forms';
 import { ChatMessage, VideoRoomService } from 'src/app/services/video-room.service';
 
@@ -32,6 +32,8 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public mainView: boolean = false;
   // public localVideo: any;
   public roomName!: string;
+  public name!: string;
+  public isRoomHardware: boolean = false;
   public messages: ChatMessage[] = [];
   public newMessage: string = '';
   public isSidebarCollapsed = true;
@@ -41,11 +43,14 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     protected videoService: VideoRoomService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.roomName = this.route.snapshot.paramMap.get('roomName') || '';
-    this.videoService.initializeSocket(this.roomName);
+    this.name = this.route.snapshot.queryParamMap.get('userName') || 'Guest';
+    this.isRoomHardware = this.route.snapshot.queryParamMap.get('inTheRoom')?.toLocaleLowerCase() === 'true' || false;
+
+    this.videoService.initializeSocket(this.roomName, this.name, this.isRoomHardware);
 
     this.videoService.getParticipants().subscribe((participants) => {
       this.participants = participants;

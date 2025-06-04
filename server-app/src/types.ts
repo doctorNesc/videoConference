@@ -7,7 +7,7 @@ interface PeerData {
   transports: string[];
   producers: string[];
   consumers: string[];
-  peerDetails: { name: string; isAdmin: boolean };
+  peerDetails: { name: string; isAdmin: boolean, isMainRoom: boolean };
 }
 
 export interface SharedState {

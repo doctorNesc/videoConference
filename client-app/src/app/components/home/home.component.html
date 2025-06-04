@@ -16,14 +16,25 @@
 
 <main class="main">
   <div class="input-combined">
-    <span class="material-symbols-outlined input-icon" style="color: #FFF; " (click)="createConf.focus()">video_call</span>
+    <span class="material-symbols-outlined input-icon" style="color: #FFF; "
+      (click)="createConf.focus()">video_call</span>
     <button #createConf (click)="createNewConference()" class="create-btn">Create New Conference</button>
   </div>
 
+  <div>
   <div class="input-combined">
     <span class="material-symbols-outlined input-icon" (click)="roomname.focus()">keyboard</span>
     <input type="text" #roomname [(ngModel)]="roomName" placeholder="Enter room name" class="form-control py-2"
       style="width: 300px" />
+  </div>
+
+  <div class="input-combined py-3">
+    <span class="material-symbols-outlined input-icon" (click)="roomname.focus()">id_card</span>
+    <input type="text" #name [(ngModel)]="userName" placeholder="Enter your name" class="form-control py-2"
+      style="width: 300px" />
+    <label for="#inTheRoom">Device is in the real room</label>
+    <input type="checkbox" #isInTheRoom [(ngModel)]="inTheRoom" placeholder="Is in the physical room" class="py-2" />
+  </div>
   </div>
 
   <button (click)="joinConference()" [disabled]="!roomName.length" class="join-btn">

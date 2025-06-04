@@ -37,6 +37,8 @@ export class VideoRoomService {
   protected producer!: Producer;
   private screenProducer!: Producer;
   private roomName!: string;
+  private username!: string;
+  public isMainRoom: boolean = false;
   private rtpCapabilities!: RtpCapabilities;
   public isProducer: boolean = false;
   public localVideo!: any;
@@ -60,8 +62,10 @@ export class VideoRoomService {
 
   constructor() { }
 
-  initializeSocket(roomName: string) {
+  initializeSocket(roomName: string, userName: string, isMainRoom: boolean) {
     this.roomName = roomName;
+    this.username = userName;
+    this.isMainRoom = isMainRoom;
     this.socket = io('http://localhost:3000/mediasoup');
 
     this.socket.on('connection-success', ({ socketId }: any) => {
@@ -110,7 +114,7 @@ export class VideoRoomService {
   }
 
   joinRoom() {
-    this.socket.emit('joinRoom', { roomName: this.roomName }, (data: any) => {
+    this.socket.emit('joinRoom', { roomName: this.roomName, userName: this.username, isMainRoom: this.isMainRoom }, (data: any) => {
       console.log('Router RTP Capabilities:', data.rtpCapabilities);
       this.rtpCapabilities = data.rtpCapabilities;
       this.createDevice();
@@ -224,7 +228,7 @@ export class VideoRoomService {
                   },
                   ({ id, producersExist }: any) => {
                     callback({ id });
-                    // if (producersExist) this.getProducers();
+                    // if (producersExist) this.getProducers(); //not needed since we
                   }
                 );
               } catch (error) {
