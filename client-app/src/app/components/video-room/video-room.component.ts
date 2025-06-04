@@ -27,8 +27,8 @@ import { ChatMessage, VideoRoomService } from 'src/app/services/video-room.servi
   styleUrls: ['./video-room.component.scss'],
 })
 export class VideoRoomComponent implements OnInit, OnDestroy {
-  public participants: { id: string; stream: MediaStream }[] = [];
-  public mainParticipant!: { id: string; stream: MediaStream };
+  public participants: { id: string; stream: MediaStream, name: string }[] = [];
+  public mainParticipant!: { id: string; stream: MediaStream, name: string };
   public mainView: boolean = false;
   // public localVideo: any;
   public roomName!: string;
@@ -65,7 +65,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.videoService.disconnectAndCleanUp();
   }
 
-  setMainParticipant(participant: { id: string; stream: MediaStream }) {
+  setMainParticipant(participant: { id: string; stream: MediaStream, name: string }) {
     this.mainParticipant = participant;
     this.mainView = true;
   }

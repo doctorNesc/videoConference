@@ -19,9 +19,9 @@ export type streamType = 'video' | 'screen';
   providedIn: 'root',
 })
 export class VideoRoomService {
-  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream }[]>([]);
-  private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream }[]>([]);
-  public mainParticipant = new BehaviorSubject<{ id: string; stream: MediaStream; }>({} as { id: string; stream: MediaStream });
+  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
+  private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
+  public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
   public mainView: boolean = false;
   private socket!: Socket;
   private device!: Device;
@@ -350,7 +350,7 @@ export class VideoRoomService {
         });
 
         const { track } = consumer;
-        this.addParticipant(remoteProducerId, new MediaStream([track]));
+        this.addParticipant(remoteProducerId, new MediaStream([track]), params.userName);
 
         this.socket.emit('consumer-resume', {
           serverConsumerId: params.serverConsumerId,
@@ -406,7 +406,7 @@ export class VideoRoomService {
     });
   }
 
-  getParticipants(): Observable<{ id: string; stream: MediaStream }[]> {
+  getParticipants(): Observable<{ id: string; stream: MediaStream, name: string }[]> {
     return this.participant$.asObservable();
   }
 
@@ -470,10 +470,11 @@ export class VideoRoomService {
     });
   }
 
-  addParticipant(remoteProducerId: string, stream: MediaStream) {
+  addParticipant(remoteProducerId: string, stream: MediaStream, name: string) {
     this.participant$.next([
       ...this.participant$.value,
-      { id: remoteProducerId, stream },
+      { id: remoteProducerId, stream, name },
+
     ]);
     console.log('Participants:', this.participant$.value);
   }
@@ -533,7 +534,7 @@ export class VideoRoomService {
       this.screenProducer = await this.screenProducerTransport.produce(
         screenParams
       );
-      this.addParticipant('screen', this.screenStream);
+      this.addParticipant('screen', this.screenStream, 'Screen Share');
       this.screenProducer.on('trackended', () =>
         console.log('Screen track ended')
       );

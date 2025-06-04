@@ -21,7 +21,7 @@ export class HomeComponent {
   // Redirect to the entered room
   joinConference() {
     if (this.roomName.trim()) {
-      this.router.navigate([`/sfu/${this.roomName.trim()}`]);
+      this.router.navigate([`/sfu/${this.roomName.trim()}`], { queryParams: { userName: this.userName, inTheRoom: this.inTheRoom } });
     } else {
       alert('Please enter a room name!');
     }
@@ -30,7 +30,7 @@ export class HomeComponent {
   // Generate a random 8-character room name and navigate to it
   createNewConference() {
     const generatedRoomName = this.generateRoomName();
-    this.router.navigate([`/sfu/${generatedRoomName}`], { queryParams: { userName: this.userName, inTheRoom: this.inTheRoom} });
+    this.router.navigate([`/sfu/${generatedRoomName}`], { queryParams: { userName: this.userName, inTheRoom: true } });
   }
 
   // Helper function to generate an 8-character random room name

@@ -35,5 +35,17 @@
     right: 10px;
   }
 
+  .name{
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 10;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+
 }
 

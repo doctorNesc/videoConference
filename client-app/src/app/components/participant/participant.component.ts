@@ -18,7 +18,7 @@ import {
 export class ParticipantComponent {
   @Input() stream!: MediaStream;
   @Input() isMain: boolean = false;
-
+  @Input() userName: string = '';
   @Output() setMainParticipant = new EventEmitter();
   @Output() detach = new EventEmitter();
 

@@ -9,6 +9,11 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState) {
     }, callback) => {
         try {
             const roomName = state.peers[socket.id].roomName;
+            // const userName = state.peers[socket.id].peerDetails.name;
+            const producerPeer = Object.values(state.peers).find(
+                peer => peer.producers.includes(remoteProducerId)
+            );
+            const userName = producerPeer?.peerDetails?.name || "Unknown";
             const router = state.rooms[roomName].router;
             const consumerTransport = state.transports.find(
                 (transportData) =>
@@ -53,11 +58,12 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState) {
                 // from the consumer extract the following params
                 // to send back to the Client
                 const params = {
-                    id: consumer?.id,
+                    id: consumer.id,
                     producerId: remoteProducerId,
-                    kind: consumer?.kind,
-                    rtpParameters: consumer?.rtpParameters,
-                    serverConsumerId: consumer?.id,
+                    kind: consumer.kind,
+                    rtpParameters: consumer.rtpParameters,
+                    serverConsumerId: consumer.id,
+                    userName
                 };
 
                 // send the parameters to the client

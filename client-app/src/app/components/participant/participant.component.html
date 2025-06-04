@@ -1,5 +1,6 @@
 <div class="video-container">
   <video [srcObject]="stream" autoplay></video>
+  <span class="name">{{ userName }}</span>
   <span class="material-symbols-outlined button full-btn" (click)="setMainParticipant.emit($event)">{{'fullscreen'}}</span>
   <span class="material-symbols-outlined button detach-btn" (click)="detach.emit($event)">{{'open_in_browser'}}</span>
 </div>  
