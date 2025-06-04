@@ -34,11 +34,40 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
   );
 
   socket.on("disconnect", () => {
-    console.log("peer disconnected");
 
     if (state.peers[socket.id]) {
       const { roomName } = state.peers[socket.id];
-      delete state.peers[socket.id];
+
+      const mainDevices = state.mainRoomDevices[roomName] || [];
+      const wasMainRoom = mainDevices.includes(socket.id);
+
+      state.mainRoomDevices[roomName] = mainDevices.filter(id => id !== socket.id);
+      if (wasMainRoom) {
+        console.log("mainRoom peer disconnected");
+        const assignments = state.remoteAssignments[roomName] || {};
+        Object.entries(assignments).forEach(([remoteId, assignedDevice]) => {
+          if (assignedDevice === socket.id) {
+            // Reassign this remote user to another main room device
+            const devices = state.mainRoomDevices[roomName];
+            if (devices && devices.length > 0) {
+              // Use your round-robin function
+              const newDevice = devices.reduce((a, b) => {
+                const aCount = Object.values(assignments).filter(id => id === a).length;
+                const bCount = Object.values(assignments).filter(id => id === b).length;
+                return aCount <= bCount ? a : b;
+              });
+              assignments[remoteId] = newDevice;
+            } else {
+              // No devices left, remove assignment
+              delete assignments[remoteId];
+            }
+          }
+        });
+        delete state.peers[socket.id];
+
+        state.remoteAssignments[roomName] = assignments;
+      }
+
       // remove socket from room
       state.rooms[roomName] = {
         router: state.rooms[roomName].router,
@@ -85,8 +114,8 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
       const roomName = state.peers[socket.id].roomName;
 
       // console.log("Created Producer, ID: ", producer?.id, producer?.kind);
-      if (isScreen && producer) {
-        state.screenProducerTransports[producer?.id] = {
+      if (isScreen && producer) { //add screenProducer to a list to close it later
+        state.screenProducerTransports[producer.id] = {
           socketId: socket.id,
           transport: transport,
         };
@@ -133,7 +162,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
       transports: [...state.peers[socket.id].transports, transport.id],
     };
   };
-  
+
   const getTransport = (socketId: SocketId) => {
     const producerTransport = state.transports.find(
       (transport) =>
@@ -154,20 +183,61 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
     return producerTransport?.transport;
   };
 
-  const informConsumers = (roomName: string, socketId: string, id: string, mediaType: MediaType) => {
-    console.log(`New ${mediaType} producer joined in room ${roomName}, socket ${socketId}:`, id);
+  const informConsumers = (roomName: string, producerSocketId: string, producerId: string, mediaType: MediaType) => {
+    console.log(`New ${mediaType} producer joined in room ${roomName}, socket ${producerSocketId}:`, producerId);
+    const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
+
+    if (isProducerMainRoom) {
+      //   // Only inform remote users, not other main room devices
+      console.log("Informing consumers that are not main room devices for socket:", );
+      Object.keys(state.peers).forEach(socketId => {
+        if (
+          state.peers[socketId].roomName === roomName &&
+          !state.mainRoomDevices[roomName]?.includes(socketId) &&
+          socketId !== producerSocketId
+        ) {
+          // console.log('For so');
+          state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
+        }
+      });
+    } else {
+      // Remote user: inform the assigned main room device
+      const assignedDevice = state.remoteAssignments[roomName][producerSocketId];
+      if (assignedDevice && state.peers[assignedDevice]) {
+        state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
+      }
+       Object.keys(state.peers).forEach(socketId => { //notify all remote users
+        if (
+          state.peers[socketId].roomName === roomName &&
+          !state.mainRoomDevices[roomName]?.includes(socketId) &&
+          socketId !== producerSocketId
+        ) {
+          // console.log('For so');
+          state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
+        }
+      });
+
+    }
+
     // A new producer just joined
     // let all consumers to consume this producer
-    state.producers.forEach((producerData) => {
-      if (
-        producerData.socketId !== socketId &&
-        producerData.roomName === roomName
-      ) {
-        const producerSocket = state.peers[producerData.socketId].socket;
-        // use socket to send producer id to producer
-        producerSocket.emit("new-producer", { producerId: id, mediaType });
-      }
-    });
+    // state.producers.forEach((producerData) => {
+    //   if (
+    //     producerData.socketId !== producerSocketId &&
+    //     producerData.roomName === roomName
+    //   ) {
+    //     if (state.peers[producerData.socketId].peerDetails.isMainRoom) {
+    //       const assignedDevice = state.remoteAssignments[roomName][producerSocketId];
+    //       if (assignedDevice && state.peers[assignedDevice]) {
+    //         state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
+    //       }
+    //     } else {
+    //       const producerSocket = state.peers[producerData.socketId].socket;
+    //       // use socket to send producer id to producer
+    //       producerSocket.emit("new-producer", { producerId, mediaType });
+    //     }
+    //   }
+    // });
   };
 
   const addProducer = (producer: Producer, roomName: string, mediaType: MediaType) => {

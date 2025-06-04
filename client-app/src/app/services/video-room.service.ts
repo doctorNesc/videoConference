@@ -171,7 +171,7 @@ export class VideoRoomService {
             'produce',
             async (parameters: any, callback: Function, errback: Function) => {
               try {
-                await this.socket.emit(
+                await this  .socket.emit(
                   'transport-produce',
                   {
                     kind: parameters.kind,

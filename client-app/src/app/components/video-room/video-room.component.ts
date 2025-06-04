@@ -75,7 +75,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  detachParticipant(participant: { id: string; stream: MediaStream }) {
+  detachParticipant(participant: { id: string; stream: MediaStream, name: string }) {
     this.videoService.detachParticipant(participant.id);
 
     const detachedTab = window.open('', '_blank', 'width=800,height=600');

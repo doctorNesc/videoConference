@@ -6,9 +6,18 @@ import { getOrCreateRoom } from "../mediasoup/utils";
 export function registerRoomHandlers(socket: Socket, state: SharedState) {
   // Join Room
   socket.on("joinRoom", async ({ roomName, userName, isMainRoom }, callback) => {
-    const { router, isAdmin } = await getOrCreateRoom(state,roomName, socket.id);
+    const { router, isAdmin } = await getOrCreateRoom(state, roomName, socket.id);
 
     console.log("Socket ", socket.id, " joined room " + roomName);
+
+    // Track main room devices
+    if (isMainRoom && !state.mainRoomDevices?.[roomName]?.includes(socket.id)) {
+      state.mainRoomDevices[roomName] = state.mainRoomDevices?.[roomName] || [];
+      state.mainRoomDevices[roomName].push(socket.id);
+    }
+    if (!isMainRoom) {
+      assignRemoteToMainRoomDevice(roomName, socket.id, state);
+    }
     state.peers[socket.id] = {
       socket,
       roomName, // name for the Router this Peer joined
@@ -16,7 +25,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState) {
       producers: [],
       consumers: [],
       peerDetails: {
-        name: userName,
+        name: userName + (isMainRoom ? " (Main Room)" : "[Remote]"),
         isAdmin, //admin if joined the room first
         isMainRoom
       },
@@ -39,5 +48,17 @@ export function registerRoomHandlers(socket: Socket, state: SharedState) {
     }
   });
 
-  // You can add more room-related events here
+  const assignRemoteToMainRoomDevice = (roomName: string, remoteSocketId: string, state: SharedState) => {
+    const devices = state.mainRoomDevices[roomName] || [];
+    if (devices.length === 0) return null;
+    // Count current assignments per device
+    const counts = devices.map(deviceSocketId =>
+      Object.values(state.remoteAssignments[roomName]).filter(id => id === deviceSocketId).length
+    );
+    const minIndex = counts.indexOf(Math.min(...counts));
+    const assignedDevice = devices[minIndex];
+    state.remoteAssignments[roomName][remoteSocketId] = assignedDevice;
+    return assignedDevice;
+  }
+
 }
