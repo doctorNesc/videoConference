@@ -54,6 +54,16 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
     this.videoService.getParticipants().subscribe((participants) => {
       this.participants = participants;
+
+      // For remote users: set main participant to the stream from assignedDevice
+      if (!this.videoService.isMainRoom && this.videoService.assignedDevice) {
+        const main = participants.find(
+          p => p.socketId === this.videoService.assignedDevice
+        );
+        if (main) {
+          this.setMainParticipant(main);
+        }
+      }
     });
 
     this.videoService.getMessages().subscribe((messages) => {

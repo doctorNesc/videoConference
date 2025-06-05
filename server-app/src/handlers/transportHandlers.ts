@@ -190,7 +190,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
     if (!state.remoteAssignments[roomName]) {
       state.remoteAssignments[roomName] = {};
     }
-    
+
     if (isProducerMainRoom) {
       // Only inform remote users, not other main room devices
       console.log("Informing consumers that are not main room devices for socket:",);
@@ -222,26 +222,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
       });
 
     }
-
-    // A new producer just joined
-    // let all consumers to consume this producer
-    // state.producers.forEach((producerData) => {
-    //   if (
-    //     producerData.socketId !== producerSocketId &&
-    //     producerData.roomName === roomName
-    //   ) {
-    //     if (state.peers[producerData.socketId].peerDetails.isMainRoom) {
-    //       const assignedDevice = state.remoteAssignments[roomName][producerSocketId];
-    //       if (assignedDevice && state.peers[assignedDevice]) {
-    //         state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
-    //       }
-    //     } else {
-    //       const producerSocket = state.peers[producerData.socketId].socket;
-    //       // use socket to send producer id to producer
-    //       producerSocket.emit("new-producer", { producerId, mediaType });
-    //     }
-    //   }
-    // });
   };
 
   const addProducer = (producer: Producer, roomName: string, mediaType: MediaType) => {

@@ -19,7 +19,7 @@ export type streamType = 'video' | 'screen';
   providedIn: 'root',
 })
 export class VideoRoomService {
-  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
+  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string }[]>([]);
   private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
   public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
   public mainView: boolean = false;
@@ -51,6 +51,7 @@ export class VideoRoomService {
   private consumedProducerIds = new Set<string>();
   private isSharingScreenSubject = new BehaviorSubject<boolean>(false);
   isSharingScreen$ = this.isSharingScreenSubject.asObservable();
+  public assignedDevice: string | undefined;// sockedId of device this client is displayed
   public params: any = {
     encodings: [
       { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
@@ -171,7 +172,7 @@ export class VideoRoomService {
             'produce',
             async (parameters: any, callback: Function, errback: Function) => {
               try {
-                await this  .socket.emit(
+                await this.socket.emit(
                   'transport-produce',
                   {
                     kind: parameters.kind,
@@ -263,7 +264,10 @@ export class VideoRoomService {
 
   async signalNewConsumerTransport(
     remoteProducerId: string,
-    mediaType: streamType
+    mediaType: streamType,
+    assignedMainRoomDevice?: string,
+    socketId?: string,
+    name?: string
   ) {
     if (this.consumedProducerIds.has(remoteProducerId)) return;
     this.consumedProducerIds.add(remoteProducerId);
@@ -309,7 +313,10 @@ export class VideoRoomService {
           consumerTransport,
           remoteProducerId,
           params.id,
-          mediaType
+          mediaType,
+          assignedMainRoomDevice,
+          socketId,
+          name
         );
       }
     );
@@ -319,7 +326,10 @@ export class VideoRoomService {
     consumerTransport: Transport,
     remoteProducerId: string,
     serverConsumerTransportId: string,
-    mediaType: streamType
+    mediaType: streamType,
+    assignedMainRoomDevice?: string,
+    socketId?: string,
+    name?: string
   ) {
     await this.socket.emit(
       'consume',
@@ -350,7 +360,13 @@ export class VideoRoomService {
         });
 
         const { track } = consumer;
-        this.addParticipant(remoteProducerId, new MediaStream([track]), params.userName);
+        this.addParticipant(
+          remoteProducerId,
+          new MediaStream([track]),
+          params.userName || name || '',
+          assignedMainRoomDevice,
+          socketId
+        );
 
         this.socket.emit('consumer-resume', {
           serverConsumerId: params.serverConsumerId,
@@ -406,7 +422,7 @@ export class VideoRoomService {
     });
   }
 
-  getParticipants(): Observable<{ id: string; stream: MediaStream, name: string }[]> {
+  getParticipants(): Observable<{ socketId?: string | undefined; id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, }[]> {
     return this.participant$.asObservable();
   }
 
@@ -463,17 +479,27 @@ export class VideoRoomService {
   }
 
   getProducers() {
-    this.socket.emit('getProducers', (producerIds: any[]) => {
-      producerIds.forEach(({ id, mediaType }) =>
-        this.signalNewConsumerTransport(id, mediaType)
+    this.socket.emit('getProducers', (response: any) => {
+      let producerList: any[] = [];
+      if (Array.isArray(response)) {
+        // main room device
+        producerList = response;
+      } else {
+        // remote user
+        producerList = response.producerList;
+        this.assignedDevice = response.myAssignedMainRoomDevice;
+      }
+
+      producerList.forEach(({ id, mediaType, assignedMainRoomDevice, socketId, name }) =>
+        this.signalNewConsumerTransport(id, mediaType, assignedMainRoomDevice, socketId, name)
       );
     });
   }
 
-  addParticipant(remoteProducerId: string, stream: MediaStream, name: string) {
+  addParticipant(remoteProducerId: string, stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string) {
     this.participant$.next([
       ...this.participant$.value,
-      { id: remoteProducerId, stream, name },
+      { id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId },
 
     ]);
     console.log('Participants:', this.participant$.value);
