@@ -2,11 +2,11 @@
   "name": "example1",
   "version": "1.0.0",
   "description": "mediasoup demo",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon src/server.ts",
     "watch": "watchify public/index.js -o public/bundle.js -v",
-    "start": "nodemon src/server.ts",
+    "start": "node dist/server.js",
     "build": "tsc",
     "serve": "node dist/server.js"
   },
@@ -31,7 +31,7 @@
     "@types/node": "^22.15.29",
     "eslint": "^9.27.0",
     "eslint-plugin-perfectionist": "^4.13.0",
-    "express": "^5.1.0",
+    "express": "^4.20.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
