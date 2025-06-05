@@ -81,7 +81,6 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState) {
     });
 
     socket.on("consumer-resume", async ({ serverConsumerId }) => {
-        // console.log("consumer resume");
         try {
             const consumer = state.consumers.find(
                 (consumerData) => consumerData.consumer.id == serverConsumerId

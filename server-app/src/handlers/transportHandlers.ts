@@ -113,7 +113,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
 
       const roomName = state.peers[socket.id].roomName;
 
-      // console.log("Created Producer, ID: ", producer?.id, producer?.kind);
       if (isScreen && producer) { //add screenProducer to a list to close it later
         state.screenProducerTransports[producer.id] = {
           socketId: socket.id,
@@ -151,7 +150,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
 
 
   const addTransport = (transport: WebRtcTransport, roomname: string, isConsumer: boolean, isScreen: boolean) => {
-    // console.log("added transport:\ntransport id:",transport.id,"isConsumer:",isConsumer,"isScreen:",isScreen);
     state.transports = [
       ...state.transports,
       { socketId: socket.id, transport, roomname, isConsumer, isScreen },
@@ -200,7 +198,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
           !state.mainRoomDevices[roomName]?.includes(socketId) &&
           socketId !== producerSocketId
         ) {
-          // console.log('For so');
           state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
         }
       });
@@ -216,7 +213,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
           !state.mainRoomDevices[roomName]?.includes(socketId) &&
           socketId !== producerSocketId
         ) {
-          // console.log('For so');
           state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
         }
       });

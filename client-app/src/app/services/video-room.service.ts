@@ -70,7 +70,7 @@ export class VideoRoomService {
     this.socket = io('http://localhost:3000/mediasoup');
 
     this.socket.on('connection-success', ({ socketId }: any) => {
-      console.log('Connected with socket ID:', socketId);
+      // console.log('Connected with socket ID:', socketId);
       this.getLocalStream();
     });
 
@@ -116,7 +116,7 @@ export class VideoRoomService {
 
   joinRoom() {
     this.socket.emit('joinRoom', { roomName: this.roomName, userName: this.username, isMainRoom: this.isMainRoom }, (data: any) => {
-      console.log('Router RTP Capabilities:', data.rtpCapabilities);
+      // console.log('Router RTP Capabilities:', data.rtpCapabilities);
       this.rtpCapabilities = data.rtpCapabilities;
       this.createDevice();
     });
@@ -126,7 +126,7 @@ export class VideoRoomService {
     try {
       this.device = new Device();
       await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
-      console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
+      // console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
       this.createSendTransport('video');
     } catch (error: any) {
       console.error('Error creating device:', error);
@@ -146,7 +146,7 @@ export class VideoRoomService {
           return;
         }
 
-        console.log('Create WebRTC Transport params:', params);
+        // console.log('Create WebRTC Transport params:', params);
         if (type === 'video') {
           this.producerTransport = this.device.createSendTransport(params);
           this.producerTransport.on(
@@ -203,7 +203,7 @@ export class VideoRoomService {
               errback: Function
             ) => {
               try {
-                console.log('Connect dtls parameters:', dtlsParameters);
+                // console.log('Connect dtls parameters:', dtlsParameters);
                 await this.socket.emit('transport-connect', {
                   dtlsParameters,
                   isScreen: true,
@@ -414,12 +414,11 @@ export class VideoRoomService {
       (participant) => participant.id !== remoteProducerId
     );
     this.detachedParticipant$.next(updatedDetached);
-    // Debug logging
-    console.log('After producer-closed:', {
-      participants: this.participant$.value,
-      detached: this.detachedParticipant$.value,
-      closedId: remoteProducerId
-    });
+    // console.log('After producer-closed:', {
+    //   participants: this.participant$.value,
+    //   detached: this.detachedParticipant$.value,
+    //   closedId: remoteProducerId
+    // });
   }
 
   getParticipants(): Observable<{ socketId?: string | undefined; id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, }[]> {
@@ -430,7 +429,7 @@ export class VideoRoomService {
     const participants = this.participant$.value.filter((p) => p.id !== id);
     const detached = this.participant$.value.find((p) => p.id === id);
 
-    console.log('participants:', participants, '/nDetached: ', detached);
+    // console.log('participants:', participants, '/nDetached: ', detached);
     if (detached) {
       this.detachedParticipant$.next([
         ...this.detachedParticipant$.value,
@@ -442,7 +441,7 @@ export class VideoRoomService {
 
   reattachParticipant(id: string) {
     const detached = this.detachedParticipant$.value.find((p) => p.id === id);
-    console.log('Detached:', detached, '/n id: ', id);
+    // console.log('Detached:', detached, '/n id: ', id);
     if (detached) {
       const updatedDetached = this.detachedParticipant$.value.filter(
         (p) => p.id !== id
@@ -460,7 +459,7 @@ export class VideoRoomService {
     // Clean up socket connection
     if (this.socket) {
       this.socket.disconnect();
-      console.log('Socket disconnected');
+      // console.log('Socket disconnected');
     }
     // Stop local media tracks
     if (this.localVideo?.srcObject) {
@@ -502,7 +501,7 @@ export class VideoRoomService {
       { id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId },
 
     ]);
-    console.log('Participants:', this.participant$.value);
+    // console.log('Participants:', this.participant$.value);
   }
 
   toggleLocalVideo() {

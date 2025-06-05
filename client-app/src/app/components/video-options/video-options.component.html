@@ -1,13 +1,18 @@
 <div class="d-flex justify-content-between align-items-end p-3 dark">
-  <strong class="align-items-start">{{ roomName }}</strong>
+    <strong class="align-items-start">{{ roomName }}</strong>
 
     <div>
-        <span class="material-symbols-rounded" (click)="toggleVideo()">{{videoEnabled? 'videocam' : 'videocam_off'}}</span> 
+        <span class="material-symbols-rounded" (click)="toggleVideo()">{{videoEnabled? 'videocam' :
+            'videocam_off'}}</span>
         <span class="material-symbols-rounded" (click)="toggleAudio()">{{audioEnabled? 'mic' : 'mic_off'}}</span>
+        <span class="material-symbols-rounded" *ngIf="!(isSharingScreen$ | async)"
+            (click)="startScreenShare.emit()">present_to_all</span>
+        <span class="material-symbols-rounded" *ngIf="isSharingScreen$ | async"
+            (click)="stopScreenShare.emit()">pause_presentation</span>
     </div>
 
     <div>
-        <span class="material-symbols-rounded" (click)="showUsersPanel.emit(true)">group</span> 
+        <span class="material-symbols-rounded" (click)="showUsersPanel.emit(true)">group</span>
     </div>
 
 </div>

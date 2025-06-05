@@ -60,7 +60,7 @@ export class RealSpaceComponent implements AfterViewInit {
     try {
       const response = await fetch(path);
       const buffer = (await response.arrayBuffer()).slice(3);
-      console.log('splat buffer:', buffer);
+      // console.log('splat buffer:', buffer);
       const data = new Float32Array(buffer);
       
       const numSplats = data.length / 7; // Assuming each splat has (x, y, z, r, g, b, size)
