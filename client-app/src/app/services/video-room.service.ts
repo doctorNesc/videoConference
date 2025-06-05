@@ -26,7 +26,7 @@ export class VideoRoomService {
   private socket!: Socket;
   private device!: Device;
   private producerTransport!: Transport;
-  private screenProducerTransport!: Transport;
+  private screenProducerTransport!: Transport | undefined;
   private consumerTransports: {
     consumerTransport: Transport;
     serverConsumerTransportId: string;
@@ -35,7 +35,7 @@ export class VideoRoomService {
   }[] = [];
   // private screenConsumerTransports: any[] = [];
   protected producer!: Producer;
-  private screenProducer!: Producer;
+  private screenProducer!: Producer | undefined;
   private roomName!: string;
   private username!: string;
   public isMainRoom: boolean = false;
@@ -556,14 +556,14 @@ export class VideoRoomService {
         encodings: this.params.encodings,
         codecOptions: this.params.codecOptions,
       };
-      this.screenProducer = await this.screenProducerTransport.produce(
+      this.screenProducer = await this.screenProducerTransport?.produce(
         screenParams
       );
       this.addParticipant('screen', this.screenStream, 'Screen Share');
-      this.screenProducer.on('trackended', () =>
+      this.screenProducer?.on('trackended', () =>
         console.log('Screen track ended')
       );
-      this.screenProducer.on('transportclose', () =>
+      this.screenProducer?.on('transportclose', () =>
         console.log('Screen transport closed')
       );
     } catch (error) {
@@ -572,22 +572,39 @@ export class VideoRoomService {
   }
 
   async startScreenShare() {
+    if (this.screenProducer) {
+      try { this.screenProducer.close(); } catch { }
+      this.screenProducer = undefined;
+    }
+    if (this.screenProducerTransport) {
+      try { this.screenProducerTransport.close(); } catch { }
+      this.screenProducerTransport = undefined;
+    }
+
     this.createSendTransport('screen');
     this.isSharingScreenSubject.next(true);
   }
 
   stopScreenShare() {
-    this.screenProducer.close();
-
-    this.screenProducerTransport.close();
-    // this.screenProducerTransport = null;
-
-    this.isSharingScreenSubject.next(false);
-
     this.socket.emit('stopScreenShare', {
       roomName: this.roomName,
-      producerId: this.screenProducer.id,
+      producerId: this.screenProducer?.id,
     });
+    // this.screenProducer?.close();
+    // this.screenProducer = undefined;
+    // this.screenProducerTransport?.close();
+    // this.screenProducerTransport = undefined;
+
+  if (this.screenProducer) {
+    try { this.screenProducer.close(); } catch {}
+    this.screenProducer = undefined;
+  }
+  if (this.screenProducerTransport) {
+    try { this.screenProducerTransport.close(); } catch {}
+    this.screenProducerTransport = undefined;
+  }
+  this.isSharingScreenSubject.next(false);
+
     const participants = this.participant$.value.filter(
       (particicipant) => particicipant.id != 'screen'
     );

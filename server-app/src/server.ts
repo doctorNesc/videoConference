@@ -32,7 +32,7 @@ const sharedState: SharedState = {
   producers: [],
   consumers: [],
   transports: [],
-  screenProducerTransports: {},
+  // screenProducerTransports: {},
   mainRoomDevices: {},
   remoteAssignments: {},
 };

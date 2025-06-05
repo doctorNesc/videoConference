@@ -22,7 +22,7 @@ export interface SharedState {
   }[];
   producers: { socketId: string; roomName: string; producer: Producer, mediaType: MediaType }[];
   consumers: { socketId: string; roomName: string; consumer: Consumer }[];
-  screenProducerTransports: Record<string, { socketId: string; transport: WebRtcTransport | undefined }>;
+  // screenProducerTransports: Record<string, { socketId: string; transport: WebRtcTransport | undefined }>;
   mainRoomDevices: { [roomName: string]: string[] }; // roomName -> [socketId, ...]
   remoteAssignments: { [roomName: string]: { [remoteSocketId: string]: string } }; // remoteSocketId -> mainRoomSocketId
   worker?: Worker;

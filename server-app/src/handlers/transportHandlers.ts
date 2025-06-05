@@ -63,6 +63,15 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
             }
           }
         });
+        // Clean up all transports for this socket
+        state.transports = state.transports.filter((t) => {
+          if (t.socketId === socket.id) {
+            t.transport.close();
+            return false;
+          }
+          return true;
+        });
+
         delete state.peers[socket.id];
 
         state.remoteAssignments[roomName] = assignments;
@@ -113,12 +122,12 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
 
       const roomName = state.peers[socket.id].roomName;
 
-      if (isScreen && producer) { //add screenProducer to a list to close it later
-        state.screenProducerTransports[producer.id] = {
-          socketId: socket.id,
-          transport: transport,
-        };
-      }
+      // if (isScreen && producer) { //add screenProducer to a list to close it later
+      //   state.screenProducerTransports[producer.id] = {
+      //     socketId: socket.id,
+      //     transport: transport,
+      //   };
+      // }
       addProducer(producer, roomName, isScreen ? "screen" : "camera");
 
       informConsumers(
@@ -148,6 +157,25 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
     }
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  socket.on('stopScreenShare', ({ roomName, producerId }) => {
+    // 1. Close and remove the screen producer
+    if (producerId) {
+      const producerData = state.producers.find(p => p.producer.id === producerId);
+      if (producerData) {
+        try { producerData.producer.close(); } catch { /* empty */ }
+        state.producers = state.producers.filter(p => p.producer.id !== producerId);
+      }
+    }
+
+    state.transports = state.transports.filter(t => {
+      if (t.socketId === socket.id && t.isScreen) {
+        try { t.transport.close(); } catch { /* empty */ }
+        return false;
+      }
+      return true;
+    });
+  });
 
   const addTransport = (transport: WebRtcTransport, roomname: string, isConsumer: boolean, isScreen: boolean) => {
     state.transports = [
