@@ -10,7 +10,7 @@ import { SideBarComponent } from '../side-bar/side-bar.component';
 import {
   FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators,
 } from '@angular/forms';
-import { ChatMessage, VideoRoomService } from 'src/app/services/video-room.service';
+import { ChatMessage, VideoRoomService } from '../../services/video-room.service';
 
 @Component({
   selector: 'app-video-room',
