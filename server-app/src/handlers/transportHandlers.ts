@@ -187,9 +187,13 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
     console.log(`New ${mediaType} producer joined in room ${roomName}, socket ${producerSocketId}:`, producerId);
     const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
 
+    if (!state.remoteAssignments[roomName]) {
+      state.remoteAssignments[roomName] = {};
+    }
+    
     if (isProducerMainRoom) {
-      //   // Only inform remote users, not other main room devices
-      console.log("Informing consumers that are not main room devices for socket:", );
+      // Only inform remote users, not other main room devices
+      console.log("Informing consumers that are not main room devices for socket:",);
       Object.keys(state.peers).forEach(socketId => {
         if (
           state.peers[socketId].roomName === roomName &&
@@ -206,7 +210,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState) {
       if (assignedDevice && state.peers[assignedDevice]) {
         state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
       }
-       Object.keys(state.peers).forEach(socketId => { //notify all remote users
+      Object.keys(state.peers).forEach(socketId => { //notify all remote users
         if (
           state.peers[socketId].roomName === roomName &&
           !state.mainRoomDevices[roomName]?.includes(socketId) &&
