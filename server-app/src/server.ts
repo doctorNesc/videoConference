@@ -6,11 +6,17 @@ import { SharedState } from "./types";
 import { creatMediasoupWorker } from "./mediasoup/utils";
 import path from "path";
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
 app.use(express.static(path.join(__dirname,"../../client-app/dist/client-app/browser")));
+
+app.use(cors({
+  origin: ["http://192.168.1.241:3000"],
+  methods: ["GET", "POST"]
+}));
 
 app.get("/api/roomUsers", (req: Request, res: Response) => {
   const room = req.query.room as string | undefined;
@@ -55,7 +61,7 @@ httpServer.listen(process.env.PORT || 3000, () => {
 });
 
 const io = new IOServer(httpServer,
-  { cors: { origin: "http://localhost:4200" } }
+  { cors: { origin: ["http://localhost:4200","http://192.168.1.241:3000"] } }
 );
 // const connections = io.of("/mediasoup");
 

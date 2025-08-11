@@ -1,4 +1,4 @@
-import { RtpCodecCapability } from "mediasoup/node/lib/types";
+import { RtpCodecCapability, WebRtcTransportOptions } from "mediasoup/node/lib/types";
 
 
 export const mediaCodecs: RtpCodecCapability[] = [
@@ -12,12 +12,14 @@ export const mediaCodecs: RtpCodecCapability[] = [
 ];
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
-export const webRtcTransport_options = {
-    listenIps: [
+export const webRtcTransport_options: WebRtcTransportOptions = {
+    listenInfos: [
         {
-            ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.1.241", //PUBLIC_IP_OF_INSTANCE : 147.175.123.135 / 192.168.1.250
-        },
+            portRange: { min: 40000, max: 49999 },
+            protocol: "udp",
+            ip: "0.0.0.0",
+            announcedIp: "192.168.1.241"
+        }
     ],
     enableUdp: true,
     enableTcp: true,
