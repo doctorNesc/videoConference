@@ -1,15 +1,10 @@
-FROM node:22
- 
-# Install mediasoup native build dependencies
-RUN apt-get update && apt-get install -y \
-  python3 \
-  make \
-  g++ \
-  libssl-dev \
-  libusrsctp-dev \
-  libsrtp2-dev \
-  pkg-config \
-  && rm -rf /var/lib/apt/lists/*
+FROM node:20-bullseye-slim AS stage-one
+
+# Install DEB dependencies and others.
+RUN \
+	set -x \
+	&& apt-get update \
+	&& apt-get install -y net-tools build-essential python3 python3-pip valgrind
 
 WORKDIR /app
 
@@ -18,6 +13,7 @@ RUN npm install
 
 COPY . .
 
+ENV PORT=3000
 
 RUN npm run build
 
