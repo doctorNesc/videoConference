@@ -1,5 +1,5 @@
 import { RtpCodecCapability, WebRtcTransportOptions } from "mediasoup/node/lib/types";
-
+import os from "os";
 
 export const mediaCodecs: RtpCodecCapability[] = [
     { kind: "audio", mimeType: "audio/opus", clockRate: 48000, channels: 2 },
@@ -19,10 +19,49 @@ export const webRtcTransport_options: WebRtcTransportOptions = {
             protocol: "udp",
             ip: "0.0.0.0",
             announcedIp: "192.168.1.241"
+        },
+        {
+            portRange: { min: 40000, max: 49999 },
+            protocol: "tcp",    
+            ip: "0.0.0.0",
+            announcedIp: "192.168.1.241"
         }
     ],
+    // listenIps: [
+    //     {
+    //         ip: "0.0.0.0",
+    //         announcedIp: "192.168.1.241"
+    //     }
+    // ],
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
 };
 
+export const systemConfig = {
+    numWorkers: Object.keys(os.cpus()).length,
+    workerSettings:
+    {
+        dtlsCertificateFile: process.env.WORKER_CERT_FULLCHAIN,
+        dtlsPrivateKeyFile: process.env.WORKER_CERT_PRIVKEY,
+        // logLevel: 'warn',
+        // logTags:
+        //     [
+        //         'info',
+        //         'ice',
+        //         'dtls',
+        //         'rtp',
+        //         'srtp',
+        //         'rtcp',
+        //         'rtx',
+        //         'bwe',
+        //         'score',
+        //         'simulcast',
+        //         'svc',
+        //         'sctp'
+        //     ],
+        // TODO change later
+        disableLiburing: true
+    },
+
+}

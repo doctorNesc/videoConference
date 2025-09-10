@@ -1,13 +1,14 @@
 
 import { createWorker } from "mediasoup";
-import { Router, WebRtcTransport, Worker } from "mediasoup/node/lib/types";
+import { Router, WebRtcServerOptions, WebRtcTransport, WebRtcTransportOptions, Worker } from "mediasoup/node/lib/types";
 import { SharedState } from "../types";
-import { mediaCodecs, webRtcTransport_options } from "../config/mediasoup.config";
+import { mediaCodecs, systemConfig, webRtcTransport_options } from "../config/mediasoup.config";
 import { SocketId } from "socket.io-adapter";
+import { AppData } from "mediasoup-client/lib/types";
 
 export const creatMediasoupWorker = async (): Promise<Worker | undefined> => {
     try {
-        const worker = await createWorker();
+        const worker = await createWorker(systemConfig.workerSettings);
         console.log(`worker pid ${worker.pid}`);
         worker.on("died", () => {
             console.error("mediasoup worker has died");
@@ -18,6 +19,30 @@ export const creatMediasoupWorker = async (): Promise<Worker | undefined> => {
         console.error("Failed to create Mediasoup worker:", error);
     }
 };
+
+export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcServerOptions => {
+    const basePort = 40000 + workerIndex * 500;
+    const portRange = { min: basePort, max: basePort + 499 };
+    return {
+        listenInfos: [
+            {
+                portRange,
+                protocol: "udp",
+                ip: "0.0.0.0",
+                announcedIp: "192.168.1.241"
+            },
+            {
+                portRange,
+                protocol: "tcp",
+                ip: "0.0.0.0",
+                announcedIp: "192.168.1.241"
+            }
+        ],
+        // enableUdp: true,
+        // enableTcp: true,
+        // preferUdp: true,
+    };
+}
 
 export const getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
     // creates router for the roomName using worker.createRouter(options)
