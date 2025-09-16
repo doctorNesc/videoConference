@@ -13,8 +13,7 @@ interface PeerData {
 export interface SharedState {
   mediasoupWorkers?: Worker[];
   webRtcServers?: { workerIndex: number; webRtcServerId: string }[];
-  routers?: Router[];
-    transports: {
+  transports: {
     socketId: string;
     transport: WebRtcTransport;
     roomname: string;

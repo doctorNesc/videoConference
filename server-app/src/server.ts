@@ -18,6 +18,8 @@ app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/br
 //   methods: ["GET", "POST"]
 // }));
 
+// app.use("/api", roomRoutes);
+
 app.get("/api/roomUsers", (req: Request, res: Response) => {
   const room = req.query.room as string | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,7 +68,7 @@ const io = new IOServer(httpServer,
 // const connections = io.of("/mediasoup");
 
 
-const sharedState: SharedState = {
+export const sharedState: SharedState = {
   peers: {},
   rooms: {},
   producers: [],
@@ -75,21 +77,15 @@ const sharedState: SharedState = {
   mainRoomDevices: {},
   remoteAssignments: {},
   mediasoupWorkers: [],
+  webRtcServers: [],
 };
 
-// (async () => {
-//   sharedState.worker = await creatMediasoupWorker();
-// })();
-
-/**
- * Launch as many mediasoup Workers as given in the configuration file.
- */
-await runMediasoupWorkers();
+(async () => {
+  await runMediasoupWorkers();
+})();
 
 async function runMediasoupWorkers() {
   const { numWorkers } = systemConfig;
-
-  // logger.info('running %d mediasoup Workers...', numWorkers);
 
   for (let i = 0; i < numWorkers; ++i) {
     const worker = await createWorker(
@@ -116,6 +112,10 @@ async function runMediasoupWorkers() {
     // Create a WebRtcServer in this Worker, assigning different portRanges to each 
     const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
     const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
+    sharedState.webRtcServers!.push({ workerIndex: i, webRtcServerId: webRtcServer.id });
+    webRtcServer.on("workerclose", () => {
+      console.log("worker closed so webRtcServer closed");
+    });
 
     worker.appData.webRtcServer = webRtcServer;
 

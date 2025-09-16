@@ -1,11 +1,11 @@
 
 import { createWorker } from "mediasoup";
-import { Router, WebRtcServerOptions, WebRtcTransport, WebRtcTransportOptions, Worker } from "mediasoup/node/lib/types";
+import { Router, WebRtcServerOptions, WebRtcTransport, Worker } from "mediasoup/node/lib/types";
 import { SharedState } from "../types";
 import { mediaCodecs, systemConfig, webRtcTransport_options } from "../config/mediasoup.config";
 import { SocketId } from "socket.io-adapter";
-import { AppData } from "mediasoup-client/lib/types";
 
+let workerIndex: number = 0;
 export const creatMediasoupWorker = async (): Promise<Worker | undefined> => {
     try {
         const worker = await createWorker(systemConfig.workerSettings);
@@ -43,8 +43,14 @@ export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcS
         // preferUdp: true,
     };
 }
-
-export const getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
+const getOrAssignWorker = (state: SharedState): Worker => {
+    const worker = state.mediasoupWorkers![workerIndex];
+    if (++workerIndex == state.mediasoupWorkers!.length) {
+        workerIndex = 0;
+    }
+    return worker;
+}
+export const    getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
     // creates router for the roomName using worker.createRouter(options)
     let router;
     let isAdmin = false;
@@ -53,7 +59,8 @@ export const getOrCreateRoom = async (state: SharedState, roomName: string, sock
         router = state.rooms[roomName].router;
         peers = state.rooms[roomName].peers || [];
     } else {
-        router = await state.worker!.createRouter({ mediaCodecs });
+        const worker = getOrAssignWorker(state);
+        router = await worker.createRouter({ mediaCodecs });
         isAdmin = true; //if room is new, first user to create it will be an admin
     }
 
