@@ -3,14 +3,22 @@ import http from "http";
 import { Server as IOServer } from "socket.io";
 import { registerSocketHandlers } from "./handlers";
 import { SharedState } from "./types";
-import { creatMediasoupWorker } from "./mediasoup/utils";
+import { getWebRtcTransportOptionsForWorker } from "./mediasoup/utils";
 import path from "path";
 import dotenv from 'dotenv';
+import { createWorker } from "mediasoup";
+import { systemConfig } from "./config/mediasoup.config";
 
 dotenv.config();
 
 const app = express();
-app.use(express.static(path.join(__dirname,"../../client-app/dist/client-app/browser")));
+app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/browser")));
+// app.use(cors({
+//   origin: ["http://192.168.1.241:3000"],
+//   methods: ["GET", "POST"]
+// }));
+
+// app.use("/api", roomRoutes);
 
 app.get("/api/roomUsers", (req: Request, res: Response) => {
   const room = req.query.room as string | undefined;
@@ -55,25 +63,74 @@ httpServer.listen(process.env.PORT || 3000, () => {
 });
 
 const io = new IOServer(httpServer,
-  { cors: { origin: "http://localhost:4200" } }
+  { cors: { origin: ["http://localhost:4200", "http://192.168.1.241:3000"] } }
 );
 // const connections = io.of("/mediasoup");
 
 
-const sharedState: SharedState = {
+export const sharedState: SharedState = {
   peers: {},
   rooms: {},
   producers: [],
   consumers: [],
   transports: [],
-  // screenProducerTransports: {},
   mainRoomDevices: {},
   remoteAssignments: {},
+  mediasoupWorkers: [],
+  webRtcServers: [],
 };
 
 (async () => {
-  sharedState.worker = await creatMediasoupWorker();
+  await runMediasoupWorkers();
 })();
+
+async function runMediasoupWorkers() {
+  const { numWorkers } = systemConfig;
+
+  for (let i = 0; i < numWorkers; ++i) {
+    const worker = await createWorker(
+      // {
+      // 	dtlsCertificateFile : config.mediasoup.workerSettings.dtlsCertificateFile,
+      // 	dtlsPrivateKeyFile  : config.mediasoup.workerSettings.dtlsPrivateKeyFile,
+      // 	logLevel            : config.mediasoup.workerSettings.logLevel,
+      // 	logTags             : config.mediasoup.workerSettings.logTags,
+      // 	rtcMinPort          : Number(config.mediasoup.workerSettings.rtcMinPort),
+      // 	rtcMaxPort          : Number(config.mediasoup.workerSettings.rtcMaxPort),
+      // 	disableLiburing     : Boolean(config.mediasoup.workerSettings.disableLiburing)
+      // }
+      systemConfig.workerSettings
+    );
+
+    worker.on('died', () => {
+      console.log(
+        'mediasoup Worker died, exiting  in 2 seconds... [pid:%d]', worker.pid);
+      setTimeout(() => process.exit(1), 2000);
+    });
+
+    sharedState.mediasoupWorkers!.push(worker);
+
+    // Create a WebRtcServer in this Worker, assigning different portRanges to each 
+    const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
+    const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
+    sharedState.webRtcServers!.push({ workerIndex: i, webRtcServerId: webRtcServer.id });
+    webRtcServer.on("workerclose", () => {
+      console.log("worker closed so webRtcServer closed");
+    });
+
+    worker.appData.webRtcServer = webRtcServer;
+
+    // Log worker resource usage every X seconds.
+    setInterval(async () => {
+      const usage = await worker.getResourceUsage();
+
+      console.log('mediasoup Worker resource usage [pid:%d]: %o', worker.pid, usage);
+
+      const dump = await worker.dump();
+
+      console.log('mediasoup Worker dump [pid:%d]: %o', worker.pid, dump);
+    }, 100000);
+  }
+}
 
 registerSocketHandlers(io, sharedState);
 

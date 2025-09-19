@@ -11,8 +11,8 @@ interface PeerData {
 }
 
 export interface SharedState {
-  rooms: Record<string, { router: Router; peers: string[] }>;
-  peers: Record<string, PeerData>;
+  mediasoupWorkers?: Worker[];
+  webRtcServers?: { workerIndex: number; webRtcServerId: string }[];
   transports: {
     socketId: string;
     transport: WebRtcTransport;
@@ -22,10 +22,11 @@ export interface SharedState {
   }[];
   producers: { socketId: string; roomName: string; producer: Producer, mediaType: MediaType }[];
   consumers: { socketId: string; roomName: string; consumer: Consumer }[];
-  // screenProducerTransports: Record<string, { socketId: string; transport: WebRtcTransport | undefined }>;
+
+  rooms: Record<string, { router: Router; peers: string[] }>;
+  peers: Record<string, PeerData>;
   mainRoomDevices: { [roomName: string]: string[] }; // roomName -> [socketId, ...]
   remoteAssignments: { [roomName: string]: { [remoteSocketId: string]: string } }; // remoteSocketId -> mainRoomSocketId
-  worker?: Worker;
-  }
+}
 
-  export type MediaType = "camera" | "screen";
+export type MediaType = "camera" | "screen";

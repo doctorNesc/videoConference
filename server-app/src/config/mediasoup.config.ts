@@ -1,5 +1,5 @@
-import { RtpCodecCapability } from "mediasoup/node/lib/types";
-
+import { RtpCodecCapability, WebRtcTransportOptions } from "mediasoup/node/lib/types";
+import os from "os";
 
 export const mediaCodecs: RtpCodecCapability[] = [
     { kind: "audio", mimeType: "audio/opus", clockRate: 48000, channels: 2 },
@@ -12,15 +12,56 @@ export const mediaCodecs: RtpCodecCapability[] = [
 ];
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
-export const webRtcTransport_options = {
-    listenIps: [
+export const webRtcTransport_options: WebRtcTransportOptions = {
+    listenInfos: [
         {
-            ip: "0.0.0.0", // PRIVATE_IP_OF_INSTANCE : 172.31.37.220
-            announcedIp: "192.168.1.241", //PUBLIC_IP_OF_INSTANCE : 147.175.123.135 / 192.168.1.250
+            portRange: { min: 40000, max: 49999 },
+            protocol: "udp",
+            ip: "0.0.0.0",
+            announcedIp: "192.168.1.241"
         },
+        {
+            portRange: { min: 40000, max: 49999 },
+            protocol: "tcp",    
+            ip: "0.0.0.0",
+            announcedIp: "192.168.1.241"
+        }
     ],
+    // listenIps: [
+    //     {
+    //         ip: "0.0.0.0",
+    //         announcedIp: "192.168.1.241"
+    //     }
+    // ],
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
 };
 
+export const systemConfig = {
+    numWorkers: Object.keys(os.cpus()).length,
+    workerSettings:
+    {
+        dtlsCertificateFile: process.env.WORKER_CERT_FULLCHAIN,
+        dtlsPrivateKeyFile: process.env.WORKER_CERT_PRIVKEY,
+        // logLevel: 'warn',
+        // logTags:
+        //     [
+        //         'info',
+        //         'ice',
+        //         'dtls',
+        //         'rtp',
+        //         'srtp',
+        //         'rtcp',
+        //         'rtx',
+        //         'bwe',
+        //         'score',
+        //         'simulcast',
+        //         'svc',
+        //         'sctp'
+        //     ],
+        // TODO change later
+        disableLiburing: true
+    },
+
+}

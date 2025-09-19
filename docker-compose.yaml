@@ -1,0 +1,16 @@
+name: meetroom
+
+services:
+  backend:
+    build: ./server-app
+    ports:
+      - "3000:3000"
+    restart: always  
+
+  frontend:
+    build: ./client-app
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    restart: always
