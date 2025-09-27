@@ -1,5 +1,7 @@
-import { Router } from "mediasoup/node/lib/types";
+import { Router, Worker } from "mediasoup/node/lib/types";
 import { Peer } from "./peer";
+import { SharedState } from "../types";
+import { mediaCodecs } from "../config/mediasoup.config";
 
 export class Room {
     roomName: string;
@@ -10,47 +12,71 @@ export class Room {
         this.roomName = roomName;
         this.router = router;
     }
+
+    addPeer(peer: Peer) {
+        this.peers.set(peer.id, peer);
+    }
+
+    getPeer(peerId: string): Peer | undefined {
+        return this.peers.get(peerId);
+    }
+
+    getAllPeers(): Peer[] {
+        return Array.from(this.peers.values()) || [];
+    }
+
+    removePeer(peerId: string): number {
+        const peer = this.peers.get(peerId);
+        if (peer) {
+            peer.close();
+            this.peers.delete(peerId);
+        }
+
+        // Cleanup if no peers left
+        if (this.peers.size === 0) {
+            this.router.close();
+            this.peers.clear();
+            console.log(`Room [${this.roomName}] closed`);
+        }
+        return this.peers.size;
+    }
 }
 
 export class RoomManager {
-
+    workerIndex: number = 0;
     rooms: Map<string, Room> = new Map();
+    socketToRoom: Map<string, string> = new Map();
 
-    constructor() {
-
-    }
-
-    joinRoom() {
-
-    }
+    constructor() {}
 
     getOrAssignWorker = (state: SharedState): Worker => {
-        const worker = state.mediasoupWorkers![workerIndex];
-        if (++workerIndex == state.mediasoupWorkers!.length) {
-            workerIndex = 0;
+        const worker = state.mediasoupWorkers![this.workerIndex];
+        if (++this.workerIndex == state.mediasoupWorkers!.length) {
+            this.workerIndex = 0;
         }
         return worker;
     }
 
-    getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
-        // creates router for the roomName using worker.createRouter(options)
-        let router;
-        let isAdmin = false;
-        let peers: string[] = [];
-        if (state.rooms[roomName]) {
-            router = state.rooms[roomName].router;
-            peers = state.rooms[roomName].peers || [];
-        } else {
-            const worker = getOrAssignWorker(state);
-            router = await worker.createRouter({ mediaCodecs });
-            isAdmin = true; //if room is new, first user to create it will be an admin
+    getOrCreateRoom = async (state: SharedState, roomName: string) => {
+
+        let room = this.rooms.get(roomName);
+
+        if (!room) {
+            const worker = this.getOrAssignWorker(state);
+            const router = await worker.createRouter({ mediaCodecs });
+            // peer.setAdmin(true); //if room is new, first user to create it will be an admin
+            room = new Room(roomName, router);
+            this.rooms.set(roomName, room);
         }
 
-        state.rooms[roomName] = {
-            router,
-            peers: [...peers, socketId],
-        };
-
-        return { router, isAdmin };
+        return room;
     };
+
+    getRoom(name: string): Room | undefined {
+        return this.rooms.get(name);
+    }
+
+    deleteRoom(roomName: string) {
+        this.rooms.delete(roomName);
+    }
 }

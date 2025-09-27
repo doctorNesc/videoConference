@@ -50,7 +50,7 @@ const getOrAssignWorker = (state: SharedState): Worker => {
     }
     return worker;
 }
-export const    getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
+export const getOrCreateRoom = async (state: SharedState, roomName: string, socketId: string) => {
     // creates router for the roomName using worker.createRouter(options)
     let router;
     let isAdmin = false;

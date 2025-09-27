@@ -274,7 +274,7 @@ export class VideoRoomService {
 
     await this.socket.emit(
       'createWebRtcTransport',
-      { isConsumer: true, isScreenShare: mediaType == 'screen' },
+      {roomName: this.roomName, isConsumer: true, isScreenShare: mediaType == 'screen' },
       ({ params }: any) => {
         if (params.error) {
           console.error(params.error);

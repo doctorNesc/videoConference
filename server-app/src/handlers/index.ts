@@ -5,15 +5,16 @@ import { registerTransportHandlers } from "./transportHandlers";
 import { registerConsumerHandlers } from "./consumerHandlers";
 import { registerProducerHandlers } from "./producerHandlers";
 import { registerChatHandlers } from "./chatHandlers";
+import { RoomManager } from "../core/roomManager";
 
-export function registerSocketHandlers(io: Server, state: SharedState) {
+export function registerSocketHandlers(io: Server, state: SharedState, roomManager: RoomManager ) {
   io.of("/mediasoup").on("connection", (socket: Socket) => {
     
     socket.emit("connection-success", {
       socketId: socket.id,
     });
 
-    registerRoomHandlers(socket, state);
+    registerRoomHandlers(socket, state,roomManager);
     registerTransportHandlers(socket, state);
     registerProducerHandlers(socket, state);
     registerConsumerHandlers(socket, state);

@@ -8,6 +8,7 @@ import path from "path";
 import dotenv from 'dotenv';
 import { createWorker } from "mediasoup";
 import { systemConfig } from "./config/mediasoup.config";
+import { RoomManager } from "./core/roomManager";
 
 dotenv.config();
 
@@ -131,6 +132,7 @@ async function runMediasoupWorkers() {
     }, 100000);
   }
 }
+const roomManager = new RoomManager(); //single instance for dependency injection
 
-registerSocketHandlers(io, sharedState);
+registerSocketHandlers(io, sharedState, roomManager);
 
