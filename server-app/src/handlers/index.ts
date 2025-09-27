@@ -15,7 +15,7 @@ export function registerSocketHandlers(io: Server, state: SharedState, roomManag
     });
 
     registerRoomHandlers(socket, state,roomManager);
-    registerTransportHandlers(socket, state);
+    registerTransportHandlers(socket, state, roomManager);
     registerProducerHandlers(socket, state);
     registerConsumerHandlers(socket, state);
     registerChatHandlers(socket, state);

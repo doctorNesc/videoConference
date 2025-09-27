@@ -10,6 +10,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
 
     const room = await roomManager.getOrCreateRoom(state, roomName);
     const peer = new Peer(socket.id, socket, userName, isMainRoom, roomName);
+    roomManager.socketToRoom.set(socket.id, roomName);
     room.addPeer(peer);
     console.log("User ", userName, " joined room " + roomName);
 
@@ -28,8 +29,8 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
     });
   });
 
-  //unused
   socket.on(ACTIONS.LEAVE_ROOM, ({ roomName }) => {
+    roomManager.getRoom(roomName)?.getPeer(socket.id)?.close();
     const userCount = roomManager.getRoom(roomName)?.removePeer(socket.id);
     if (!userCount) {
       roomManager.deleteRoom(roomName);

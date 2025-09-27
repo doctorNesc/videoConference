@@ -19,10 +19,11 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
         }
         const transport: WebRtcTransport = await createWebRtcTransport(room.router);
         // add transport to Peer's props
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        isConsumer ? room.getPeer(socket.id)?.setRecvTransport(transport) :
+        if (isConsumer) {
+          room.getPeer(socket.id)?.setRecvTransport(transport)
+        } else {
           room.getPeer(socket.id)?.setSendTransport(transport);
-
+        }
         callback({
           params: {
             id: transport?.id,
@@ -56,50 +57,50 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     //   const mainDevices = state.mainRoomDevices[roomName] || [];
     //   const wasMainRoom = mainDevices.includes(socket.id);
 
-      // state.mainRoomDevices[roomName] = mainDevices.filter(id => id !== socket.id);
-      // if (wasMainRoom) {
-      //   console.log("mainRoom peer disconnected");
-      //   const assignments = state.remoteAssignments[roomName] || {};
-      //   Object.entries(assignments).forEach(([remoteId, assignedDevice]) => {
-      //     if (assignedDevice === socket.id) {
-      //       // Reassign this remote user to another main room device
-      //       const devices = state.mainRoomDevices[roomName];
-      //       if (devices && devices.length > 0) {
-      //         // Use your round-robin function
-      //         const newDevice = devices.reduce((a, b) => {
-      //           const aCount = Object.values(assignments).filter(id => id === a).length;
-      //           const bCount = Object.values(assignments).filter(id => id === b).length;
-      //           return aCount <= bCount ? a : b;
-      //         });
-      //         assignments[remoteId] = newDevice;
-      //       } else {
-      //         // No devices left, remove assignment
-      //         delete assignments[remoteId];
-      //       }
-      //     }
-      //   });
-      //   // Clean up all transports for this socket
-      //   state.transports = state.transports.filter((t) => {
-      //     if (t.socketId === socket.id) {
-      //       t.transport.close();
-      //       return false;
-      //     }
-      //     return true;
-      //   });
+    // state.mainRoomDevices[roomName] = mainDevices.filter(id => id !== socket.id);
+    // if (wasMainRoom) {
+    //   console.log("mainRoom peer disconnected");
+    //   const assignments = state.remoteAssignments[roomName] || {};
+    //   Object.entries(assignments).forEach(([remoteId, assignedDevice]) => {
+    //     if (assignedDevice === socket.id) {
+    //       // Reassign this remote user to another main room device
+    //       const devices = state.mainRoomDevices[roomName];
+    //       if (devices && devices.length > 0) {
+    //         // Use your round-robin function
+    //         const newDevice = devices.reduce((a, b) => {
+    //           const aCount = Object.values(assignments).filter(id => id === a).length;
+    //           const bCount = Object.values(assignments).filter(id => id === b).length;
+    //           return aCount <= bCount ? a : b;
+    //         });
+    //         assignments[remoteId] = newDevice;
+    //       } else {
+    //         // No devices left, remove assignment
+    //         delete assignments[remoteId];
+    //       }
+    //     }
+    //   });
+    //   // Clean up all transports for this socket
+    //   state.transports = state.transports.filter((t) => {
+    //     if (t.socketId === socket.id) {
+    //       t.transport.close();
+    //       return false;
+    //     }
+    //     return true;
+    //   });
 
-      //   delete state.peers[socket.id];
+    //   delete state.peers[socket.id];
 
-      //   state.remoteAssignments[roomName] = assignments;
-      // }
+    //   state.remoteAssignments[roomName] = assignments;
+    // }
 
-      // remove socket from room
-  //     state.rooms[roomName] = {
-  //       router: state.rooms[roomName].router,
-  //       peers: state.rooms[roomName].peers.filter(
-  //         (socketId) => socketId !== socket.id
-  //       ),
-  //     };
-  //   }
+    // remove socket from room
+    //     state.rooms[roomName] = {
+    //       router: state.rooms[roomName].router,
+    //       peers: state.rooms[roomName].peers.filter(
+    //         (socketId) => socketId !== socket.id
+    //       ),
+    //     };
+    //   }
   });
 
   // see client's socket.emit('transport-connect', ...)
