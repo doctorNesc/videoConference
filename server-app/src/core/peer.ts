@@ -55,8 +55,8 @@ export class Peer {
         // Clean up everything when peer disconnects
         this.producers.forEach((p) => p.close());
         this.consumers.forEach((c) => c.close());
-        this.recvTransport.close();
-        this.sendTransport.close();
+        this.recvTransport?.close();
+        this.sendTransport?.close();
         this.producers.clear();
         this.consumers.clear();
     }

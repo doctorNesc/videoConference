@@ -116,7 +116,7 @@ export class VideoRoomService {
 
   joinRoom() {
     this.socket.emit('joinRoom', { roomName: this.roomName, userName: this.username, isMainRoom: this.isMainRoom }, (data: any) => {
-      // console.log('Router RTP Capabilities:', data.rtpCapabilities);
+      console.log('Router RTP Capabilities:', data.rtpCapabilities);
       this.rtpCapabilities = data.rtpCapabilities;
       this.createDevice();
     });
@@ -126,7 +126,7 @@ export class VideoRoomService {
     try {
       this.device = new Device();
       await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
-      // console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
+      console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
       this.createSendTransport('video');
     } catch (error: any) {
       console.error('Error creating device:', error);
@@ -139,14 +139,14 @@ export class VideoRoomService {
   createSendTransport(type: streamType) {
     this.socket.emit(
       'createWebRtcTransport',
-      { isConsumer: false, isScreenShare: type == 'screen' },
+      { roomName: this.roomName, isConsumer: false },
       ({ params }: any) => {
         if (params.error) {
           console.error(params.error);
           return;
         }
 
-        // console.log('Create WebRTC Transport params:', params);
+        console.log('Create WebRTC Transport params:', params);
         if (type === 'video') {
           this.producerTransport = this.device.createSendTransport(params);
           this.producerTransport.on(
@@ -156,6 +156,7 @@ export class VideoRoomService {
               callback: Function,
               errback: Function
             ) => {
+              console.log("Connect dtls parameters:", dtlsParameters);
               try {
                 await this.socket.emit('transport-connect', {
                   dtlsParameters,
@@ -177,7 +178,7 @@ export class VideoRoomService {
                   {
                     kind: parameters.kind,
                     rtpParameters: parameters.rtpParameters,
-                    isScreen: false,
+                    // isScreen: false,
                     // appData: parameters.appData,
                   },
                   ({ id, producersExist }: any) => {
@@ -203,7 +204,7 @@ export class VideoRoomService {
               errback: Function
             ) => {
               try {
-                // console.log('Connect dtls parameters:', dtlsParameters);
+                console.log('Connect dtls parameters:', dtlsParameters);
                 await this.socket.emit('transport-connect', {
                   dtlsParameters,
                   isScreen: true,
@@ -264,8 +265,7 @@ export class VideoRoomService {
 
   async signalNewConsumerTransport(
     remoteProducerId: string,
-    mediaType: streamType,
-    assignedMainRoomDevice?: string,
+    // assignedMainRoomDevice?: string,
     socketId?: string,
     name?: string
   ) {
@@ -274,7 +274,7 @@ export class VideoRoomService {
 
     await this.socket.emit(
       'createWebRtcTransport',
-      {roomName: this.roomName, isConsumer: true, isScreenShare: mediaType == 'screen' },
+      { roomName: this.roomName, isConsumer: true },
       ({ params }: any) => {
         if (params.error) {
           console.error(params.error);
@@ -299,8 +299,8 @@ export class VideoRoomService {
             try {
               await this.socket.emit('transport-recv-connect', {
                 dtlsParameters,
-                serverConsumerTransportId: params.id,
-                mediaType,
+                // serverConsumerTransportId: params.id,
+                // mediaType,
               });
               callback();
             } catch (error) {
@@ -313,8 +313,8 @@ export class VideoRoomService {
           consumerTransport,
           remoteProducerId,
           params.id,
-          mediaType,
-          assignedMainRoomDevice,
+          // mediaType,
+          // assignedMainRoomDevice,
           socketId,
           name
         );
@@ -326,8 +326,8 @@ export class VideoRoomService {
     consumerTransport: Transport,
     remoteProducerId: string,
     serverConsumerTransportId: string,
-    mediaType: streamType,
-    assignedMainRoomDevice?: string,
+    // mediaType: streamType,
+    // assignedMainRoomDevice?: string,
     socketId?: string,
     name?: string
   ) {
@@ -337,7 +337,7 @@ export class VideoRoomService {
         rtpCapabilities: this.device.rtpCapabilities,
         remoteProducerId,
         serverConsumerTransportId,
-        mediaType,
+        // mediaType,
       },
       async ({ params }: any) => {
         if (params.error) {
@@ -364,7 +364,7 @@ export class VideoRoomService {
           remoteProducerId,
           new MediaStream([track]),
           params.userName || name || '',
-          assignedMainRoomDevice,
+          // assignedMainRoomDevice,
           socketId
         );
 
@@ -489,8 +489,8 @@ export class VideoRoomService {
         this.assignedDevice = response.myAssignedMainRoomDevice;
       }
 
-      producerList.forEach(({ id, mediaType, assignedMainRoomDevice, socketId, name }) =>
-        this.signalNewConsumerTransport(id, mediaType, assignedMainRoomDevice, socketId, name)
+      producerList.forEach(({ id, socketId, name }) =>
+        this.signalNewConsumerTransport(id, socketId, name)
       );
     });
   }
@@ -595,15 +595,15 @@ export class VideoRoomService {
     // this.screenProducerTransport?.close();
     // this.screenProducerTransport = undefined;
 
-  if (this.screenProducer) {
-    try { this.screenProducer.close(); } catch {}
-    this.screenProducer = undefined;
-  }
-  if (this.screenProducerTransport) {
-    try { this.screenProducerTransport.close(); } catch {}
-    this.screenProducerTransport = undefined;
-  }
-  this.isSharingScreenSubject.next(false);
+    if (this.screenProducer) {
+      try { this.screenProducer.close(); } catch { }
+      this.screenProducer = undefined;
+    }
+    if (this.screenProducerTransport) {
+      try { this.screenProducerTransport.close(); } catch { }
+      this.screenProducerTransport = undefined;
+    }
+    this.isSharingScreenSubject.next(false);
 
     const participants = this.participant$.value.filter(
       (particicipant) => particicipant.id != 'screen'

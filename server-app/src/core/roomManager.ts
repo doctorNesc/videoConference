@@ -1,4 +1,4 @@
-import { Router, Worker } from "mediasoup/node/lib/types";
+import { Router, WebRtcServer, Worker } from "mediasoup/node/lib/types";
 import { Peer } from "./peer";
 import { SharedState } from "../types";
 import { mediaCodecs } from "../config/mediasoup.config";
@@ -7,18 +7,24 @@ export class Room {
     roomName: string;
     router: Router;
     peers: Map<string, Peer> = new Map();
+    webRtcServer!: WebRtcServer;
 
-    constructor(roomName: string, router: Router) {
+    constructor(roomName: string, router: Router, webRtcServer: WebRtcServer) {
         this.roomName = roomName;
         this.router = router;
+        this.webRtcServer = webRtcServer;
     }
 
     addPeer(peer: Peer) {
         this.peers.set(peer.id, peer);
     }
 
-    getPeer(peerId: string): Peer | undefined {
-        return this.peers.get(peerId);
+    getPeer(peerId: string): Peer {
+        const peer = this.peers.get(peerId);
+        if (!peer) {
+            throw new Error(`Peer with peerId:'${peerId}' not found`);
+        }
+        return peer;
     }
 
     getAllPeers(): Peer[] {
@@ -47,7 +53,7 @@ export class RoomManager {
     rooms: Map<string, Room> = new Map();
     socketToRoom: Map<string, string> = new Map();
 
-    constructor() {}
+    constructor() { }
 
     getOrAssignWorker = (state: SharedState): Worker => {
         const worker = state.mediasoupWorkers![this.workerIndex];
@@ -65,15 +71,22 @@ export class RoomManager {
             const worker = this.getOrAssignWorker(state);
             const router = await worker.createRouter({ mediaCodecs });
             // peer.setAdmin(true); //if room is new, first user to create it will be an admin
-            room = new Room(roomName, router);
+            console.log("WebServer worker pid:", worker.pid);
+            console.log("WebServer pid:", (worker.appData.webRtcServer as WebRtcServer).id);
+
+            room = new Room(roomName, router, worker.appData.webRtcServer as WebRtcServer);
             this.rooms.set(roomName, room);
         }
 
         return room;
     };
 
-    getRoom(name: string): Room | undefined {
-        return this.rooms.get(name);
+    getRoom(name: string): Room {
+        const room = this.rooms.get(name);
+        if (!room) {
+            throw new Error(`Room '${name}' not found`);
+        }
+        return room;
     }
 
     deleteRoom(roomName: string) {

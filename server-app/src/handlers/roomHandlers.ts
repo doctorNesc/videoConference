@@ -24,6 +24,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
     // }
 
     // call callback from the client and send back the rtpCapabilities
+    // console.log("sending Room RTP Capabilities to client", room.router.rtpCapabilities);
     callback({
       rtpCapabilities: room.router.rtpCapabilities,
     });
@@ -32,6 +33,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
   socket.on(ACTIONS.LEAVE_ROOM, ({ roomName }) => {
     roomManager.getRoom(roomName)?.getPeer(socket.id)?.close();
     const userCount = roomManager.getRoom(roomName)?.removePeer(socket.id);
+    roomManager.socketToRoom.delete(socket.id);
     if (!userCount) {
       roomManager.deleteRoom(roomName);
     }

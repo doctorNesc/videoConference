@@ -1,41 +1,35 @@
-import { Producer, WebRtcTransport } from "mediasoup/node/lib/types";
+import { WebRtcTransport } from "mediasoup/node/lib/types";
 import { Socket } from "socket.io";
 import { createWebRtcTransport } from "../mediasoup/utils";
-import { MediaType, SharedState } from "../types";
-import { Transport } from "mediasoup/node/lib/types";
-import { SocketId } from "socket.io-adapter";
+import { SharedState } from "../types";
 import { RoomManager } from "../core/roomManager";
 
 
 export function registerTransportHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
-  socket.on(
-    "createWebRtcTransport",
-    async ({ roomName, isConsumer }, callback) => {
-      try {
-        // get room name from peer's props
-        const room = roomManager.getRoom(roomName);
-        if (!room) {
-          throw new Error(`Room ${roomName} not found`);
-        }
-        const transport: WebRtcTransport = await createWebRtcTransport(room.router);
-        // add transport to Peer's props
-        if (isConsumer) {
-          room.getPeer(socket.id)?.setRecvTransport(transport)
-        } else {
-          room.getPeer(socket.id)?.setSendTransport(transport);
-        }
-        callback({
-          params: {
-            id: transport?.id,
-            iceParameters: transport.iceParameters,
-            iceCandidates: transport.iceCandidates,
-            dtlsParameters: transport.dtlsParameters,
-          },
-        });
-      } catch (error) {
-        console.error("Error creating WebRTC transport:", error);
+  socket.on("createWebRtcTransport", async ({ roomName, isConsumer }, callback) => {
+    try {
+      // get room name from peer's props
+      const room = roomManager.getRoom(roomName);
+      console.log("Creating WebRTC transport for room:", roomName);
+      const transport: WebRtcTransport = await createWebRtcTransport(room.router, room.webRtcServer);
+      // add transport to Peer's props
+      if (isConsumer) {
+        room.getPeer(socket.id)?.setRecvTransport(transport)
+      } else {
+        room.getPeer(socket.id)?.setSendTransport(transport);
       }
+      callback({
+        params: {
+          id: transport?.id,
+          iceParameters: transport.iceParameters,
+          iceCandidates: transport.iceCandidates,
+          dtlsParameters: transport.dtlsParameters,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating WebRTC transport:", error);
     }
+  }
   );
 
   socket.on("disconnect", () => {
@@ -43,11 +37,12 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
     const room = roomManager.getRoom(roomName);
-    const peer = room?.getPeer(socket.id);
+    const peer = room.getPeer(socket.id);
 
     if (peer) {
       peer.close();              // cleanup resources
-      room?.removePeer(socket.id);  // remove from room
+      room.removePeer(socket.id);  // remove from room
+      roomManager.socketToRoom.delete(socket.id);
     }
     roomManager.socketToRoom.delete(socket.id);
 
@@ -104,16 +99,14 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   });
 
   // see client's socket.emit('transport-connect', ...)
-  socket.on("transport-connect", async ({ dtlsParameters, isScreen }) => {
+  socket.on("transport-connect", async ({ dtlsParameters }) => {
     try {
-      let transport: Transport | undefined;
-      if (isScreen) {
-        transport = getScreenTransport(socket.id);
-      } else {
-        transport = getTransport(socket.id);
-      }
+      const roomName = roomManager.socketToRoom.get(socket.id);
+      const transport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
+      // const transport = getTransport(socket.id);
 
-      await transport?.connect({ dtlsParameters });
+
+      await transport.connect({ dtlsParameters });
     } catch (error) {
       console.error("Error connecting transport:", error);
     }
@@ -121,18 +114,21 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
   socket.on(
     "transport-produce",
-    async ({ kind, rtpParameters, isScreen }, callback) => {
+    async ({ kind, rtpParameters, }, callback) => {
       // call produce based on the prameters from the client
-      let transport;
-      if (isScreen) {
-        transport = getScreenTransport(socket.id);
-      } else {
-        transport = getTransport(socket.id);
-      }
+      // let transport;
+      // if (isScreen) {
+      //   transport = getScreenTransport(socket.id);
+      // } else {
+      //   transport = getTransport(socket.id);
+      // }
+      const roomName = roomManager.socketToRoom.get(socket.id);
+      const peer = roomManager.getRoom(roomName || "")?.getPeer(socket.id);
 
+      const transport = peer?.sendTransport;
       const producer = await transport!.produce({ kind, rtpParameters });
 
-      const roomName = state.peers[socket.id].roomName;
+      // const roomName = state.peers[socket.id].roomName;
 
       // if (isScreen && producer) { //add screenProducer to a list to close it later
       //   state.screenProducerTransports[producer.id] = {
@@ -140,18 +136,18 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       //     transport: transport,
       //   };
       // }
-      addProducer(producer, roomName, isScreen ? "screen" : "camera");
+      peer?.addProducer(producer);
+      // addProducer(producer, roomName, isScreen ? "screen" : "camera");
 
       informConsumers(
-        roomName,
+        roomName!,
         socket.id,
         producer.id,
-        isScreen ? "screen" : "camera"
       );
       // Send back to the client the Producer's id
       callback({
         id: producer.id,
-        producersExist: state.producers.length > 1 ? true : false,
+        producersExist: peer.producers.size > 0 ? true : false,
       });
     }
   );
@@ -159,12 +155,15 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   socket.on(
     "transport-recv-connect",
     async ({ dtlsParameters, serverConsumerTransportId, mediaType }) => {
-      const consumerTransport = state.transports.find(
-        (transportData) =>
-          transportData.isConsumer &&
-          transportData.transport.id == serverConsumerTransportId &&
-          transportData.isScreen == (mediaType == "screen")
-      )?.transport;
+      const roomName = roomManager.socketToRoom.get(socket.id);
+      const peer = roomManager.getRoom(roomName || "")?.getPeer(socket.id);
+      const consumerTransport = peer?.recvTransport; //TODO check if right implementation
+      // const consumerTransport = state.transports.find(
+      //   (transportData) =>
+      //     transportData.isConsumer &&
+      //     transportData.transport.id == serverConsumerTransportId &&
+      //     transportData.isScreen == (mediaType == "screen")
+      // )?.transport;
       await consumerTransport?.connect({ dtlsParameters });
     }
   );
@@ -189,71 +188,76 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     });
   });
 
-  const getTransport = (socketId: SocketId) => {
-    const producerTransport = state.transports.find(
-      (transport) =>
-        transport.socketId === socketId &&
-        !transport.isConsumer &&
-        !transport.isScreen
-    );
-    return producerTransport?.transport;
-  };
+  // const getTransport = (socketId: SocketId) => {
+  //   const producerTransport = state.transports.find(
+  //     (transport) =>
+  //       transport.socketId === socketId &&
+  //       !transport.isConsumer &&
+  //       !transport.isScreen
+  //   );
+  //   return producerTransport?.transport;
+  // };
 
-  const getScreenTransport = (socketId: SocketId) => {
-    const producerTransport = state.transports.find(
-      (transport) =>
-        transport.socketId === socketId &&
-        !transport.isConsumer &&
-        transport.isScreen
-    );
-    return producerTransport?.transport;
-  };
+  // const getScreenTransport = (socketId: SocketId) => {
+  //   const producerTransport = state.transports.find(
+  //     (transport) =>
+  //       transport.socketId === socketId &&
+  //       !transport.isConsumer &&
+  //       transport.isScreen
+  //   );
+  //   return producerTransport?.transport;
+  // };
 
-  const informConsumers = (roomName: string, producerSocketId: string, producerId: string, mediaType: MediaType) => {
-    console.log(`New ${mediaType} producer joined in room ${roomName}, socket ${producerSocketId}:`, producerId);
-    const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
+  const informConsumers = (roomName: string, producerSocketId: string, producerId: string) => {
+    console.log(`New producer joined in room ${roomName}, socket ${producerSocketId}:`, producerId);
+    // const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
 
-    if (!state.remoteAssignments[roomName]) {
-      state.remoteAssignments[roomName] = {};
-    }
+    // if (!state.remoteAssignments[roomName]) {
+    //   state.remoteAssignments[roomName] = {};
+    // }
 
-    if (isProducerMainRoom) {
-      // Only inform remote users, not other main room devices
-      console.log("Informing consumers that are not main room devices for socket:",);
-      Object.keys(state.peers).forEach(socketId => {
-        if (
-          state.peers[socketId].roomName === roomName &&
-          !state.mainRoomDevices[roomName]?.includes(socketId) &&
-          socketId !== producerSocketId
-        ) {
-          state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
-        }
-      });
-    } else {
-      // Remote user: inform the assigned main room device
-      const assignedDevice = state.remoteAssignments[roomName][producerSocketId];
-      if (assignedDevice && state.peers[assignedDevice]) {
-        state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
+    // if (isProducerMainRoom) {
+    // Only inform remote users, not other main room devices
+    const room = roomManager.getRoom(roomName || "");
+    room?.getAllPeers().forEach(element => {
+      if (element.id != producerSocketId) {
+        element.socket.emit("new-producer", { producerId });
       }
-      Object.keys(state.peers).forEach(socketId => { //notify all remote users
-        if (
-          state.peers[socketId].roomName === roomName &&
-          !state.mainRoomDevices[roomName]?.includes(socketId) &&
-          socketId !== producerSocketId
-        ) {
-          state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
-        }
-      });
+    });
+    // Object.keys(state.peers).forEach(socketId => {
+    //   if (
+    //     state.peers[socketId].roomName === roomName &&
+    //     !state.mainRoomDevices[roomName]?.includes(socketId) &&
+    //     socketId !== producerSocketId
+    //   ) {
+    //     state.peers[socketId].socket.emit("new-producer", { producerId });
+    //   }
+    // });
+    // } else {
+    //   // Remote user: inform the assigned main room device
+    //   const assignedDevice = state.remoteAssignments[roomName][producerSocketId];
+    //   if (assignedDevice && state.peers[assignedDevice]) {
+    //     state.peers[assignedDevice].socket.emit("new-producer", { producerId, mediaType });
+    //   }
+    //   Object.keys(state.peers).forEach(socketId => { //notify all remote users
+    //     if (
+    //       state.peers[socketId].roomName === roomName &&
+    //       !state.mainRoomDevices[roomName]?.includes(socketId) &&
+    //       socketId !== producerSocketId
+    //     ) {
+    //       state.peers[socketId].socket.emit("new-producer", { producerId, mediaType });
+    //     }
+    //   });
 
-    }
+    // }
   };
 
-  const addProducer = (producer: Producer, roomName: string, mediaType: MediaType) => {
-    state.producers = [...state.producers, { socketId: socket.id, producer, roomName, mediaType }];
+  // const addProducer = (producer: Producer, roomName: string, mediaType: MediaType) => {
+  //   state.producers = [...state.producers, { socketId: socket.id, producer, roomName, mediaType }];
 
-    state.peers[socket.id] = {
-      ...state.peers[socket.id],
-      producers: [...state.peers[socket.id].producers, producer.id],
-    };
-  };
+  //   state.peers[socket.id] = {
+  //     ...state.peers[socket.id],
+  //     producers: [...state.peers[socket.id].producers, producer.id],
+  //   };
+  // };
 }

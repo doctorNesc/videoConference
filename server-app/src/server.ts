@@ -113,7 +113,7 @@ async function runMediasoupWorkers() {
     // Create a WebRtcServer in this Worker, assigning different portRanges to each 
     const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
     const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
-    sharedState.webRtcServers!.push({ workerIndex: i, webRtcServerId: webRtcServer.id });
+    // sharedState.webRtcServers!.push({ workerIndex: i, webRtcServerId: webRtcServer.id });
     webRtcServer.on("workerclose", () => {
       console.log("worker closed so webRtcServer closed");
     });
@@ -121,15 +121,15 @@ async function runMediasoupWorkers() {
     worker.appData.webRtcServer = webRtcServer;
 
     // Log worker resource usage every X seconds.
-    setInterval(async () => {
-      const usage = await worker.getResourceUsage();
+    // setInterval(async () => {
+    //   const usage = await worker.getResourceUsage();
 
-      console.log('mediasoup Worker resource usage [pid:%d]: %o', worker.pid, usage);
+    //   console.log('mediasoup Worker resource usage [pid:%d]: %o', worker.pid, usage);
 
-      const dump = await worker.dump();
+    //   const dump = await worker.dump();
 
-      console.log('mediasoup Worker dump [pid:%d]: %o', worker.pid, dump);
-    }, 100000);
+    //   console.log('mediasoup Worker dump [pid:%d]: %o', worker.pid, dump);
+    // }, 100000);
   }
 }
 const roomManager = new RoomManager(); //single instance for dependency injection
