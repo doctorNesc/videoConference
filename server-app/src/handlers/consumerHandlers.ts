@@ -1,26 +1,31 @@
 import { Socket } from "socket.io";
 import { SharedState } from "../types";
 import { Consumer } from "mediasoup/node/lib/types";
+import { RoomManager } from "../core/roomManager";
 
-export function registerConsumerHandlers(socket: Socket, state: SharedState) {
+export function registerConsumerHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
 
     socket.on("consume", async ({
         rtpCapabilities, remoteProducerId, serverConsumerTransportId, mediaType
     }, callback) => {
         try {
-            const roomName = state.peers[socket.id].roomName;
-            // const userName = state.peers[socket.id].peerDetails.name;
-            const producerPeer = Object.values(state.peers).find(
-                peer => peer.producers.includes(remoteProducerId)
-            );
-            const userName = producerPeer?.peerDetails?.name || "Unknown";
-            const router = state.rooms[roomName].router;
-            const consumerTransport = state.transports.find(
-                (transportData) =>
-                    transportData.isConsumer &&
-                    transportData.transport.id == serverConsumerTransportId &&
-                    transportData.isScreen == (mediaType == "screen")
-            )!.transport;
+            // const roomName = state.peers[socket.id].roomName;
+            const roomName = roomManager.socketToRoom.get(socket.id);
+            const room = roomManager.getRoom(roomName!);
+            const userName = room?.getPeer(socket.id)?.userName;
+            // const producerPeer = Object.values(state.peers).find(
+            //     peer => peer.producers.includes(remoteProducerId)
+            // );
+            // const userName = producerPeer?.peerDetails?.name || "Unknown";
+            const router = room.router;
+
+            const consumerTransport = room.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
+            // const consumerTransport = state.transports.find(
+            //     (transportData) =>
+            //         transportData.isConsumer &&
+            //         transportData.transport.id == serverConsumerTransportId &&
+            //         transportData.isScreen == (mediaType == "screen")
+            // )!.transport;
             // check if the router can consume the specified producer
             if (router.canConsume({
                 producerId: remoteProducerId,
@@ -37,32 +42,35 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState) {
                     console.log("transport close from consumer");
                 });
 
-                consumer?.on("producerclose", () => {
+                consumer?.on("producerclose", () => { //UNUSED???/
+
                     console.log("producer of consumer closed");
                     socket.emit("producer-closed", { remoteProducerId });
 
                     consumerTransport?.close();
-                    state.transports = state.transports.filter(
-                        (transportData) =>
-                            transportData.transport.id !== consumerTransport?.id
-                    );
+                    // state.transports = state.transports.filter(
+                    //     (transportData) =>
+                    //         transportData.transport.id !== consumerTransport?.id
+                    // );
+
                     consumer.close();
 
-                    state.consumers = state.consumers.filter(
-                        (consumerData) => consumerData.consumer.id !== consumer.id
-                    );
+                    // state.consumers = state.consumers.filter(
+                    //     (consumerData) => consumerData.consumer.id !== consumer.id
+                    // );
                 });
-
-                addConsumer(consumer, roomName);
+                const peer = room.getPeer(socket.id);
+                peer.addConsumer(consumer!);
+                // addConsumer(consumer, roomName);
 
                 // from the consumer extract the following params
                 // to send back to the Client
                 const params = {
-                    id: consumer.id,
+                    id: consumer!.id,
                     producerId: remoteProducerId,
-                    kind: consumer.kind,
-                    rtpParameters: consumer.rtpParameters,
-                    serverConsumerId: consumer.id,
+                    kind: consumer!.kind,
+                    rtpParameters: consumer!.rtpParameters,
+                    serverConsumerId: consumer!.id,
                     userName
                 };
 
@@ -82,23 +90,27 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState) {
 
     socket.on("consumer-resume", async ({ serverConsumerId }) => {
         try {
-            const consumer = state.consumers.find(
-                (consumerData) => consumerData.consumer.id == serverConsumerId
-            )?.consumer;
+            const roomName = roomManager.socketToRoom.get(socket.id);
+            const room = roomManager.getRoom(roomName!);
+            const consumer = room.getAllPeers().find(peer => peer.consumers.get(serverConsumerId))!.consumers.get(serverConsumerId);
+            // const consumer = roomManager
+            // const consumer = state.consumers.find(
+            //     (consumerData) => consumerData.consumer.id == serverConsumerId
+            // )?.consumer;
             await consumer?.resume();
         } catch (error) {
             console.error("Error resuming consumer:", error);
         }
     });
 
-    const addConsumer = (consumer: Consumer, roomName: string) => {
-        // add the consumer to the consumers list
-        state.consumers = [...state.consumers, { socketId: socket.id, consumer, roomName }];
+    // const addConsumer = (consumer: Consumer, roomName: string) => {
+    //     // add the consumer to the consumers list
+    //     state.consumers = [...state.consumers, { socketId: socket.id, consumer, roomName }];
 
-        // add the consumer id to the peers list
-        state.peers[socket.id] = {
-            ...state.peers[socket.id],
-            consumers: [...state.peers[socket.id].consumers, consumer.id],
-        };
-    };
+    //     // add the consumer id to the peers list
+    //     state.peers[socket.id] = {
+    //         ...state.peers[socket.id],
+    //         consumers: [...state.peers[socket.id].consumers, consumer.id],
+    //     };
+    // };
 }
