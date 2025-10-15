@@ -8,6 +8,7 @@ import {
 } from 'mediasoup-client/lib/types';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { ACTIONS } from '../../../../server-app/src/config/actions'
 
 export interface ChatMessage {
   sender: string;
@@ -33,7 +34,6 @@ export class VideoRoomService {
     producerId: string;
     consumer: Consumer;
   }[] = [];
-  // private screenConsumerTransports: any[] = [];
   protected producer!: Producer;
   private screenProducer!: Producer | undefined;
   private roomName!: string;
@@ -69,12 +69,12 @@ export class VideoRoomService {
     this.isMainRoom = isMainRoom;
     this.socket = io('http://localhost:3000/mediasoup');
 
-    this.socket.on('connection-success', ({ socketId }: any) => {
+    this.socket.on(ACTIONS.CONNECTION_SUCCESS, ({ socketId }: any) => {
       // console.log('Connected with socket ID:', socketId);
       this.getLocalStream();
     });
 
-    this.socket.on('new-producer', ({ producerId, mediaType }: any) => {
+    this.socket.on(ACTIONS.NEW_PRODUCER, ({ producerId, mediaType }: any) => {
       this.signalNewConsumerTransport(producerId, mediaType);
     });
 
@@ -83,14 +83,9 @@ export class VideoRoomService {
       this.messagesSubject.next([...currentMessages, msg]);
     });
 
-    this.socket.on('producer-closed', ({ remoteProducerId }: any) => {
+    this.socket.on(ACTIONS.PRODUCER_CLOSED, ({ remoteProducerId }: any) => {
       this.handleProducerClosed(remoteProducerId);
     });
-
-    // this.socket.on('screenShareStopped', ({ socketId }) => {
-    //   // remove that participant’s screen stream from your UI
-    //   this.screenStreams = this.screenStreams.filter(s => s.id !== socketId);
-    // });
   }
 
   async getLocalStream() {
@@ -115,7 +110,7 @@ export class VideoRoomService {
   }
 
   joinRoom() {
-    this.socket.emit('joinRoom', { roomName: this.roomName, userName: this.username, isMainRoom: this.isMainRoom }, (data: any) => {
+    this.socket.emit(ACTIONS.JOIN_ROOM, { roomName: this.roomName, userName: this.username, isMainRoom: this.isMainRoom }, (data: any) => {
       console.log('Router RTP Capabilities:', data.rtpCapabilities);
       this.rtpCapabilities = data.rtpCapabilities;
       this.createDevice();
@@ -126,7 +121,7 @@ export class VideoRoomService {
     try {
       this.device = new Device();
       await this.device.load({ routerRtpCapabilities: this.rtpCapabilities });
-      console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
+      // console.log('Device RTP Capabilities:', this.device.rtpCapabilities);
       this.createSendTransport('video');
     } catch (error: any) {
       console.error('Error creating device:', error);
@@ -138,7 +133,7 @@ export class VideoRoomService {
 
   createSendTransport(type: streamType) {
     this.socket.emit(
-      'createWebRtcTransport',
+      ACTIONS.CREATE_WEBRTC_TRANSPORT,
       { roomName: this.roomName, isConsumer: false },
       ({ params }: any) => {
         if (params.error) {
@@ -146,7 +141,7 @@ export class VideoRoomService {
           return;
         }
 
-        console.log('Create WebRTC Transport params:', params);
+        // console.log('Create WebRTC Transport params:', params);
         if (type === 'video') {
           this.producerTransport = this.device.createSendTransport(params);
           this.producerTransport.on(
@@ -156,11 +151,10 @@ export class VideoRoomService {
               callback: Function,
               errback: Function
             ) => {
-              console.log("Connect dtls parameters:", dtlsParameters);
               try {
-                await this.socket.emit('transport-connect', {
+                await this.socket.emit(ACTIONS.CONNECT_TRANSPORT, {
                   dtlsParameters,
-                  isScreen: false,
+                  // isScreen: false,
                 });
                 callback();
               } catch (error) {
@@ -170,11 +164,11 @@ export class VideoRoomService {
           );
 
           this.producerTransport.on(
-            'produce',
+            ACTIONS.PRODUCE,
             async (parameters: any, callback: Function, errback: Function) => {
               try {
                 await this.socket.emit(
-                  'transport-produce',
+                  ACTIONS.PRODUCE,
                   {
                     kind: parameters.kind,
                     rtpParameters: parameters.rtpParameters,
@@ -204,10 +198,10 @@ export class VideoRoomService {
               errback: Function
             ) => {
               try {
-                console.log('Connect dtls parameters:', dtlsParameters);
-                await this.socket.emit('transport-connect', {
+                // console.log('Connect dtls parameters:', dtlsParameters);
+                await this.socket.emit(ACTIONS.CONNECT_TRANSPORT, {
                   dtlsParameters,
-                  isScreen: true,
+                  // isScreen: true,
                 });
                 callback();
               } catch (error) {
@@ -221,7 +215,7 @@ export class VideoRoomService {
             async (parameters: any, callback: Function, errback: Function) => {
               try {
                 await this.socket.emit(
-                  'transport-produce',
+                  ACTIONS.PRODUCE,
                   {
                     kind: parameters.kind,
                     rtpParameters: parameters.rtpParameters,
@@ -255,9 +249,10 @@ export class VideoRoomService {
       };
 
       // this.params = { track, ...this.params };
+            console.log("Connecting transport:", this.producerTransport.id, "closed?", this.producerTransport.closed);
       this.producer = await this.producerTransport.produce(cameraParams);
       this.producer.on('trackended', () => console.log('Track ended'));
-      this.producer.on('transportclose', () => console.log('Transport closed'));
+      this.producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
     } catch (error) {
       console.error('Error connecting send transport:', error);
     }
@@ -265,7 +260,8 @@ export class VideoRoomService {
 
   async signalNewConsumerTransport(
     remoteProducerId: string,
-    // assignedMainRoomDevice?: string,
+    mediaType: streamType,
+    assignedMainRoomDevice?: string,
     socketId?: string,
     name?: string
   ) {
@@ -274,7 +270,7 @@ export class VideoRoomService {
 
     await this.socket.emit(
       'createWebRtcTransport',
-      { roomName: this.roomName, isConsumer: true },
+      { isConsumer: true, isScreenShare: mediaType == 'screen' },
       ({ params }: any) => {
         if (params.error) {
           console.error(params.error);
@@ -297,10 +293,10 @@ export class VideoRoomService {
             errback: Function
           ) => {
             try {
-              await this.socket.emit('transport-recv-connect', {
+              await this.socket.emit(ACTIONS.TRANSPORT_RECV_CONNECT, {
                 dtlsParameters,
-                // serverConsumerTransportId: params.id,
-                // mediaType,
+                serverConsumerTransportId: params.id,
+                mediaType,
               });
               callback();
             } catch (error) {
@@ -313,8 +309,8 @@ export class VideoRoomService {
           consumerTransport,
           remoteProducerId,
           params.id,
-          // mediaType,
-          // assignedMainRoomDevice,
+          mediaType,
+          assignedMainRoomDevice,
           socketId,
           name
         );
@@ -326,18 +322,18 @@ export class VideoRoomService {
     consumerTransport: Transport,
     remoteProducerId: string,
     serverConsumerTransportId: string,
-    // mediaType: streamType,
-    // assignedMainRoomDevice?: string,
+    mediaType: streamType,
+    assignedMainRoomDevice?: string,
     socketId?: string,
     name?: string
   ) {
     await this.socket.emit(
-      'consume',
+      ACTIONS.CONSUME,
       {
         rtpCapabilities: this.device.rtpCapabilities,
         remoteProducerId,
         serverConsumerTransportId,
-        // mediaType,
+        mediaType,
       },
       async ({ params }: any) => {
         if (params.error) {
@@ -364,11 +360,11 @@ export class VideoRoomService {
           remoteProducerId,
           new MediaStream([track]),
           params.userName || name || '',
-          // assignedMainRoomDevice,
+          assignedMainRoomDevice,
           socketId
         );
 
-        this.socket.emit('consumer-resume', {
+        this.socket.emit(ACTIONS.CONSUMER_RESUME, {
           serverConsumerId: params.serverConsumerId,
         });
       }
@@ -478,7 +474,7 @@ export class VideoRoomService {
   }
 
   getProducers() {
-    this.socket.emit('getProducers', (response: any) => {
+    this.socket.emit(ACTIONS.GET_PRODUCERS, (response: any) => {
       let producerList: any[] = [];
       if (Array.isArray(response)) {
         // main room device
@@ -489,8 +485,8 @@ export class VideoRoomService {
         this.assignedDevice = response.myAssignedMainRoomDevice;
       }
 
-      producerList.forEach(({ id, socketId, name }) =>
-        this.signalNewConsumerTransport(id, socketId, name)
+      producerList.forEach(({ id, mediaType, assignedMainRoomDevice, socketId, name }) =>
+        this.signalNewConsumerTransport(id, mediaType, assignedMainRoomDevice, socketId, name)
       );
     });
   }
@@ -563,7 +559,7 @@ export class VideoRoomService {
       this.screenProducer?.on('trackended', () =>
         console.log('Screen track ended')
       );
-      this.screenProducer?.on('transportclose', () =>
+      this.screenProducer?.on(ACTIONS.TRANSPORT_CLOSE, () =>
         console.log('Screen transport closed')
       );
     } catch (error) {
@@ -586,7 +582,7 @@ export class VideoRoomService {
   }
 
   stopScreenShare() {
-    this.socket.emit('stopScreenShare', {
+    this.socket.emit(ACTIONS.STOP_SCREEN_SHARE, {
       roomName: this.roomName,
       producerId: this.screenProducer?.id,
     });

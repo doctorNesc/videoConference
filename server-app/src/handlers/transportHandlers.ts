@@ -3,10 +3,11 @@ import { Socket } from "socket.io";
 import { createWebRtcTransport } from "../mediasoup/utils";
 import { SharedState } from "../types";
 import { RoomManager } from "../core/roomManager";
+import { ACTIONS } from "../config/actions";
 
 
 export function registerTransportHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
-  socket.on("createWebRtcTransport", async ({ roomName, isConsumer }, callback) => {
+  socket.on(ACTIONS.CREATE_WEBRTC_TRANSPORT, async ({ roomName, isConsumer }, callback) => {
     try {
       // get room name from peer's props
       const room = roomManager.getRoom(roomName);
@@ -14,7 +15,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       const transport: WebRtcTransport = await createWebRtcTransport(room.router, room.webRtcServer);
       // add transport to Peer's props
       if (isConsumer) {
-        room.getPeer(socket.id)?.setRecvTransport(transport)
+        room.getPeer(socket.id)?.setRecvTransport(transport);
       } else {
         room.getPeer(socket.id)?.setSendTransport(transport);
       }
@@ -32,7 +33,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   }
   );
 
-  socket.on("disconnect", () => {
+  socket.on(ACTIONS.DISCONNECT, () => {
 
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
@@ -98,8 +99,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     //   }
   });
 
-  // see client's socket.emit('transport-connect', ...)
-  socket.on("transport-connect", async ({ dtlsParameters }) => {
+  socket.on(ACTIONS.CONNECT_TRANSPORT, async ({ dtlsParameters }) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
       const transport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
@@ -113,7 +113,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   });
 
   socket.on(
-    "transport-produce",
+    ACTIONS.PRODUCE,
     async ({ kind, rtpParameters, }, callback) => {
       // call produce based on the prameters from the client
       // let transport;
@@ -153,11 +153,12 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   );
 
   socket.on(
-    "transport-recv-connect",
-    async ({ dtlsParameters, serverConsumerTransportId, mediaType }) => {
+    ACTIONS.TRANSPORT_RECV_CONNECT,
+    async ({ dtlsParameters, serverConsumerTransportId }) => {
       const roomName = roomManager.socketToRoom.get(socket.id);
-      const peer = roomManager.getRoom(roomName || "")?.getPeer(socket.id);
+      const peer = roomManager.getRoom(roomName || "")?.getAllPeers().find(p => p.recvTransport?.id === serverConsumerTransportId);
       const consumerTransport = peer?.recvTransport; //TODO check if right implementation
+
       // const consumerTransport = state.transports.find(
       //   (transportData) =>
       //     transportData.isConsumer &&
@@ -169,7 +170,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  socket.on('stopScreenShare', ({ roomName, producerId }) => {
+  socket.on(ACTIONS.STOP_SCREEN_SHARE, ({ roomName, producerId }) => {
     // 1. Close and remove the screen producer
     if (producerId) {
       const producerData = state.producers.find(p => p.producer.id === producerId);
@@ -221,7 +222,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     const room = roomManager.getRoom(roomName || "");
     room?.getAllPeers().forEach(element => {
       if (element.id != producerSocketId) {
-        element.socket.emit("new-producer", { producerId });
+        element.socket.emit(ACTIONS.NEW_PRODUCER, { producerId });
       }
     });
     // Object.keys(state.peers).forEach(socketId => {

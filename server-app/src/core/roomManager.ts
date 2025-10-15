@@ -40,7 +40,7 @@ export class Room {
 
         // Cleanup if no peers left
         if (this.peers.size === 0) {
-            this.router.close();
+            // this.router.close();
             this.peers.clear();
             console.log(`Room [${this.roomName}] closed`);
         }

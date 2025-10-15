@@ -1,12 +1,12 @@
 import { Socket } from "socket.io";
 import { SharedState } from "../types";
-import { Consumer } from "mediasoup/node/lib/types";
 import { RoomManager } from "../core/roomManager";
+import { ACTIONS } from "../config/actions";
 
 export function registerConsumerHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
 
-    socket.on("consume", async ({
-        rtpCapabilities, remoteProducerId, serverConsumerTransportId, mediaType
+    socket.on(ACTIONS.CONSUME, async ({
+        rtpCapabilities, remoteProducerId, serverConsumerTransportId
     }, callback) => {
         try {
             // const roomName = state.peers[socket.id].roomName;
@@ -38,14 +38,14 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                     paused: true,
                 });
 
-                consumer?.on("transportclose", () => {
+                consumer?.on(ACTIONS.TRANSPORT_CLOSE, () => {
                     console.log("transport close from consumer");
                 });
 
-                consumer?.on("producerclose", () => { //UNUSED???/
+                consumer?.on(ACTIONS.PRODUCER_CLOSE, () => { //UNUSED???/
 
                     console.log("producer of consumer closed");
-                    socket.emit("producer-closed", { remoteProducerId });
+                    socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
 
                     consumerTransport?.close();
                     // state.transports = state.transports.filter(
@@ -88,7 +88,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         }
     });
 
-    socket.on("consumer-resume", async ({ serverConsumerId }) => {
+    socket.on(ACTIONS.CONSUMER_RESUME, async ({ serverConsumerId }) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
             const room = roomManager.getRoom(roomName!);

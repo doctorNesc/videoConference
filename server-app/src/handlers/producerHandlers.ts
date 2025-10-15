@@ -1,10 +1,11 @@
 import { Socket } from "socket.io";
 import { SharedState } from "../types";
 import { RoomManager } from "../core/roomManager";
+import { ACTIONS } from "../config/actions";
 
 export function registerProducerHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
 
-    socket.on("getProducers", (callback) => {
+    socket.on(ACTIONS.GET_PRODUCERS, (callback) => {
         // const { roomName } = state.peers[socket.id];
         const roomName = roomManager.socketToRoom.get(socket.id);
         // const isMainRoom = state.mainRoomDevices[roomName]?.includes(socket.id);

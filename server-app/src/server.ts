@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { createWorker } from "mediasoup";
 import { systemConfig } from "./config/mediasoup.config";
 import { RoomManager } from "./core/roomManager";
+import { ACTIONS } from "./config/actions";
 
 dotenv.config();
 
@@ -102,7 +103,7 @@ async function runMediasoupWorkers() {
       systemConfig.workerSettings
     );
 
-    worker.on('died', () => {
+    worker.on(ACTIONS.DIED, () => {
       console.log(
         'mediasoup Worker died, exiting  in 2 seconds... [pid:%d]', worker.pid);
       setTimeout(() => process.exit(1), 2000);

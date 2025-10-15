@@ -9,19 +9,24 @@ export const ACTIONS = {
 
     // Transport
     CREATE_TRANSPORT: "createTransport",
+    CREATE_WEBRTC_TRANSPORT: "createWebRtcTransport",
     TRANSPORT_CREATED: "transportCreated",
     CONNECT_TRANSPORT: "connectTransport",
+    TRANSPORT_RECV_CONNECT: "transport-recv-connect",
     TRANSPORT_CONNECTED: "transportConnected",
+    TRANSPORT_CLOSE: "transportclose",
 
     // Producer
     PRODUCE: "produce",
     PRODUCER_CREATED: "producerCreated",
-    PRODUCER_CLOSED: "producerClosed",
-
+    NEW_PRODUCER: "new-producer",
+    GET_PRODUCERS: "getProducers",
+    PRODUCER_CLOSE: "producerclose",
+    PRODUCER_CLOSED: "producer-closed",
     // Consumer
     CONSUME: "consume",
     CONSUMER_CREATED: "consumerCreated",
-    CONSUMER_RESUME: "consumerResume",
+    CONSUMER_RESUME: "consumer-resume",
     CONSUMER_PAUSE: "consumerPause",
     CONSUMER_CLOSED: "consumerClosed",
 
@@ -37,7 +42,8 @@ export const ACTIONS = {
 
     // Errors
     ERROR: "error",
-    DISCONNECT: "disconnect"
+    DISCONNECT: "disconnect",
+    DIED: "died"
 } as const;
 
 export type ActionType = typeof ACTIONS[keyof typeof ACTIONS];

@@ -6,11 +6,12 @@ import { registerConsumerHandlers } from "./consumerHandlers";
 import { registerProducerHandlers } from "./producerHandlers";
 import { registerChatHandlers } from "./chatHandlers";
 import { RoomManager } from "../core/roomManager";
+import { ACTIONS } from "../config/actions";
 
 export function registerSocketHandlers(io: Server, state: SharedState, roomManager: RoomManager ) {
   io.of("/mediasoup").on("connection", (socket: Socket) => {
     
-    socket.emit("connection-success", {
+    socket.emit(ACTIONS.CONNECTION_SUCCESS, {
       socketId: socket.id,
     });
 
