@@ -6,10 +6,11 @@ import { Peer } from "../core/peer";
 import { RoomManager } from "../core/roomManager";
 export function registerRoomHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
   // Join Room
-  socket.on(ACTIONS.JOIN_ROOM, async ({ roomName, userName, isMainRoom }, callback) => {
+  socket.on(ACTIONS.JOIN_ROOM, async ({ roomName, userName,  }, callback) => {
 
     const room = await roomManager.getOrCreateRoom(state, roomName);
-    const peer = new Peer(socket.id, socket, userName, isMainRoom, roomName);
+    
+    const peer = new Peer(socket.id, socket, userName, false, roomName);
     roomManager.socketToRoom.set(socket.id, roomName);
     room.addPeer(peer);
     console.log("User ", userName, " joined room " + roomName);
@@ -24,14 +25,13 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
     // }
 
     // call callback from the client and send back the rtpCapabilities
-    // console.log("sending Room RTP Capabilities to client", room.router.rtpCapabilities);
     callback({
       rtpCapabilities: room.router.rtpCapabilities,
     });
   });
 
   socket.on(ACTIONS.LEAVE_ROOM, ({ roomName }) => {
-    roomManager.getRoom(roomName)?.getPeer(socket.id)?.close();
+    // roomManager.getRoom(roomName)?.getPeer(socket.id)?.close();
     const userCount = roomManager.getRoom(roomName)?.removePeer(socket.id);
     roomManager.socketToRoom.delete(socket.id);
     if (!userCount) {

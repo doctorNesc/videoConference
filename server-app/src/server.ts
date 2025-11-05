@@ -102,6 +102,7 @@ async function runMediasoupWorkers() {
       // }
       systemConfig.workerSettings
     );
+    console.log(`Created worker #${i}, worker pid ${worker.pid}`);
 
     worker.on(ACTIONS.DIED, () => {
       console.log(
@@ -109,17 +110,16 @@ async function runMediasoupWorkers() {
       setTimeout(() => process.exit(1), 2000);
     });
 
-    sharedState.mediasoupWorkers!.push(worker);
-
     // Create a WebRtcServer in this Worker, assigning different portRanges to each 
     const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
     const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
-    // sharedState.webRtcServers!.push({ workerIndex: i, webRtcServerId: webRtcServer.id });
     webRtcServer.on("workerclose", () => {
       console.log("worker closed so webRtcServer closed");
     });
 
     worker.appData.webRtcServer = webRtcServer;
+
+    sharedState.mediasoupWorkers!.push(worker);
 
     // Log worker resource usage every X seconds.
     // setInterval(async () => {

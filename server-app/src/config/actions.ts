@@ -11,8 +11,9 @@ export const ACTIONS = {
     CREATE_TRANSPORT: "createTransport",
     CREATE_WEBRTC_TRANSPORT: "createWebRtcTransport",
     TRANSPORT_CREATED: "transportCreated",
-    CONNECT_TRANSPORT: "connectTransport",
+    CONNECT_SEND_TRANSPORT: "connectSendTransport",
     TRANSPORT_RECV_CONNECT: "transport-recv-connect",
+    TRANSPORT_PRODUCE: "transport-produce",
     TRANSPORT_CONNECTED: "transportConnected",
     TRANSPORT_CLOSE: "transportclose",
 

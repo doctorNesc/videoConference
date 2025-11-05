@@ -11,69 +11,49 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         try {
             // const roomName = state.peers[socket.id].roomName;
             const roomName = roomManager.socketToRoom.get(socket.id);
-            const room = roomManager.getRoom(roomName!);
-            const userName = room?.getPeer(socket.id)?.userName;
-            // const producerPeer = Object.values(state.peers).find(
-            //     peer => peer.producers.includes(remoteProducerId)
-            // );
-            // const userName = producerPeer?.peerDetails?.name || "Unknown";
-            const router = room.router;
 
-            const consumerTransport = room.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
-            // const consumerTransport = state.transports.find(
-            //     (transportData) =>
-            //         transportData.isConsumer &&
-            //         transportData.transport.id == serverConsumerTransportId &&
-            //         transportData.isScreen == (mediaType == "screen")
-            // )!.transport;
+            const room = roomManager.getRoom(roomName!);
+            const producerPeer = room?.getAllPeers().find(peer => peer.producers.has(remoteProducerId));
+            const userName = producerPeer?.userName;
+            const router = room.router;
+            const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
+            // console.log(`CONSUME request: room=${roomName} user=${room.getPeer(socket.id).userName} consumerTransportId=${consumerTransport!.id}`);
             // check if the router can consume the specified producer
             if (router.canConsume({
                 producerId: remoteProducerId,
                 rtpCapabilities,
             })) {
                 // transport can now consume and return a consumer
-                const consumer = await consumerTransport?.consume({
+                const consumer = await consumerTransport!.consume({
                     producerId: remoteProducerId,
                     rtpCapabilities,
                     paused: true,
                 });
 
-                consumer?.on(ACTIONS.TRANSPORT_CLOSE, () => {
+                consumer.on(ACTIONS.TRANSPORT_CLOSE, () => {
                     console.log("transport close from consumer");
                 });
 
-                consumer?.on(ACTIONS.PRODUCER_CLOSE, () => { //UNUSED???/
-
+                consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
                     console.log("producer of consumer closed");
                     socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
 
                     consumerTransport?.close();
-                    // state.transports = state.transports.filter(
-                    //     (transportData) =>
-                    //         transportData.transport.id !== consumerTransport?.id
-                    // );
-
                     consumer.close();
-
-                    // state.consumers = state.consumers.filter(
-                    //     (consumerData) => consumerData.consumer.id !== consumer.id
-                    // );
                 });
-                const peer = room.getPeer(socket.id);
-                peer.addConsumer(consumer!);
-                // addConsumer(consumer, roomName);
+                const peerConsumer = room.getPeer(socket.id);
+                peerConsumer.addConsumer(consumer);
 
                 // from the consumer extract the following params
                 // to send back to the Client
                 const params = {
-                    id: consumer!.id,
+                    id: consumer.id,
                     producerId: remoteProducerId,
-                    kind: consumer!.kind,
-                    rtpParameters: consumer!.rtpParameters,
-                    serverConsumerId: consumer!.id,
+                    kind: consumer.kind,
+                    rtpParameters: consumer.rtpParameters,
+                    serverConsumerId: consumer.id,
                     userName
                 };
-
                 // send the parameters to the client
                 callback({ params });
             }

@@ -7,21 +7,23 @@ import { ACTIONS } from "../config/actions";
 
 
 export function registerTransportHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
-  socket.on(ACTIONS.CREATE_WEBRTC_TRANSPORT, async ({ roomName, isConsumer }, callback) => {
+  socket.on(ACTIONS.CREATE_WEBRTC_TRANSPORT, async ({ isConsumer, roomName }, callback) => {
     try {
       // get room name from peer's props
       const room = roomManager.getRoom(roomName);
-      console.log("Creating WebRTC transport for room:", roomName);
       const transport: WebRtcTransport = await createWebRtcTransport(room.router, room.webRtcServer);
       // add transport to Peer's props
+      console.log("Creating a ", isConsumer ? 'recv ' : 'send ', "WebRTC transport with ID ", transport.id," for user: ", room.getPeer(socket.id).userName);
+
       if (isConsumer) {
         room.getPeer(socket.id)?.setRecvTransport(transport);
       } else {
         room.getPeer(socket.id)?.setSendTransport(transport);
       }
       callback({
+        success: true,
         params: {
-          id: transport?.id,
+          id: transport.id,
           iceParameters: transport.iceParameters,
           iceCandidates: transport.iceCandidates,
           dtlsParameters: transport.dtlsParameters,
@@ -29,6 +31,11 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       });
     } catch (error) {
       console.error("Error creating WebRTC transport:", error);
+      callback({
+        success: false,
+        error: "Failed to create WebRTC transport",
+      });
+
     }
   }
   );
@@ -99,36 +106,29 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     //   }
   });
 
-  socket.on(ACTIONS.CONNECT_TRANSPORT, async ({ dtlsParameters }) => {
+  socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
-      const transport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
+      const sendTransport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
       // const transport = getTransport(socket.id);
-
-
-      await transport.connect({ dtlsParameters });
+      // console.log("Connecting send transport:", sendTransport?.id, " with client's transportId:", transportId);
+      await sendTransport.connect({ dtlsParameters });
     } catch (error) {
       console.error("Error connecting transport:", error);
+      // callback({ error: error });
     }
   });
 
   socket.on(
-    ACTIONS.PRODUCE,
+    ACTIONS.TRANSPORT_PRODUCE,
     async ({ kind, rtpParameters, }, callback) => {
       // call produce based on the prameters from the client
-      // let transport;
-      // if (isScreen) {
-      //   transport = getScreenTransport(socket.id);
-      // } else {
-      //   transport = getTransport(socket.id);
-      // }
       const roomName = roomManager.socketToRoom.get(socket.id);
       const peer = roomManager.getRoom(roomName || "")?.getPeer(socket.id);
 
       const transport = peer?.sendTransport;
       const producer = await transport!.produce({ kind, rtpParameters });
-
-      // const roomName = state.peers[socket.id].roomName;
+      console.log("Created server-side producer with id: ", producer.id, " for user: ", peer.userName);
 
       // if (isScreen && producer) { //add screenProducer to a list to close it later
       //   state.screenProducerTransports[producer.id] = {
@@ -145,9 +145,10 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
         producer.id,
       );
       // Send back to the client the Producer's id
+      console.log("testing if producersExist", roomManager.getRoom(roomName!).peers.size);
       callback({
         id: producer.id,
-        producersExist: peer.producers.size > 0 ? true : false,
+        producersExist: roomManager.getRoom(roomName!).peers.size > 1, //check, if there are other producers, when connection into the room
       });
     }
   );
@@ -156,6 +157,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     ACTIONS.TRANSPORT_RECV_CONNECT,
     async ({ dtlsParameters, serverConsumerTransportId }) => {
       const roomName = roomManager.socketToRoom.get(socket.id);
+      // const peer = roomManager.getRoom(roomName!).getPeer(socket.id);
       const peer = roomManager.getRoom(roomName || "")?.getAllPeers().find(p => p.recvTransport?.id === serverConsumerTransportId);
       const consumerTransport = peer?.recvTransport; //TODO check if right implementation
 
@@ -165,6 +167,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       //     transportData.transport.id == serverConsumerTransportId &&
       //     transportData.isScreen == (mediaType == "screen")
       // )?.transport;
+      console.log("AAAAAAAAAAAAAAAA conncting consumer transport:", consumerTransport?.id);
       await consumerTransport?.connect({ dtlsParameters });
     }
   );
@@ -210,7 +213,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   // };
 
   const informConsumers = (roomName: string, producerSocketId: string, producerId: string) => {
-    console.log(`New producer joined in room ${roomName}, socket ${producerSocketId}:`, producerId);
     // const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
 
     // if (!state.remoteAssignments[roomName]) {
@@ -220,8 +222,10 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     // if (isProducerMainRoom) {
     // Only inform remote users, not other main room devices
     const room = roomManager.getRoom(roomName || "");
+    console.log(`New producer joined in room ${roomName}, user ${room.getPeer(socket.id).userName}. ID:`, producerId);
     room?.getAllPeers().forEach(element => {
       if (element.id != producerSocketId) {
+        console.log("User with producer ID ", producerId, " sending info about new producer to user: ", element.userName);
         element.socket.emit(ACTIONS.NEW_PRODUCER, { producerId });
       }
     });

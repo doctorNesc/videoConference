@@ -10,7 +10,7 @@
     "serve:ssr:client-app": "node dist/client-app/server/server.mjs",
     "lint": "ng lint"
   },
-    "imports": {
+  "imports": {
     "#*": "./src/*"
   },
   "private": true,
@@ -30,8 +30,8 @@
     "express": "^4.18.2",
     "httpolyglot": "^0.1.2",
     "material-symbols": "^0.27.2",
-    "mediasoup": "^3.14.9",
-    "mediasoup-client": "^3.7.16",
+    "mediasoup": "^3.19.7",
+    "mediasoup-client": "^3.18.0",
     "rxjs": "~7.8.0",
     "socket.io": "^4.8.0",
     "socket.io-client": "^4.8.0",
