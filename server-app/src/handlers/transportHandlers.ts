@@ -13,7 +13,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       const room = roomManager.getRoom(roomName);
       const transport: WebRtcTransport = await createWebRtcTransport(room.router, room.webRtcServer);
       // add transport to Peer's props
-      console.log("Creating a ", isConsumer ? 'recv ' : 'send ', "WebRTC transport with ID ", transport.id," for user: ", room.getPeer(socket.id).userName);
+      console.log("Creating a ", isConsumer ? 'recv ' : 'send ', "WebRTC transport with ID ", transport.id, " for user: ", room.getPeer(socket.id).userName);
 
       if (isConsumer) {
         room.getPeer(socket.id)?.setRecvTransport(transport);
@@ -41,18 +41,20 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   );
 
   socket.on(ACTIONS.DISCONNECT, () => {
-
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
     const room = roomManager.getRoom(roomName);
     const peer = room.getPeer(socket.id);
+    console.log("Called disconnect for user: ", peer.userName);
 
     if (peer) {
-      peer.close();              // cleanup resources
-      room.removePeer(socket.id);  // remove from room
+      // peer.close();              // cleanup resources
+      const peerCount = room.removePeer(socket.id);  // remove from room
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      peerCount == 0 && roomManager.deleteRoom(roomName);
       roomManager.socketToRoom.delete(socket.id);
     }
-    roomManager.socketToRoom.delete(socket.id);
+    // roomManager.socketToRoom.delete(socket.id);
 
     // if (state.peers[socket.id]) {
     //   const { roomName } = state.peers[socket.id];
@@ -167,7 +169,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       //     transportData.transport.id == serverConsumerTransportId &&
       //     transportData.isScreen == (mediaType == "screen")
       // )?.transport;
-      console.log("AAAAAAAAAAAAAAAA conncting consumer transport:", consumerTransport?.id);
+      // console.log("conncting consumer transport:", consumerTransport?.id);
       await consumerTransport?.connect({ dtlsParameters });
     }
   );

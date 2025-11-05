@@ -11,12 +11,30 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         try {
             // const roomName = state.peers[socket.id].roomName;
             const roomName = roomManager.socketToRoom.get(socket.id);
-
-            const room = roomManager.getRoom(roomName!);
-            const producerPeer = room?.getAllPeers().find(peer => peer.producers.has(remoteProducerId));
+            if (!roomName) {
+                console.warn('[CONSUME] request from socket not in room:', socket.id);
+                return callback({ params: { error: 'not-in-room' } });
+            }
+            const room = roomManager.getRoom(roomName);
+            if (!room) {
+                return callback({ params: { error: 'room-not-found' } });
+            }
+            const producerPeer = room.getAllPeers().find(peer => peer.producers.has(remoteProducerId));
+            if (!producerPeer) {
+                return callback({ params: { error: 'producer-not-found' } });
+            }
+            const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
+            if (!consumerTransport) {
+                return callback({ params: { error: 'consumer-transport-not-found' } });
+            }
+            if (!room.router.canConsume({ producerId: remoteProducerId, rtpCapabilities })) {
+                return callback({ params: { error: 'cannot-consume-with-rtp-capabilities' } });
+            }
+            // const room = roomManager.getRoom(roomName!);
+            // const producerPeer = room?.getAllPeers().find(peer => peer.producers.has(remoteProducerId));
             const userName = producerPeer?.userName;
             const router = room.router;
-            const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
+            // const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
             // console.log(`CONSUME request: room=${roomName} user=${room.getPeer(socket.id).userName} consumerTransportId=${consumerTransport!.id}`);
             // check if the router can consume the specified producer
             if (router.canConsume({
@@ -35,7 +53,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
-                    console.log("producer of consumer closed");
+                    console.log("producer closed");
                     socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
 
                     consumerTransport?.close();
@@ -59,12 +77,8 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
-            console.log(error.message);
-            callback({
-                params: {
-                    error: error,
-                },
-            });
+            console.error('[CONSUME] failed to create consumer:', error);
+            callback({ params: { error: error.message || String(error) } });
         }
     });
 

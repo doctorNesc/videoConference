@@ -34,7 +34,7 @@ export class Room {
     removePeer(peerId: string): number {
         const peer = this.peers.get(peerId);
         if (peer) {
-            peer.close();
+            peer.close();//cleanup logic for transports etc
             this.peers.delete(peerId);
         }
 
@@ -90,6 +90,8 @@ export class RoomManager {
     }
 
     deleteRoom(roomName: string) {
+        const room = this.rooms.get(roomName);
+        room?.router.close();
         this.rooms.delete(roomName);
     }
 }

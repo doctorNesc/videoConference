@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import {
   Transport,
   Consumer,
@@ -10,6 +10,7 @@ import { Device } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ACTIONS } from '../../../../server-app/src/config/actions'
+import { Router } from '@angular/router';
 
 export interface ChatMessage {
   sender: string;
@@ -23,6 +24,10 @@ export type streamType = 'video' | 'screen';
   providedIn: 'root',
 })
 export class VideoRoomService {
+
+  private router = inject(Router);
+
+
   private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string }[]>([]);
   private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
   public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
@@ -567,5 +572,10 @@ export class VideoRoomService {
       (particicipant) => particicipant.id != 'screen'
     );
     this.participant$.next(participants); //stop local video stream display
+  }
+
+  public leaveRoom() {
+    this.socket.emit(ACTIONS.LEAVE_ROOM, { roomName: this.roomName });
+    this.router.navigate(['/']);
   }
 }

@@ -40,15 +40,15 @@ export const createWebRtcTransport = async (
   // console.log(`Created transport with id: ${transport.id}`);
 
   transport.on("dtlsstatechange", (dtlsState) => {
-    console.log(`transport ${transport.id} dtlsstatechange:`, dtlsState);
+    // console.log(`transport ${transport.id} dtlsstatechange:`, dtlsState);
     if (dtlsState === "closed") {
       transport.close();
     }
   });
 
-  transport.on("icestatechange", (iceState) => {
-    console.log(`transport ${transport.id} icestatechange:`, iceState);
-  });
+  // transport.on("icestatechange", (iceState) => {//debug purposes
+  //   console.log(`transport ${transport.id} icestatechange:`, iceState);
+  // });
 
   transport.on("@close", () => {
     console.log("transport closed");
