@@ -21,7 +21,7 @@ export class HomeComponent {
   // Redirect to the entered room
   joinConference() {
     if (this.roomName.trim()) {
-      this.router.navigate([`/sfu/${this.roomName.trim()}`], { queryParams: { roomName: this.roomName, userName: this.userName, inTheRoom: this.inTheRoom } });
+      this.router.navigate([`/sfu/${this.roomName.trim()}`], { queryParams: { userName: this.userName, inTheRoom: this.inTheRoom } });
     } else {
       alert('Please enter a room name!');
     }

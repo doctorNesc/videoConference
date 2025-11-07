@@ -51,12 +51,12 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 consumer.on(ACTIONS.TRANSPORT_CLOSE, () => {
                     console.log("transport close from consumer", consumer.id);
                     // remove consumer from peer map when transport is closed
-                    try {
-                        const peerConsumer = room.getPeer(socket.id);
-                        peerConsumer.removeConsumer(consumer.id);
-                    } catch {
-                        // ignore
-                    }
+                    // try {
+                    //     const peerConsumer = room.getPeer(socket.id);
+                    //     peerConsumer.removeConsumer(consumer.id);
+                    // } catch {
+                    //     // ignore
+                    // }
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {

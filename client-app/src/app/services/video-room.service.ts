@@ -322,7 +322,7 @@ export class VideoRoomService {
         this.addParticipant(
           remoteProducerId,
           new MediaStream([track]),
-          params.userName || name || '',
+          params.userName || '',
           // assignedMainRoomDevice,
           socketId
         );
@@ -332,23 +332,6 @@ export class VideoRoomService {
         });
       }
     );
-  }
-
-  sendMessage(message: string, sender: string, roomName: string) {
-    const chatMessage: ChatMessage = {
-      sender,
-      message,
-      timestamp: new Date().toISOString(),
-    };
-
-    this.socket.emit('sendMessage', { roomName, message });
-
-    const currentMessages = this.messagesSubject.value;
-    this.messagesSubject.next([...currentMessages, chatMessage]);
-  }
-
-  getMessages(): Observable<ChatMessage[]> {
-    return this.messages$;
   }
 
   handleProducerClosed(remoteProducerId: string) {
@@ -363,6 +346,11 @@ export class VideoRoomService {
     //     (transportData) => transportData.producerId !== remoteProducerId
     //   );
     // }
+
+    //closing the consumer
+    const consumerToClose = this.consumers.find((item) => item.producerId == remoteProducerId);
+    consumerToClose?.close();
+    this.consumers.filter((item) => item.producerId != remoteProducerId);
     // Remove from participants
     const updatedParticipants = this.participant$.value.filter(
       (participant) => participant.id !== remoteProducerId
@@ -426,6 +414,9 @@ export class VideoRoomService {
       stream.getTracks().forEach((track) => track.stop());
     }
 
+    this.participant$.next([]);
+    this.detachedParticipant$.next([]);
+    // this.mainParticipant = null;
     // Clean up Mediasoup transports
     this.producers.forEach((producer) => {
       producer.close();
@@ -465,43 +456,31 @@ export class VideoRoomService {
   }
 
   toggleLocalVideo() {
-    //   if (this.producer && this.producer.kind === 'video') {
-    //     if (this.producer.paused) {
-    //       // Resume video
-    //       this.producer.resume();
-    //       console.log('Video resumed');
-    //     } else {
-    //       // Pause video
-    //       this.producer.pause();
-    //       console.log('Video paused');
-    //     }
-    //   }
-
-    //   // Stop the video track in the local MediaStream (optional)
-    //   const videoTrack = this.localVideo?.srcObject?.getVideoTracks()[0];
-    //   if (videoTrack) {
-    //     videoTrack.enabled = !videoTrack.enabled; // Toggle video track
-    //   }
+    if (this.producers[0] && this.producers[0].kind === 'video') {
+      if (this.producers[0].paused) {
+        // Resume video
+        this.producers[0].resume();
+        console.log('Video resumed');
+      } else {
+        // Pause video
+        this.producers[0].pause();
+        console.log('Video paused');
+      }
+    }
   }
 
   toggleLocalAudio() {
-    //   if (this.producer && this.producer.kind === 'audio') {
-    //     if (this.producer.paused) {
-    //       // Resume audio
-    //       this.producer.resume();
-    //       console.log('Audio resumed');
-    //     } else {
-    //       // Pause audio
-    //       this.producer.pause();
-    //       console.log('Audio paused');
-    //     }
-    //   }
-
-    // Stop the audio track in the local MediaStream (optional)
-    //   const audioTrack = this.localVideo?.srcObject?.getAudioTracks()[0];
-    //   if (audioTrack) {
-    //     audioTrack.enabled = !audioTrack.enabled; // Toggle audio track
-    //   }
+    if (this.producers[0] && this.producers[0].kind === 'audio') {
+      if (this.producers[0].paused) {
+        // Resume audio
+        this.producers[0].resume();
+        console.log('Audio resumed');
+      } else {
+        // Pause audio
+        this.producers[0].pause();
+        console.log('Audio paused');
+      }
+    }
   }
 
   // async connectScreenSendTransport() {
@@ -575,4 +554,23 @@ export class VideoRoomService {
     this.socket.emit(ACTIONS.LEAVE_ROOM, { roomName: this.roomName });
     this.router.navigate(['/']);
   }
+
+  sendMessage(message: string, sender: string, roomName: string) {
+    const chatMessage: ChatMessage = {
+      sender,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.socket.emit('sendMessage', { roomName, message });
+
+    const currentMessages = this.messagesSubject.value;
+    this.messagesSubject.next([...currentMessages, chatMessage]);
+  }
+
+  getMessages(): Observable<ChatMessage[]> {
+    return this.messages$;
+  }
+
+
 }
