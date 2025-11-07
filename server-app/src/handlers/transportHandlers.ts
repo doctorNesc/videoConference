@@ -1,6 +1,6 @@
 import { WebRtcTransport } from "mediasoup/node/lib/types";
 import { Socket } from "socket.io";
-import { createWebRtcTransport } from "../mediasoup/utils";
+import { createWebRtcTransport, leaveRoom } from "../mediasoup/utils";
 import { SharedState } from "../types";
 import { RoomManager } from "../core/roomManager";
 import { ACTIONS } from "../config/actions";
@@ -43,14 +43,16 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   socket.on(ACTIONS.DISCONNECT, () => {
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
-    const room = roomManager.getRoom(roomName);
-    const peer = room.getPeer(socket.id);
 
-    if (peer) {
-      peer.close();              // cleanup resources
-      room.removePeer(socket.id);  // remove from room
-      roomManager.socketToRoom.delete(socket.id);
-    }
+    leaveRoom(roomManager,roomName, socket.id)
+    // const room = roomManager.getRoom(roomName);
+    // const peer = room.getPeer(socket.id);
+
+    // if (peer) {
+    //   peer.close();              // cleanup resources
+    //   room.removePeer(socket.id);  // remove from room
+    //   roomManager.socketToRoom.delete(socket.id);
+    // }
 
     // if (state.peers[socket.id]) {
     //   const { roomName } = state.peers[socket.id];

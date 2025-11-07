@@ -1,29 +1,31 @@
 
 // import { createWorker } from "mediasoup";
 import { Router, WebRtcServer, WebRtcServerOptions, WebRtcTransport, } from "mediasoup/node/lib/types";
+import { RoomManager } from "../core/roomManager";
+import { Socket } from "socket.io";
 
 export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcServerOptions => {
-    const basePort = 40000 + workerIndex * 500;
-    const portRange = { min: basePort, max: basePort + 499 };
-    return {
-        listenInfos: [
-            {
-                portRange,
-                protocol: "udp",
-                ip: "0.0.0.0",
-                announcedIp: "192.168.1.250"
-            },
-            {
-                portRange,
-                protocol: "tcp",
-                ip: "0.0.0.0",
-                announcedIp: "192.168.1.250"
-            }
-        ],
-        // enableUdp: true,
-        // enableTcp: true,
-        // preferUdp: true,
-    };
+  const basePort = 40000 + workerIndex * 500;
+  const portRange = { min: basePort, max: basePort + 499 };
+  return {
+    listenInfos: [
+      {
+        portRange,
+        protocol: "udp",
+        ip: "0.0.0.0",
+        announcedIp: "192.168.1.250"
+      },
+      {
+        portRange,
+        protocol: "tcp",
+        ip: "0.0.0.0",
+        announcedIp: "192.168.1.250"
+      }
+    ],
+    // enableUdp: true,
+    // enableTcp: true,
+    // preferUdp: true,
+  };
 }
 
 export const createWebRtcTransport = async (
@@ -50,9 +52,25 @@ export const createWebRtcTransport = async (
   //   console.log(`transport ${transport.id} icestatechange:`, iceState);
   // });
 
-  transport.on("@close", () => {
-    console.log("transport closed");
-  });
+  // transport.on("@close", () => {
+  //   console.log("transport closed");
+  // });
 
   return transport;
 };
+
+export function leaveRoom(roomManager: RoomManager, roomName: string, socketId: string) {
+
+  const room = roomManager.getRoom(roomName);
+  const peer = room.getPeer(socketId);
+
+  if (peer) {
+    const userCount = room.removePeer(socketId);
+    roomManager.socketToRoom.delete(socketId);
+
+    if (!userCount) {
+      roomManager.deleteRoom(roomName);
+    }
+  }
+
+}

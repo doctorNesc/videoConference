@@ -60,12 +60,8 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
-                    console.log("producer closed");
+                    // console.log("producer closed");
                     socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
-
-                    // Don't close the whole consumer transport here: closing the transport
-                    // will also close other consumers that share it and cause other
-                    // participants' video to freeze. Only close this specific consumer.
                     try {
                         consumer.close();
                     } catch (err) {
@@ -117,14 +113,4 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         }
     });
 
-    // const addConsumer = (consumer: Consumer, roomName: string) => {
-    //     // add the consumer to the consumers list
-    //     state.consumers = [...state.consumers, { socketId: socket.id, consumer, roomName }];
-
-    //     // add the consumer id to the peers list
-    //     state.peers[socket.id] = {
-    //         ...state.peers[socket.id],
-    //         consumers: [...state.peers[socket.id].consumers, consumer.id],
-    //     };
-    // };
 }

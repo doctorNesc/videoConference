@@ -4,12 +4,13 @@ import { SharedState } from "../types"; // Define your shared state interface
 import { ACTIONS } from "../config/actions";
 import { Peer } from "../core/peer";
 import { RoomManager } from "../core/roomManager";
+import { leaveRoom } from "../mediasoup/utils";
 export function registerRoomHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
   // Join Room
-  socket.on(ACTIONS.JOIN_ROOM, async ({ roomName, userName,  }, callback) => {
+  socket.on(ACTIONS.JOIN_ROOM, async ({ roomName, userName, }, callback) => {
 
     const room = await roomManager.getOrCreateRoom(state, roomName);
-    
+
     const peer = new Peer(socket.id, socket, userName, false, roomName);
     roomManager.socketToRoom.set(socket.id, roomName);
     room.addPeer(peer);
@@ -31,12 +32,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
   });
 
   socket.on(ACTIONS.LEAVE_ROOM, ({ roomName }) => {
-    // roomManager.getRoom(roomName)?.getPeer(socket.id)?.close();
-    const userCount = roomManager.getRoom(roomName)?.removePeer(socket.id);
-    roomManager.socketToRoom.delete(socket.id);
-    if (!userCount) {
-      roomManager.deleteRoom(roomName);
-    }
+    leaveRoom(roomManager, roomName, socket.id)
   });
 
   // const assignRemoteToMainRoomDevice = (roomName: string, remoteSocketId: string, state: SharedState) => {

@@ -119,7 +119,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.messageForm.value &&
       this.videoService.sendMessage(
         this.messageForm.value.message as any,
-        'Me',
+        'YOU',
         this.roomName
       );
     this.messageForm.reset();
