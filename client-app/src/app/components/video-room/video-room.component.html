@@ -36,7 +36,7 @@
     <app-video-options [isSharingScreen$]="videoService.isSharingScreen$" (startScreenShare)="startScreenShare()"
       (stopScreenShare)="stopScreenShare()" (videoToggle)="videoService.toggleLocalVideo()"
       (audioToggle)="videoService.toggleLocalAudio()" [roomName]="roomName"
-      (showUsersPanel)="onSidebarToggle()"></app-video-options>
+      (showUsersPanel)="onSidebarToggle()" (leaveCall)="leaveCall()"></app-video-options>
   </div>
 
   <app-side-bar class="sidebar" [isSidebarCollapsed]="isSidebarCollapsed" (sidebarToggle)="onSidebarToggle()">

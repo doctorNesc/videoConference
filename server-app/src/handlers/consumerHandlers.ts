@@ -49,18 +49,38 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 });
 
                 consumer.on(ACTIONS.TRANSPORT_CLOSE, () => {
-                    console.log("transport close from consumer");
+                    console.log("transport close from consumer", consumer.id);
+                    // remove consumer from peer map when transport is closed
+                    try {
+                        const peerConsumer = room.getPeer(socket.id);
+                        peerConsumer.removeConsumer(consumer.id);
+                    } catch {
+                        // ignore
+                    }
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
                     console.log("producer closed");
                     socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
 
-                    consumerTransport?.close();
-                    consumer.close();
+                    // Don't close the whole consumer transport here: closing the transport
+                    // will also close other consumers that share it and cause other
+                    // participants' video to freeze. Only close this specific consumer.
+                    try {
+                        consumer.close();
+                    } catch (err) {
+                        console.error('[CONSUMER] error closing consumer after producer close:', err);
+                    }
                 });
+
                 const peerConsumer = room.getPeer(socket.id);
                 peerConsumer.addConsumer(consumer);
+
+                // When this consumer is closed (for any reason) remove it from the peer
+                // mediasoup emits an internal '@close' event when a consumer is closed
+                consumer.on('@close', () => {
+                    peerConsumer.removeConsumer(consumer.id);
+                });
 
                 // from the consumer extract the following params
                 // to send back to the Client

@@ -27,7 +27,6 @@ export class VideoRoomService {
 
   private router = inject(Router);
 
-
   private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string }[]>([]);
   private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
   public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
@@ -286,7 +285,6 @@ export class VideoRoomService {
     serverConsumerTransportId: string,
     // assignedMainRoomDevice?: string,
     socketId?: string,
-    name?: string
   ) {
     this.socket.emit(
       ACTIONS.CONSUME,
@@ -451,9 +449,8 @@ export class VideoRoomService {
       //   this.assignedDevice = response.myAssignedMainRoomDevice;
       // }
 
-      producerList.forEach(({ id, socketId, name }) =>
-        // this.signalNewConsumer(id, socketId, name);
-        this.connectRecvTransport(id, this.consumerTransport, this.recv_params.id, socketId, name)
+      producerList.forEach(({ producerId, socketId }) =>
+        this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId)
       )
     });
   }

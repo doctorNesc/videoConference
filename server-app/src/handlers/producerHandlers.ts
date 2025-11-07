@@ -10,13 +10,13 @@ export function registerProducerHandlers(socket: Socket, state: SharedState, roo
         const roomName = roomManager.socketToRoom.get(socket.id);
         // const isMainRoom = state.mainRoomDevices[roomName]?.includes(socket.id);
 
-        const producerList: { id: string; socketId: string }[] = [];
+        const producerList: { producerId: string; socketId: string }[] = [];
         const room = roomManager.getRoom(roomName!);
 
         room?.getAllPeers().forEach(peer => {
             if (peer.id !== socket.id) {
                 peer.producers.forEach(producer => {
-                    producerList.push({ id: producer.id, socketId: peer.id });
+                    producerList.push({ producerId: producer.id, socketId: peer.id });
                 });
             }
         });

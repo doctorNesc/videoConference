@@ -136,4 +136,9 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   stopScreenShare() {
     this.videoService.stopScreenShare();
   }
+
+  leaveCall() {
+    this.videoService.leaveRoom();
+    this.videoService.disconnectAndCleanUp();
+  }
 }

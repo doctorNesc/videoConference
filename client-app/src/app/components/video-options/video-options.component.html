@@ -2,13 +2,16 @@
     <strong class="align-items-start">{{ roomName }}</strong>
 
     <div>
-        <span class="material-symbols-rounded" (click)="toggleVideo()">{{videoEnabled? 'videocam' :
+        <span class="material-symbols-rounded central-button" (click)="toggleVideo()">{{videoEnabled? 'videocam' :
             'videocam_off'}}</span>
-        <span class="material-symbols-rounded" (click)="toggleAudio()">{{audioEnabled? 'mic' : 'mic_off'}}</span>
-        <span class="material-symbols-rounded" *ngIf="!(isSharingScreen$ | async)"
+        <span class="material-symbols-rounded central-button" (click)="toggleAudio()">{{audioEnabled? 'mic' : 'mic_off'}}</span>
+        <span class="material-symbols-rounded central-button" *ngIf="!(isSharingScreen$ | async)"
             (click)="startScreenShare.emit()">present_to_all</span>
-        <span class="material-symbols-rounded" *ngIf="isSharingScreen$ | async"
+        <span class="material-symbols-rounded central-button" *ngIf="isSharingScreen$ | async"
             (click)="stopScreenShare.emit()">pause_presentation</span>
+
+        <span class="material-symbols-rounded central-button" (click)="leaveCall.emit()">logout</span>
+
     </div>
 
     <div>

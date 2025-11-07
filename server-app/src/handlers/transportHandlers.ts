@@ -45,16 +45,12 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     if (!roomName) return;
     const room = roomManager.getRoom(roomName);
     const peer = room.getPeer(socket.id);
-    console.log("Called disconnect for user: ", peer.userName);
 
     if (peer) {
-      // peer.close();              // cleanup resources
-      const peerCount = room.removePeer(socket.id);  // remove from room
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      peerCount == 0 && roomManager.deleteRoom(roomName);
+      peer.close();              // cleanup resources
+      room.removePeer(socket.id);  // remove from room
       roomManager.socketToRoom.delete(socket.id);
     }
-    // roomManager.socketToRoom.delete(socket.id);
 
     // if (state.peers[socket.id]) {
     //   const { roomName } = state.peers[socket.id];
@@ -147,7 +143,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
         producer.id,
       );
       // Send back to the client the Producer's id
-      console.log("testing if producersExist", roomManager.getRoom(roomName!).peers.size);
+      console.log("peer count: ", roomManager.getRoom(roomName!).peers.size);
       callback({
         id: producer.id,
         producersExist: roomManager.getRoom(roomName!).peers.size > 1, //check, if there are other producers, when connection into the room

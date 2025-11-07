@@ -18,7 +18,8 @@ export class VideoOptionsComponent {
   @Input() isSharingScreen$!: Observable<boolean>;
   @Output() startScreenShare = new EventEmitter<void>();
   @Output() stopScreenShare = new EventEmitter<void>();
-  
+  @Output() leaveCall = new EventEmitter<void>();
+
   @Output() videoToggle = new EventEmitter<boolean>();
   @Output() audioToggle = new EventEmitter<boolean>();
   @Output() showUsersPanel = new EventEmitter<boolean>();
