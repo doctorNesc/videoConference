@@ -15,7 +15,7 @@ export class VideoOptionsComponent {
 
   @Input() videoEnabled = true;
   @Input() audioEnabled = true;
-  @Input() isSharingScreen$!: Observable<boolean>;
+  // @Input() isSharingScreen$!: Observable<boolean>;
   @Output() startScreenShare = new EventEmitter<void>();
   @Output() stopScreenShare = new EventEmitter<void>();
   @Output() leaveCall = new EventEmitter<void>();

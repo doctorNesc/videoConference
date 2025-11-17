@@ -11,6 +11,8 @@ import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ACTIONS } from '../../../../server-app/src/config/actions'
 import { Router } from '@angular/router';
+import { ParticipantService } from './participant.service';
+import { MediasoupService } from './mediasoup.service';
 
 export interface ChatMessage {
   sender: string;
@@ -29,14 +31,13 @@ export class VideoRoomService {
 
   private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string }[]>([]);
   private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
-  public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
+  // public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
   public mainView: boolean = false;
   private socket!: Socket;
   private device!: Device;
   private producerTransport!: Transport;
   private consumerTransport!: Transport;
-  private recv_params: any;
-  private screenProducerTransport!: Transport | undefined;
+  // private screenProducerTransport!: Transport | undefined;
   // private consumerTransports: {
   //   consumerTransport: Transport;
   //   serverConsumerTransportId: string;
@@ -45,22 +46,22 @@ export class VideoRoomService {
   // }[] = [];
   protected producers: Producer[] = [];
   protected consumers: Consumer[] = [];
-  private screenProducer!: Producer | undefined;
+  // private screenProducer!: Producer | undefined;
   private roomName!: string;
   private username!: string;
-  public isMainRoom: boolean = false;
+  // public isMainRoom: boolean = false;
   private rtpCapabilities!: RtpCapabilities;
-  public isProducer: boolean = false;
+  private recv_params: any;
   public localVideo!: any;
-  public localStream!: MediaStream;
+  // public localStream!: MediaStream;
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   public messages$: Observable<ChatMessage[]> =
     this.messagesSubject.asObservable();
   public videoStream!: MediaStream;
   // private screenStream!: MediaStream;
   // private consumedProducerIds = new Set<string>();
-  private isSharingScreenSubject = new BehaviorSubject<boolean>(false);
-  isSharingScreen$ = this.isSharingScreenSubject.asObservable();
+  // private isSharingScreenSubject = new BehaviorSubject<boolean>(false);
+  // isSharingScreen$ = this.isSharingScreenSubject.asObservable();
   public assignedDevice: string | undefined;// sockedId of device this client is displayed
   public params: any = {
     encodings: [
@@ -71,21 +72,21 @@ export class VideoRoomService {
     codecOptions: { videoGoogleStartBitrate: 1000 },
   };
 
-  constructor() { }
+  constructor(public participantService: ParticipantService, private msService: MediasoupService) { }
 
   initializeSocket(roomName: string, userName: string, isMainRoom: boolean) {
     this.roomName = roomName;
     this.username = userName;
-    this.isMainRoom = isMainRoom;
+    // this.isMainRoom = isMainRoom;
     this.socket = io('http://localhost:3000/mediasoup');
 
     this.socket.on(ACTIONS.CONNECTION_SUCCESS, ({ socketId }: any) => {
       console.log('Connected with socket ID:', socketId);
       this.getLocalStream();
+      // this.joinRoom();
     });
 
     this.socket.on(ACTIONS.NEW_PRODUCER, ({ producerId }: any) => {
-      // this.signalNewConsumer(producerId);
       this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id);
     });
 
@@ -125,8 +126,8 @@ export class VideoRoomService {
       console.log('Router RTP Capabilities:', data.rtpCapabilities);
       this.rtpCapabilities = data.rtpCapabilities;
       await this.createDevice();
-      await this.createRecvTransport();
-      await this.createSendTransport();
+      this.createRecvTransport();
+      this.createSendTransport();
     });
   }
 
@@ -416,7 +417,6 @@ export class VideoRoomService {
 
     this.participant$.next([]);
     this.detachedParticipant$.next([]);
-    // this.mainParticipant = null;
     // Clean up Mediasoup transports
     this.producers.forEach((producer) => {
       producer.close();
@@ -511,43 +511,43 @@ export class VideoRoomService {
   // }
 
   async startScreenShare() {
-    if (this.screenProducer) {
-      try { this.screenProducer.close(); } catch { }
-      this.screenProducer = undefined;
-    }
-    if (this.screenProducerTransport) {
-      try { this.screenProducerTransport.close(); } catch { }
-      this.screenProducerTransport = undefined;
-    }
+    // if (this.screenProducer) {
+    //   try { this.screenProducer.close(); } catch { }
+    //   this.screenProducer = undefined;
+    // }
+    // if (this.screenProducerTransport) {
+    //   try { this.screenProducerTransport.close(); } catch { }
+    //   this.screenProducerTransport = undefined;
+    // }
 
-    this.createSendTransport();
-    this.isSharingScreenSubject.next(true);
+    // this.createSendTransport();
+    // this.isSharingScreenSubject.next(true);
   }
 
   stopScreenShare() {
-    this.socket.emit(ACTIONS.STOP_SCREEN_SHARE, {
-      roomName: this.roomName,
-      producerId: this.screenProducer?.id,
-    });
-    // this.screenProducer?.close();
-    // this.screenProducer = undefined;
-    // this.screenProducerTransport?.close();
-    // this.screenProducerTransport = undefined;
+    //   this.socket.emit(ACTIONS.STOP_SCREEN_SHARE, {
+    //     roomName: this.roomName,
+    //     producerId: this.screenProducer?.id,
+    //   });
+    //   // this.screenProducer?.close();
+    //   // this.screenProducer = undefined;
+    //   // this.screenProducerTransport?.close();
+    //   // this.screenProducerTransport = undefined;
 
-    if (this.screenProducer) {
-      try { this.screenProducer.close(); } catch { }
-      this.screenProducer = undefined;
-    }
-    if (this.screenProducerTransport) {
-      try { this.screenProducerTransport.close(); } catch { }
-      this.screenProducerTransport = undefined;
-    }
-    this.isSharingScreenSubject.next(false);
+    //   if (this.screenProducer) {
+    //     try { this.screenProducer.close(); } catch { }
+    //     this.screenProducer = undefined;
+    //   }
+    //   if (this.screenProducerTransport) {
+    //     try { this.screenProducerTransport.close(); } catch { }
+    //     this.screenProducerTransport = undefined;
+    //   }
+    //   this.isSharingScreenSubject.next(false);
 
-    const participants = this.participant$.value.filter(
-      (particicipant) => particicipant.id != 'screen'
-    );
-    this.participant$.next(participants); //stop local video stream display
+    //   const participants = this.participant$.value.filter(
+    //     (particicipant) => particicipant.id != 'screen'
+    //   );
+    //   this.participant$.next(participants); //stop local video stream display
   }
 
   public leaveRoom() {

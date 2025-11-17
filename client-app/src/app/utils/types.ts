@@ -1,0 +1,1 @@
+export type Participant = { id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string };

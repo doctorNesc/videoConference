@@ -6,9 +6,6 @@
     "outDir": "./dist/out-tsc",
     "strict": true,
     "baseUrl": ".",
-    "paths": {
-      "@node-modules":["node_modules/*"]
-    },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,

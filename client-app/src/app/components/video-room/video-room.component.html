@@ -33,7 +33,7 @@
       <video id="localVideo" class="local-video" autoplay playsinline muted></video>
     </div>
 
-    <app-video-options [isSharingScreen$]="videoService.isSharingScreen$" (startScreenShare)="startScreenShare()"
+    <app-video-options (startScreenShare)="startScreenShare()"
       (stopScreenShare)="stopScreenShare()" (videoToggle)="videoService.toggleLocalVideo()"
       (audioToggle)="videoService.toggleLocalAudio()" [roomName]="roomName"
       (showUsersPanel)="onSidebarToggle()" (leaveCall)="leaveCall()"></app-video-options>

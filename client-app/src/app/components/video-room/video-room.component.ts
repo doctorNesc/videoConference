@@ -56,7 +56,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       this.participants = participants;
 
       // For remote users: set main participant to the stream from assignedDevice
-      if (!this.videoService.isMainRoom && this.videoService.assignedDevice) {
+      if (this.videoService.assignedDevice) {
         const main = participants.find(
           p => p.socketId === this.videoService.assignedDevice
         );

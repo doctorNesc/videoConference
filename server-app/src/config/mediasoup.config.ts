@@ -1,4 +1,4 @@
-import { RtpCodecCapability, WebRtcTransportOptions } from "mediasoup/node/lib/types";
+import { RtpCodecCapability } from "mediasoup/node/lib/types";
 // import os from "os";
 
 export const mediaCodecs: RtpCodecCapability[] = [
@@ -21,31 +21,31 @@ export const mediaCodecs: RtpCodecCapability[] = [
 ];
 
 // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
-export const webRtcTransport_options: WebRtcTransportOptions = {
-    listenInfos: [
-        {
-            portRange: { min: 40000, max: 49999 },
-            protocol: "udp",
-            ip: "0.0.0.0",
-            announcedIp: "192.168.1.241"
-        },
-        {
-            portRange: { min: 40000, max: 49999 },
-            protocol: "tcp",
-            ip: "0.0.0.0",
-            announcedIp: "192.168.1.241"
-        }
-    ],
-    // listenIps: [
-    //     {
-    //         ip: "0.0.0.0",
-    //         announcedIp: "192.168.1.241"
-    //     }
-    // ],
-    enableUdp: true,
-    enableTcp: true,
-    preferUdp: true,
-};
+// export const webRtcTransport_options: WebRtcTransportOptions = {
+//     listenInfos: [
+//         {
+//             portRange: { min: 40000, max: 49999 },
+//             protocol: "udp",
+//             ip: "0.0.0.0",
+//             announcedIp: "192.168.68.68"
+//         },
+//         {
+//             portRange: { min: 40000, max: 49999 },
+//             protocol: "tcp",
+//             ip: "0.0.0.0",
+//             announcedIp: "192.168.68.68"
+//         }
+//     ],
+//     // listenIps: [
+//     //     {
+//     //         ip: "0.0.0.0",
+//     //         announcedIp: "192.168.1.241"
+//     //     }
+//     // ],
+//     enableUdp: true,
+//     enableTcp: true,
+//     preferUdp: true,
+// };
 
 export const systemConfig = {
     // numWorkers: Object.keys(os.cpus()).length,
