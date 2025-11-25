@@ -44,7 +44,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
 
-    leaveRoom(roomManager,roomName, socket.id)
+    leaveRoom(roomManager, roomName, socket.id)
     // const room = roomManager.getRoom(roomName);
     // const peer = room.getPeer(socket.id);
 
@@ -106,16 +106,17 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     //   }
   });
 
-  socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }) => {
+  socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }, callback) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
       const sendTransport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
       // const transport = getTransport(socket.id);
       // console.log("Connecting send transport:", sendTransport?.id, " with client's transportId:", transportId);
       await sendTransport.connect({ dtlsParameters });
+      callback({ connected: true });
     } catch (error) {
       console.error("Error connecting transport:", error);
-      // callback({ error: error });
+      callback({ error: error });
     }
   });
 
@@ -155,7 +156,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
   socket.on(
     ACTIONS.TRANSPORT_RECV_CONNECT,
-    async ({ dtlsParameters, serverConsumerTransportId }) => {
+    async ({ dtlsParameters, serverConsumerTransportId }, callback) => {
       const roomName = roomManager.socketToRoom.get(socket.id);
       // const peer = roomManager.getRoom(roomName!).getPeer(socket.id);
       const peer = roomManager.getRoom(roomName || "")?.getAllPeers().find(p => p.recvTransport?.id === serverConsumerTransportId);
@@ -169,6 +170,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       // )?.transport;
       // console.log("conncting consumer transport:", consumerTransport?.id);
       await consumerTransport?.connect({ dtlsParameters });
+      callback({ connected: true });
     }
   );
 

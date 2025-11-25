@@ -2,7 +2,6 @@
 // import { createWorker } from "mediasoup";
 import { Router, WebRtcServer, WebRtcServerOptions, WebRtcTransport, } from "mediasoup/node/lib/types";
 import { RoomManager } from "../core/roomManager";
-import { Socket } from "socket.io";
 
 export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcServerOptions => {
   const basePort = 40000 + workerIndex * 500;

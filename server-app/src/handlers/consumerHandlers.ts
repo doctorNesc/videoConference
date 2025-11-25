@@ -98,7 +98,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         }
     });
 
-    socket.on(ACTIONS.CONSUMER_RESUME, async ({ serverConsumerId }) => {
+    socket.on(ACTIONS.CONSUMER_RESUME, async ({ serverConsumerId }, callback) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
             const room = roomManager.getRoom(roomName!);
@@ -108,6 +108,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
             //     (consumerData) => consumerData.consumer.id == serverConsumerId
             // )?.consumer;
             await consumer?.resume();
+            callback({ resumed: true });
         } catch (error) {
             console.error("Error resuming consumer:", error);
         }

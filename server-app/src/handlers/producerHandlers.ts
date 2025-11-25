@@ -5,7 +5,7 @@ import { ACTIONS } from "../config/actions";
 
 export function registerProducerHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
 
-    socket.on(ACTIONS.GET_PRODUCERS, (callback) => {
+    socket.on(ACTIONS.GET_PRODUCERS, (data, callback) => {
         // const { roomName } = state.peers[socket.id];
         const roomName = roomManager.socketToRoom.get(socket.id);
         // const isMainRoom = state.mainRoomDevices[roomName]?.includes(socket.id);
