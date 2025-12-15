@@ -37,8 +37,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       });
 
     }
-  }
-  );
+  });
 
   socket.on(ACTIONS.DISCONNECT, () => {
     const roomName = roomManager.socketToRoom.get(socket.id);

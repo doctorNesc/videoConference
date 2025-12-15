@@ -173,7 +173,6 @@ export class VideoRoomService {
         async (
           { dtlsParameters }: any,
           callback: Function,
-          errback: Function
         ) => {
           try {
             await this.socketService.emit(ACTIONS.CONNECT_SEND_TRANSPORT, {
@@ -181,12 +180,12 @@ export class VideoRoomService {
             });
             callback();
           } catch (error) {
-            errback(error);
+            callback(error);
           }
         }
       );
 
-      this.producerTransport.on(ACTIONS.PRODUCE, async (parameters: any, callback: Function, errback: Function) => {
+      this.producerTransport.on(ACTIONS.PRODUCE, async (parameters: any, callback: Function) => {
         try {
           const { id, producersExist } = await this.socketService.emit(ACTIONS.TRANSPORT_PRODUCE, {
             kind: parameters.kind,
@@ -198,7 +197,7 @@ export class VideoRoomService {
           //   }
           // );
         } catch (error) {
-          errback(error);
+          callback(error);
         }
       });
     } catch {
@@ -232,12 +231,12 @@ export class VideoRoomService {
 
   async createRecvTransport() {
     try {
-      const params = await this.socketService.emit(ACTIONS.CREATE_WEBRTC_TRANSPORT, { isConsumer: true, roomName: this.roomName });
+      const { params } = await this.socketService.emit(ACTIONS.CREATE_WEBRTC_TRANSPORT, { isConsumer: true, roomName: this.roomName });
 
       console.log('Created Recv WebRTC Transport, params:', params);
-      this.recv_params = params.params;
+      this.recv_params = params;
       this.consumerTransport = this.device.createRecvTransport(this.recv_params);
-      this.consumerTransport.on('connect', async ({ dtlsParameters }: any, callback: Function, errback: Function) => {
+      this.consumerTransport.on('connect', async ({ dtlsParameters }: any, callback: Function) => {
         try {
           await this.socketService.emit(ACTIONS.TRANSPORT_RECV_CONNECT, {
             dtlsParameters: dtlsParameters,
@@ -245,14 +244,12 @@ export class VideoRoomService {
           });
           callback();
         } catch (error) {
-          errback(error);
+          callback(error);
         }
       });
     } catch {
       console.error('Error creating recv transport');
     }
-    // }
-    // );
   }
 
   async connectRecvTransport(remoteProducerId: string, consumerTransport: Transport, serverConsumerTransportId: string,// assignedMainRoomDevice?: string,
