@@ -11,12 +11,19 @@ export class ParticipantService {
     return this.participants$.asObservable();
   }
 
+  get detachedParticipants() {
+    return this.detached$.asObservable();
+  }
+
   add(participant: Participant) {
     this.participants$.next([...this.participants$.value, participant]);
   }
 
   remove(id: string) {
     this.participants$.next(this.participants$.value.filter(p => p.id !== id));
+  }
+  removeDetached(id: string) {
+    this.detached$.next(this.participants$.value.filter(p => p.id !== id));
   }
 
   detach(id: string) {
@@ -34,4 +41,10 @@ export class ParticipantService {
       this.detached$.next(this.detached$.value.filter(p => p.id !== id));
     }
   }
+
+  cleanUp() {
+    this.participants$.next([]);
+    this.detached$.next([]);
+  }
+
 }

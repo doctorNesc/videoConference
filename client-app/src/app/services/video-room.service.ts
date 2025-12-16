@@ -12,7 +12,6 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { ACTIONS } from '../../../../server-app/src/config/actions'
 import { Router } from '@angular/router';
 import { ParticipantService } from './participant.service';
-import { MediasoupService } from './mediasoup.service';
 import { SocketService } from './socket.service';
 
 export interface ChatMessage {
@@ -30,8 +29,6 @@ export class VideoRoomService {
 
   private router = inject(Router);
 
-  private participant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string }[]>([]);
-  private detachedParticipant$ = new BehaviorSubject<{ id: string; stream: MediaStream, name: string }[]>([]);
   // public mainParticipant = new BehaviorSubject<{ id: string, stream: MediaStream, name: string }>({} as { id: string, stream: MediaStream, name: string });
   public mainView: boolean = false;
   private socket!: Socket;
@@ -73,7 +70,7 @@ export class VideoRoomService {
     codecOptions: { videoGoogleStartBitrate: 1000 },
   };
 
-  constructor(public participantService: ParticipantService, private msService: MediasoupService, public socketService: SocketService) { }
+  constructor(public participantService: ParticipantService, public socketService: SocketService) { }
 
   initializeSocket(roomName: string, userName: string, isMainRoom: boolean) {
     this.roomName = roomName;
@@ -320,15 +317,9 @@ export class VideoRoomService {
     consumerToClose?.close();
     this.consumers.filter((item) => item.producerId != remoteProducerId);
     // Remove from participants
-    const updatedParticipants = this.participant$.value.filter(
-      (participant) => participant.id !== remoteProducerId
-    );
-    this.participant$.next(updatedParticipants);
+    this.participantService.remove(remoteProducerId);
     // Remove from detached participants as well
-    const updatedDetached = this.detachedParticipant$.value.filter(
-      (participant) => participant.id !== remoteProducerId
-    );
-    this.detachedParticipant$.next(updatedDetached);
+    this.participantService.removeDetached(remoteProducerId);
     // console.log('After producer-closed:', {
     //   participants: this.participant$.value,
     //   detached: this.detachedParticipant$.value,
@@ -337,37 +328,19 @@ export class VideoRoomService {
   }
 
   getParticipants(): Observable<{ socketId?: string | undefined; id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, }[]> {
-    return this.participant$.asObservable();
+    return this.participantService.participants;
   }
 
   detachParticipant(id: string) {
-    const participants = this.participant$.value.filter((p) => p.id !== id);
-    const detached = this.participant$.value.find((p) => p.id === id);
-
-    // console.log('participants:', participants, '/nDetached: ', detached);
-    if (detached) {
-      this.detachedParticipant$.next([
-        ...this.detachedParticipant$.value,
-        detached,
-      ]);
-      this.participant$.next(participants);
-    }
+    this.participantService.detach(id);
   }
 
   reattachParticipant(id: string) {
-    const detached = this.detachedParticipant$.value.find((p) => p.id === id);
-    // console.log('Detached:', detached, '/n id: ', id);
-    if (detached) {
-      const updatedDetached = this.detachedParticipant$.value.filter(
-        (p) => p.id !== id
-      );
-      this.detachedParticipant$.next(updatedDetached);
-      this.participant$.next([...this.participant$.value, detached]);
-    }
+    this.participantService.reattach(id);
   }
 
   getDetachedParticipants(): Observable<{ id: string; stream: MediaStream }[]> {
-    return this.detachedParticipant$.asObservable();
+    return this.participantService.detachedParticipants;
   }
 
   disconnectAndCleanUp() {
@@ -382,8 +355,7 @@ export class VideoRoomService {
       stream.getTracks().forEach((track) => track.stop());
     }
 
-    this.participant$.next([]);
-    this.detachedParticipant$.next([]);
+    this.participantService.cleanUp();
     // Clean up Mediasoup transports
     this.producers.forEach((producer) => {
       producer.close();
@@ -413,11 +385,12 @@ export class VideoRoomService {
   }
 
   addParticipant(remoteProducerId: string, stream: MediaStream, name: string, assignedMainRoomDevice?: string, socketId?: string) {
-    this.participant$.next([
-      ...this.participant$.value,
-      { id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId },
+    this.participantService.add({ id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId });
+    // this.participant$.next([
+    //   ...this.participant$.value,
+    //   { id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId },
 
-    ]);
+    // ]);
     // console.log('Participants:', this.participant$.value);
   }
 
