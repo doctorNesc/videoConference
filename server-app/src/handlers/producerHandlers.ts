@@ -11,7 +11,7 @@ export function registerProducerHandlers(socket: Socket, state: SharedState, roo
         // const isMainRoom = state.mainRoomDevices[roomName]?.includes(socket.id);
 
         const producerList: { producerId: string; socketId: string }[] = [];
-        const room = roomManager.getRoom(roomName!);
+        const room = roomManager.getRoom(roomName!,'GET_PRODUCERS');
 
         room?.getAllPeers().forEach(peer => {
             if (peer.id !== socket.id) {

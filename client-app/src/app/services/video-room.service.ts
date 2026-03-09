@@ -8,7 +8,7 @@ import {
 } from 'mediasoup-client/types';
 import { Device } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, take } from 'rxjs';
 import { ACTIONS } from '../../../../server-app/src/config/actions'
 import { Router } from '@angular/router';
 import { ParticipantService } from './participant.service';
@@ -42,7 +42,7 @@ export class VideoRoomService {
   //   producerId: string;
   //   consumer: Consumer;
   // }[] = [];
-  protected producers: Producer[] = [];
+  protected producers: { id: string, producer: Producer, isScreen?: boolean }[] = [];
   protected consumers: Consumer[] = [];
   // private screenProducer!: Producer | undefined;
   private roomName!: string;
@@ -86,7 +86,7 @@ export class VideoRoomService {
       await this.createDevice();
       await this.createRecvTransport();
       await this.createSendTransport();
-      await this.connectSendTransport();
+      await this.produceVideo();
     });
 
     this.socketService.on(ACTIONS.NEW_PRODUCER, async ({ producerId }: any) => {
@@ -188,11 +188,8 @@ export class VideoRoomService {
             kind: parameters.kind,
             rtpParameters: parameters.rtpParameters,
           });
-          // ({ id, producersExist }: any) => {
           if (producersExist) this.getProducers();
           callback({ id });
-          //   }
-          // );
         } catch (error) {
           callback(error);
         }
@@ -200,13 +197,9 @@ export class VideoRoomService {
     } catch {
       console.error('Error creating send transport');
     }
-
-    // this.connectSendTransport();
   }
-  //   );
-  // }
 
-  async connectSendTransport() {
+  async produceVideo() {
     try {
       const track = this.videoStream.getVideoTracks()[0];
       const cameraParams = {
@@ -216,16 +209,39 @@ export class VideoRoomService {
       };
 
       // this.params = { track, ...this.params };
-      const producer = await this.producerTransport.produce(cameraParams);
-      console.log('Producer created:', producer);
+      const producer: Producer = await this.producerTransport.produce(cameraParams);
+      // console.log('Producer created:', producer);
       producer.on('trackended', () => console.log('Track ended'));
       producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
-      this.producers.push(producer);
+      this.producers.push({ id: producer.id, producer, isScreen: false });
     } catch (error) {
       console.error('Error connecting send transport:', error);
     }
   }
 
+  async produceScreen() {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+      const track = await screenStream.getVideoTracks()[0];
+      const screenParams = {
+        track,
+        encodings: this.params.encodings,
+        codecOptions: this.params.codecOptions,
+      };
+
+      // this.params = { track, ...this.params };
+      const producer = await this.producerTransport.produce(screenParams);
+      // console.log('Producer created:', producer);
+      producer.on('trackended', () => console.log('Track ended'));
+      producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
+      this.producers.push({ id: producer.id, producer, isScreen: true });
+    } catch (error) {
+      console.error('Error connecting send transport:', error);
+    }
+  }
   async createRecvTransport() {
     try {
       const { params } = await this.socketService.emit(ACTIONS.CREATE_WEBRTC_TRANSPORT, { isConsumer: true, roomName: this.roomName });
@@ -301,17 +317,6 @@ export class VideoRoomService {
 
   handleProducerClosed(remoteProducerId: string) {
     // Close and remove the consumer and its transport
-    // const producerToClose = this.consumerTransports.find(
-    //   (transportData) => transportData.producerId === remoteProducerId
-    // );
-    // if (producerToClose) {
-    //   producerToClose.consumerTransport.close();
-    //   producerToClose.consumer.close();
-    //   this.consumerTransports = this.consumerTransports.filter(
-    //     (transportData) => transportData.producerId !== remoteProducerId
-    //   );
-    // }
-
     //closing the consumer
     const consumerToClose = this.consumers.find((item) => item.producerId == remoteProducerId);
     consumerToClose?.close();
@@ -320,11 +325,6 @@ export class VideoRoomService {
     this.participantService.remove(remoteProducerId);
     // Remove from detached participants as well
     this.participantService.removeDetached(remoteProducerId);
-    // console.log('After producer-closed:', {
-    //   participants: this.participant$.value,
-    //   detached: this.detachedParticipant$.value,
-    //   closedId: remoteProducerId
-    // });
   }
 
   getParticipants(): Observable<{ socketId?: string | undefined; id: string; stream: MediaStream, name: string, assignedMainRoomDevice?: string, }[]> {
@@ -357,8 +357,8 @@ export class VideoRoomService {
 
     this.participantService.cleanUp();
     // Clean up Mediasoup transports
-    this.producers.forEach((producer) => {
-      producer.close();
+    this.producers.forEach((item) => {
+      item.producer.close();
     });
     this.consumers.forEach((consumer) => {
       consumer.close();
@@ -368,8 +368,8 @@ export class VideoRoomService {
   }
 
   async getProducers() {
-    const response = await this.socketService.emit(ACTIONS.GET_PRODUCERS);
-    let producerList: any[] = response;
+    const response: { producerId: string, socketId: string }[] = await this.socketService.emit(ACTIONS.GET_PRODUCERS);
+    // let producerList: any[] = response;
     // if (Array.isArray(response)) {
     // main room device
     // producerList = response;
@@ -379,8 +379,8 @@ export class VideoRoomService {
     //   this.assignedDevice = response.myAssignedMainRoomDevice;
     // }
 
-    producerList.forEach(async ({ producerId, socketId }) =>
-      await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId)
+    response.forEach(async ({ producerId, socketId }) =>
+      !this.producers.find((producer) => producer.id == producerId) && await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId)
     );
   }
 
@@ -391,65 +391,40 @@ export class VideoRoomService {
     //   { id: remoteProducerId, stream, name, assignedMainRoomDevice, socketId },
 
     // ]);
-    // console.log('Participants:', this.participant$.value);
+    this.participantService.participants.pipe(take(1)).subscribe(val => console.log('Added participant:', val));
   }
 
   toggleLocalVideo() {
-    if (this.producers[0] && this.producers[0].kind === 'video') {
-      if (this.producers[0].paused) {
+    if (this.producers[0] && this.producers[0].producer.kind === 'video') {
+      if (this.producers[0].producer?.paused) {
         // Resume video
-        this.producers[0].resume();
+        this.producers[0].producer?.resume();
         console.log('Video resumed');
       } else {
         // Pause video
-        this.producers[0].pause();
+        this.producers[0].producer?.pause();
         console.log('Video paused');
       }
     }
   }
 
   toggleLocalAudio() {
-    if (this.producers[0] && this.producers[0].kind === 'audio') {
-      if (this.producers[0].paused) {
+    if (this.producers[0].producer && this.producers[0].producer?.kind === 'audio') {
+      if (this.producers[0].producer?.paused) {
         // Resume audio
-        this.producers[0].resume();
+        this.producers[0].producer?.resume();
         console.log('Audio resumed');
       } else {
         // Pause audio
-        this.producers[0].pause();
+        this.producers[0].producer?.pause();
         console.log('Audio paused');
       }
     }
   }
 
-  // async connectScreenSendTransport() {
-  //   try {
-  //     this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-  //       video: true,
-  //       audio: true,
-  //     });
-  //     const track = await this.screenStream.getVideoTracks()[0];
-  //     const screenParams = {
-  //       track,
-  //       encodings: this.params.encodings,
-  //       codecOptions: this.params.codecOptions,
-  //     };
-  //     this.screenProducer = await this.screenProducerTransport?.produce(
-  //       screenParams
-  //     );
-  //     this.addParticipant('screen', this.screenStream, 'Screen Share');
-  //     this.screenProducer?.on('trackended', () =>
-  //       console.log('Screen track ended')
-  //     );
-  //     this.screenProducer?.on(ACTIONS.TRANSPORT_CLOSE, () =>
-  //       console.log('Screen transport closed')
-  //     );
-  //   } catch (error) {
-  //     console.error('Error connecting screen send transport:', error);
-  //   }
-  // }
-
   async startScreenShare() {
+
+    await this.produceScreen();
     // if (this.screenProducer) {
     //   try { this.screenProducer.close(); } catch { }
     //   this.screenProducer = undefined;
@@ -463,11 +438,14 @@ export class VideoRoomService {
     // this.isSharingScreenSubject.next(true);
   }
 
-  stopScreenShare() {
+  async stopScreenShare() {
     //   this.socket.emit(ACTIONS.STOP_SCREEN_SHARE, {
     //     roomName: this.roomName,
     //     producerId: this.screenProducer?.id,
     //   });
+    await this.producers.find(item => item.isScreen)?.producer?.close();
+    this.producers.filter(item => item.isScreen == false);
+    // this.participantService.remove('screen');
     //   // this.screenProducer?.close();
     //   // this.screenProducer = undefined;
     //   // this.screenProducerTransport?.close();

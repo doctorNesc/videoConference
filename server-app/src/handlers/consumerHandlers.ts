@@ -15,7 +15,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 console.warn('[CONSUME] request from socket not in room:', socket.id);
                 return callback({ params: { error: 'not-in-room' } });
             }
-            const room = roomManager.getRoom(roomName);
+            const room = roomManager.getRoom(roomName,'CONSUME');
             if (!room) {
                 return callback({ params: { error: 'room-not-found' } });
             }
@@ -101,7 +101,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
     socket.on(ACTIONS.CONSUMER_RESUME, async ({ serverConsumerId }, callback) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
-            const room = roomManager.getRoom(roomName!);
+            const room = roomManager.getRoom(roomName!, 'CONSUMER_RESUME');
             const consumer = room.getAllPeers().find(peer => peer.consumers.get(serverConsumerId))!.consumers.get(serverConsumerId);
             // const consumer = roomManager
             // const consumer = state.consumers.find(

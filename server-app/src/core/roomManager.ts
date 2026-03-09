@@ -81,10 +81,10 @@ export class RoomManager {
         return room;
     };
 
-    getRoom(name: string): Room {
+    getRoom(name: string, method?: string): Room {
         const room = this.rooms.get(name);
         if (!room) {
-            throw new Error(`Room '${name}' not found`);
+            throw new Error(`Room '${name}' when using method '${method}' not found`);
         }
         return room;
     }

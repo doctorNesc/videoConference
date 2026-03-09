@@ -10,7 +10,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   socket.on(ACTIONS.CREATE_WEBRTC_TRANSPORT, async ({ isConsumer, roomName }, callback) => {
     try {
       // get room name from peer's props
-      const room = roomManager.getRoom(roomName);
+      const room = roomManager.getRoom(roomName, 'CREATE_WEBRTC_TRANSPORT');
       const transport: WebRtcTransport = await createWebRtcTransport(room.router, room.webRtcServer);
       // add transport to Peer's props
       console.log("Creating a ", isConsumer ? 'recv ' : 'send ', "WebRTC transport with ID ", transport.id, " for user: ", room.getPeer(socket.id).userName);
@@ -108,7 +108,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }, callback) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
-      const sendTransport = roomManager.getRoom(roomName || "")?.getPeer(socket.id)?.sendTransport;
+      const sendTransport = roomManager.getRoom(roomName || "", "CONNECT_SEND_TRANSPORT")?.getPeer(socket.id)?.sendTransport;
       // const transport = getTransport(socket.id);
       // console.log("Connecting send transport:", sendTransport?.id, " with client's transportId:", transportId);
       await sendTransport.connect({ dtlsParameters });
@@ -124,7 +124,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     async ({ kind, rtpParameters, }, callback) => {
       // call produce based on the prameters from the client
       const roomName = roomManager.socketToRoom.get(socket.id);
-      const peer = roomManager.getRoom(roomName || "")?.getPeer(socket.id);
+      const peer = roomManager.getRoom(roomName || "", "TRANSPORT_PRODUCE")?.getPeer(socket.id);
 
       const transport = peer?.sendTransport;
       const producer = await transport!.produce({ kind, rtpParameters });
@@ -145,10 +145,10 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
         producer.id,
       );
       // Send back to the client the Producer's id
-      console.log("peer count: ", roomManager.getRoom(roomName!).peers.size);
+      console.log("peer count: ", roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size);
       callback({
         id: producer.id,
-        producersExist: roomManager.getRoom(roomName!).peers.size > 1, //check, if there are other producers, when connection into the room
+        producersExist: roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size > 1, //check, if there are other producers, when connection into the room
       });
     }
   );
@@ -158,7 +158,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     async ({ dtlsParameters, serverConsumerTransportId }, callback) => {
       const roomName = roomManager.socketToRoom.get(socket.id);
       // const peer = roomManager.getRoom(roomName!).getPeer(socket.id);
-      const peer = roomManager.getRoom(roomName || "")?.getAllPeers().find(p => p.recvTransport?.id === serverConsumerTransportId);
+      const peer = roomManager.getRoom(roomName || "", "TRANSPORT_RECV_CONNECT")?.getAllPeers().find(p => p.recvTransport?.id === serverConsumerTransportId);
       const consumerTransport = peer?.recvTransport; //TODO check if right implementation
 
       // const consumerTransport = state.transports.find(
@@ -222,7 +222,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
     // if (isProducerMainRoom) {
     // Only inform remote users, not other main room devices
-    const room = roomManager.getRoom(roomName || "");
+    const room = roomManager.getRoom(roomName || "", "INFORM_CONSUMERS");
     console.log(`New producer joined in room ${roomName}, user ${room.getPeer(socket.id).userName}. ID:`, producerId);
     room?.getAllPeers().forEach(element => {
       if (element.id != producerSocketId) {
