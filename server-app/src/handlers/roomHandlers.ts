@@ -15,7 +15,7 @@ export function registerRoomHandlers(socket: Socket, state: SharedState, roomMan
     roomManager.socketToRoom.set(socket.id, roomName);
 
     room.addPeer(peer);
-    console.log("User ", userName, " joined room " + roomName);
+    // console.log("User ", userName, " joined room " + roomName);
 
     // Track main room devices
     // if (isMainRoom && !state.mainRoomDevices?.[roomName]?.includes(socket.id)) {

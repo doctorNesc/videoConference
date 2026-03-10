@@ -35,7 +35,6 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
             const userName = producerPeer?.userName;
             const router = room.router;
             // const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
-            // console.log(`CONSUME request: room=${roomName} user=${room.getPeer(socket.id).userName} consumerTransportId=${consumerTransport!.id}`);
             // check if the router can consume the specified producer
             if (router.canConsume({
                 producerId: remoteProducerId,
@@ -60,7 +59,6 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
-                    // console.log("producer closed");
                     socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId });
                     try {
                         consumer.close();

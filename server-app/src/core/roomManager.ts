@@ -56,7 +56,7 @@ export class RoomManager {
     constructor() { }
 
     getOrAssignWorker = (state: SharedState): Worker => {
-        console.log("#number of assigned worker for the room: ", this.workerIndex);
+        // console.log("#number of assigned worker for the room: ", this.workerIndex);
         const worker = state.mediasoupWorkers![this.workerIndex];
         if (++this.workerIndex == state.mediasoupWorkers!.length) {
             this.workerIndex = 0;
@@ -72,7 +72,7 @@ export class RoomManager {
             const worker = this.getOrAssignWorker(state);
             const router = await worker.createRouter({ mediaCodecs });
             // peer.setAdmin(true); //if room is new, first user to create it will be an admin
-            console.log("Created room, webServer worker pid:", worker.pid);
+            // console.log("Created room, webServer worker pid:", worker.pid);
 
             room = new Room(roomName, router, worker.appData.webRtcServer as WebRtcServer);
             this.rooms.set(roomName, room);
@@ -81,10 +81,10 @@ export class RoomManager {
         return room;
     };
 
-    getRoom(name: string, method?: string): Room {
+    getRoom(name: string, placeOfCall?: string): Room {
         const room = this.rooms.get(name);
         if (!room) {
-            throw new Error(`Room '${name}' when using method '${method}' not found`);
+            throw new Error(`Room '${name}' when using method '${placeOfCall}' not found`);
         }
         return room;
     }

@@ -80,7 +80,7 @@ export class VideoRoomService {
     // this.socket = io('http://localhost:3000/mediasoup');
 
     this.socketService.on(ACTIONS.CONNECTION_SUCCESS, async ({ socketId }: any) => {
-      console.log('Connected with socket ID:', socketId);
+      // console.log('Connected with socket ID:', socketId);
       await this.getLocalStream();
       await this.joinRoom();
       await this.createDevice();
@@ -90,7 +90,10 @@ export class VideoRoomService {
     });
 
     this.socketService.on(ACTIONS.NEW_PRODUCER, async ({ producerId }: any) => {
-      await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id);
+      // Check if this producer is our own to avoid consuming our own streams
+      if (!this.producers.find((producer) => producer.id === producerId)) {
+        await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id);
+      }
     });
 
     this.socketService.on('receiveMessage', (msg: ChatMessage) => {
@@ -210,7 +213,6 @@ export class VideoRoomService {
 
       // this.params = { track, ...this.params };
       const producer: Producer = await this.producerTransport.produce(cameraParams);
-      // console.log('Producer created:', producer);
       producer.on('trackended', () => console.log('Track ended'));
       producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
       this.producers.push({ id: producer.id, producer, isScreen: false });
@@ -347,7 +349,6 @@ export class VideoRoomService {
     // Clean up socket connection
     if (this.socket) {
       this.socket.disconnect();
-      // console.log('Socket disconnected');
     }
     // Stop local media tracks
     if (this.localVideo?.srcObject) {

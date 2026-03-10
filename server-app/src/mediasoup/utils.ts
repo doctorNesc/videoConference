@@ -38,10 +38,7 @@ export const createWebRtcTransport = async (
     preferUdp: true,
   });
 
-  // console.log(`Created transport with id: ${transport.id}`);
-
   transport.on("dtlsstatechange", (dtlsState) => {
-    // console.log(`transport ${transport.id} dtlsstatechange:`, dtlsState);
     if (dtlsState === "closed") {
       transport.close();
     }

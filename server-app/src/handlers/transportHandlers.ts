@@ -110,7 +110,6 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
       const roomName = roomManager.socketToRoom.get(socket.id);
       const sendTransport = roomManager.getRoom(roomName || "", "CONNECT_SEND_TRANSPORT")?.getPeer(socket.id)?.sendTransport;
       // const transport = getTransport(socket.id);
-      // console.log("Connecting send transport:", sendTransport?.id, " with client's transportId:", transportId);
       await sendTransport.connect({ dtlsParameters });
       callback({ connected: true });
     } catch (error) {
@@ -128,7 +127,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
       const transport = peer?.sendTransport;
       const producer = await transport!.produce({ kind, rtpParameters });
-      console.log("Created server-side producer with id: ", producer.id, " for user: ", peer.userName);
+      // console.log("Created server-side producer with id: ", producer.id, " for user: ", peer.userName);
 
       // if (isScreen && producer) { //add screenProducer to a list to close it later
       //   state.screenProducerTransports[producer.id] = {

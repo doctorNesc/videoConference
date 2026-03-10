@@ -8,7 +8,6 @@ export class CameraSelectService {
 
   async getAvailableCameras(): Promise<MediaDeviceInfo[]> {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    // console.log('devices:', devices);
     return devices.filter((device) => device.kind === 'videoinput');
   }
 
