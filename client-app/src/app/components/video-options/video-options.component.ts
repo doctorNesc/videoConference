@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal, } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { Observable } from 'rxjs';
@@ -24,6 +24,8 @@ export class VideoOptionsComponent {
   @Output() audioToggle = new EventEmitter<boolean>();
   @Output() showUsersPanel = new EventEmitter<boolean>();
 
+  isSharingScreen = signal(false);
+
   toggleVideo() {
     this.videoEnabled = !this.videoEnabled;
     this.videoToggle.emit(this.videoEnabled);
@@ -34,5 +36,13 @@ export class VideoOptionsComponent {
     this.audioToggle.emit(this.audioEnabled);
   }
 
-  camera = true;
+  startScreenShareBtn() {
+    this.isSharingScreen.update(() => true);
+    this.startScreenShare.emit();
+  }
+
+  stopScreenShareBtn() {
+    this.isSharingScreen.update(() => false);
+    this.stopScreenShare.emit();
+  }
 }

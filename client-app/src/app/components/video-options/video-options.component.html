@@ -5,8 +5,8 @@
         <span class="material-symbols-rounded central-button" (click)="toggleVideo()">{{videoEnabled? 'videocam' :
             'videocam_off'}}</span>
         <span class="material-symbols-rounded central-button" (click)="toggleAudio()">{{audioEnabled? 'mic' : 'mic_off'}}</span>
-        <span class="material-symbols-rounded central-button"(click)="startScreenShare.emit()">present_to_all</span>
-        <span class="material-symbols-rounded central-button" (click)="stopScreenShare.emit()">pause_presentation</span>
+        <span class="material-symbols-rounded central-button" *ngIf="!isSharingScreen()" (click)="startScreenShareBtn()">present_to_all</span>
+        <span class="material-symbols-rounded central-button" *ngIf="isSharingScreen()" (click)="stopScreenShareBtn()">pause_presentation</span>
 
         <span class="material-symbols-rounded central-button" (click)="leaveCall.emit()">logout</span>
 
