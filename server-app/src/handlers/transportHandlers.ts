@@ -174,22 +174,48 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   socket.on(ACTIONS.STOP_SCREEN_SHARE, ({ roomName, producerId }) => {
-    // 1. Close and remove the screen producer
-    if (producerId) {
-      const producerData = state.producers.find(p => p.producer.id === producerId);
-      if (producerData) {
-        try { producerData.producer.close(); } catch { /* empty */ }
-        state.producers = state.producers.filter(p => p.producer.id !== producerId);
-      }
-    }
+    try {
+      const room = roomManager.getRoom(roomName, 'STOP_SCREEN_SHARE');
+      if (!room) return;
 
-    state.transports = state.transports.filter(t => {
-      if (t.socketId === socket.id && t.isScreen) {
-        try { t.transport.close(); } catch { /* empty */ }
-        return false;
+      const allPeers = room.getAllPeers();
+
+      // Find the producer and close it
+      const producerPeer = allPeers.find(peer => peer.producers.has(producerId));
+      if (producerPeer && producerId) {
+        const producer = producerPeer.producers.get(producerId);
+        if (producer) {
+          try {
+            producer.close();
+          } catch (err) {
+            console.error('Error closing screen producer:', err);
+          }
+          producerPeer.removeProducer(producerId);
+        }
       }
-      return true;
-    });
+
+      // Find and close all consumers that were consuming this producer on other peers
+      allPeers.forEach(peer => {
+        if (peer.id !== socket.id) {
+          peer.consumers.forEach((consumer, consumerId) => {
+            if (consumer.producerId === producerId) {
+              try {
+                consumer.close();
+                peer.removeConsumer(consumerId);
+              } catch (err) {
+                console.error('Error closing consumer:', err);
+              }
+              // Notify the peer that the producer closed
+              peer.socket.emit(ACTIONS.PRODUCER_CLOSED, { remoteProducerId: producerId });
+            }
+          });
+        }
+      });
+
+      console.log(`Screen share stopped for producer: ${producerId} in room: ${roomName}`);
+    } catch (error) {
+      console.error('Error in STOP_SCREEN_SHARE handler:', error);
+    }
   });
 
   // const getTransport = (socketId: SocketId) => {

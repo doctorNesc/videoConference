@@ -440,32 +440,29 @@ export class VideoRoomService {
   }
 
   async stopScreenShare() {
-    //   this.socket.emit(ACTIONS.STOP_SCREEN_SHARE, {
-    //     roomName: this.roomName,
-    //     producerId: this.screenProducer?.id,
-    //   });
-    await this.producers.find(item => item.isScreen)?.producer?.close();
-    this.producers.filter(item => item.isScreen == false);
-    // this.participantService.remove('screen');
-    //   // this.screenProducer?.close();
-    //   // this.screenProducer = undefined;
-    //   // this.screenProducerTransport?.close();
-    //   // this.screenProducerTransport = undefined;
-
-    //   if (this.screenProducer) {
-    //     try { this.screenProducer.close(); } catch { }
-    //     this.screenProducer = undefined;
-    //   }
-    //   if (this.screenProducerTransport) {
-    //     try { this.screenProducerTransport.close(); } catch { }
-    //     this.screenProducerTransport = undefined;
-    //   }
-    //   this.isSharingScreenSubject.next(false);
-
-    //   const participants = this.participant$.value.filter(
-    //     (particicipant) => particicipant.id != 'screen'
-    //   );
-    //   this.participant$.next(participants); //stop local video stream display
+    try {
+      const screenProducer = this.producers.find(item => item.isScreen);
+      
+      if (screenProducer) {
+        const producerId = screenProducer.id;
+        
+        // Close the producer locally
+        await screenProducer.producer?.close();
+        
+        // Remove from producers array
+        this.producers = this.producers.filter(item => !item.isScreen);
+        
+        // Notify server to close all consumers on other peers
+        await this.socketService.emit(ACTIONS.STOP_SCREEN_SHARE, {
+          roomName: this.roomName,
+          producerId: producerId,
+        });
+        
+        console.log('Screen share stopped and cleaned up:', producerId);
+      }
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+    }
   }
 
   public leaveRoom() {

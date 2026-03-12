@@ -16,7 +16,16 @@ export class ParticipantService {
   }
 
   add(participant: Participant) {
-    this.participants$.next([...this.participants$.value, participant]);
+    const existing = this.participants$.value.find(p => p.id === participant.id);
+    if (!existing) {
+      this.participants$.next([...this.participants$.value, participant]);
+    } else {
+      // Update existing participant with new properties (e.g., assignedMainRoomDevice)
+      const updated = this.participants$.value.map(p =>
+        p.id === participant.id ? { ...p, ...participant } : p
+      );
+      this.participants$.next(updated);
+    }
   }
 
   remove(id: string) {

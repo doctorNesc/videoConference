@@ -12,13 +12,13 @@ export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcS
         portRange,
         protocol: "udp",
         ip: "0.0.0.0",
-        announcedIp: "192.168.1.250"
+        announcedIp: "147.175.122.101"
       },
       {
         portRange,
         protocol: "tcp",
         ip: "0.0.0.0",
-        announcedIp: "192.168.1.250"
+        announcedIp: "147.175.122.101"
       }
     ],
     // enableUdp: true,
