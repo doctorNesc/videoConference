@@ -8,14 +8,21 @@ RUN \
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+# Copy server-app and client-app
+COPY server-app ./
+COPY client-app/ ./client-app
 
-COPY . .
+# Build the client-app
+WORKDIR /app/client-app
+RUN npm install
+RUN npm run build
+
+# Build the server-app
+WORKDIR /app
+RUN npm install
+RUN npm run build
 
 ENV PORT=3000
-
-RUN npm run build
 
 EXPOSE 3000
 

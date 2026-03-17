@@ -1,6 +1,5 @@
 import { Socket } from "socket.io";
-import { Router } from "mediasoup/node/lib/Router";
-import { Consumer, Producer, WebRtcTransport, Worker } from "mediasoup/node/lib/types";
+import { Router, Consumer, Producer, WebRtcTransport, Worker } from "mediasoup/node/lib/types";
 interface PeerData {
   socket: Socket;
   roomName: string;

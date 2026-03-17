@@ -65,7 +65,7 @@ httpServer.listen(process.env.PORT || 3000, () => {
 });
 
 const io = new IOServer(httpServer,
-  { cors: { origin: ["http://localhost:4200", "http://192.168.1.250:3000"] } }
+  { cors: { origin: true } }
 );
 // const connections = io.of("/mediasoup");
 
