@@ -1,22 +1,96 @@
-<div *ngIf="allRooms.length > 0; else noRooms">
-    <div *ngFor="let room of allRooms" class="room">
-      <h2 style="color: blue;">Room: {{ room.room }}</h2>
-      <p>User Count: {{ room.userCount }}</p>
-      <h3>Peers:</h3>
-      <ul>
-        <li *ngFor="let peer of room.peers">
-          <p><strong>Socket ID:</strong> {{ peer.socketId }}</p>
-          <p><strong>Transports:</strong> {{ peer.transports.join(', ') }}</p>
-          <p><strong>Producers:</strong> {{ peer.producers.join(', ') }}</p>
-          <p><strong>Consumers:</strong> {{ peer.consumers.join(', ') }}</p>
-          <p><strong>IsAdmin:</strong> {{ peer.peerDetails.isAdmin }}</p>
-          <p><strong>Name:</strong> {{ peer.peerDetails.name }}</p>
-        </li>
-      </ul>
-    </div>
-  </div>
-  
-  <ng-template #noRooms>
-    <p>No rooms available.</p>
-  </ng-template>
-  
+<div class="admin-root">
+  <header class="admin-header">
+    <h1>Admin / Debug Panel</h1>
+    <button class="refresh-btn" (click)="refresh()">
+      <span class="material-symbols-outlined">refresh</span> Refresh
+    </button>
+  </header>
+
+  <!-- ── No rooms ──────────────────────────────────────────────────────────── -->
+  @if (allRooms.length === 0) {
+    <p class="empty-msg">No active rooms.</p>
+  }
+
+  <!-- ── Per-room section ───────────────────────────────────────────────────── -->
+  @for (room of allRooms; track room.room) {
+    <section class="room-section">
+      <h2 class="room-title">
+        <span class="material-symbols-outlined">meeting_room</span>
+        {{ room.room }}
+        <span class="badge">{{ room.userCount }} peer(s)</span>
+      </h2>
+
+      <!-- ── Peers table ──────────────────────────────────────────────────── -->
+      <h3 class="sub-title">Peers</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Socket ID</th>
+            <th>Name</th>
+            <th>Transports</th>
+            <th>Producers</th>
+            <th>Consumers</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (peer of room.peers; track peer.socketId) {
+            <tr>
+              <td class="mono">{{ peer.socketId }}</td>
+              <td>{{ peer.peerDetails?.name || '—' }}</td>
+              <td class="mono small">{{ peer.transports?.join(', ') || '—' }}</td>
+              <td class="mono small">{{ peer.producers?.join(', ') || '—' }}</td>
+              <td class="mono small">{{ peer.consumers?.join(', ') || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- ── Hybrid topology ─────────────────────────────────────────────── -->
+      @let topo = topologyFor(room.room);
+      @if (topo && topo.slots.length > 0) {
+        <h3 class="sub-title">Hybrid Topology</h3>
+        <div class="slot-grid">
+          @for (slot of topo.slots; track slot.slotId) {
+            <div class="slot-card" [class.has-remote]="slot.assignedRemoteIds.length > 0">
+              <div class="slot-header">
+                <span class="material-symbols-outlined">monitor</span>
+                <strong>{{ slot.screenLabel }}</strong>
+                <span class="slot-id mono">{{ slot.slotId.slice(0, 8) }}…</span>
+              </div>
+
+              <div class="slot-body">
+                <div class="slot-row">
+                  <span class="material-symbols-outlined icon-sm">videocam</span>
+                  {{ slot.cameraLabel || 'No camera paired' }}
+                </div>
+                @if (slot.cameraProducerId) {
+                  <div class="slot-row producer-id">
+                    <span class="material-symbols-outlined icon-sm">stream</span>
+                    Producer: <span class="mono">{{ slot.cameraProducerId.slice(0, 12) }}…</span>
+                  </div>
+                }
+                <div class="slot-row">
+                  <span class="material-symbols-outlined icon-sm">devices</span>
+                  Device: <span class="mono">{{ slot.deviceSocketId.slice(0, 8) }}…</span>
+                </div>
+
+                <div class="assigned-remotes">
+                  <span class="material-symbols-outlined icon-sm">people</span>
+                  @if (slot.assignedRemoteIds.length === 0) {
+                    <em>No remotes assigned</em>
+                  } @else {
+                    @for (rid of slot.assignedRemoteIds; track rid) {
+                      <span class="remote-chip">{{ rid.slice(0, 8) }}…</span>
+                    }
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (topo && topo.slots.length === 0) {
+        <p class="empty-msg small">No screen slots registered for this room.</p>
+      }
+    </section>
+  }
+</div>

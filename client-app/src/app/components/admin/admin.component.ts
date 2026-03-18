@@ -1,7 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
-import { RoomDataService } from 'src/app/services/room-data.service';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { interval, Subscription, switchMap, startWith } from 'rxjs';
+import { RoomDataService } from '../../services/room-data.service';
+import { RoomTopologyDTO } from '../../utils/hybrid-types';
 
 @Component({
   selector: 'app-admin',
@@ -10,17 +12,49 @@ import { RoomDataService } from 'src/app/services/room-data.service';
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   allRooms: any[] = [];
-  constructor(private roomService: RoomDataService) {}
+  topologies: RoomTopologyDTO[] = [];
+
+  private subs = new Subscription();
+
+  constructor(
+    private roomService: RoomDataService,
+    private http: HttpClient,
+  ) {}
 
   ngOnInit(): void {
-    this.roomService.getAllUsers().subscribe({
-      next: (data) => {
-        this.allRooms = data;
-      },
-      error: (err) => console.error('Failed to fetch rooms:', err),
-      complete: ()=>console.log('complete')
-    });
+    // Poll room users every 5 s
+    this.subs.add(
+      interval(5000).pipe(startWith(0), switchMap(() => this.roomService.getAllUsers())).subscribe({
+        next: (data) => { this.allRooms = data; },
+        error: (err) => console.error('Failed to fetch rooms:', err),
+      })
+    );
+
+    // Poll topology every 5 s
+    this.subs.add(
+      interval(5000).pipe(
+        startWith(0),
+        switchMap(() => this.http.get<RoomTopologyDTO[]>('/api/topology')),
+      ).subscribe({
+        next: (data) => { this.topologies = data; },
+        error: (err) => console.error('Failed to fetch topology:', err),
+      })
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
+  }
+
+  /** Returns the topology for a given room name */
+  topologyFor(roomName: string): RoomTopologyDTO | undefined {
+    return this.topologies.find(t => t.roomName === roomName);
+  }
+
+  refresh() {
+    this.roomService.getAllUsers().subscribe(data => { this.allRooms = data; });
+    this.http.get<RoomTopologyDTO[]>('/api/topology').subscribe(data => { this.topologies = data; });
   }
 }
