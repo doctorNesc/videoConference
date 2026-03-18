@@ -1,12 +1,13 @@
 import { WebRtcTransport } from "mediasoup/node/lib/types";
-import { Socket } from "socket.io";
+import { Socket, Namespace } from "socket.io";
 import { createWebRtcTransport, leaveRoom } from "../mediasoup/utils";
 import { SharedState } from "../types";
 import { RoomManager } from "../core/roomManager";
 import { ACTIONS } from "../config/actions";
+import { handleDeviceLeave, unassignRemoteOnLeave } from "./hybridHandlers";
 
 
-export function registerTransportHandlers(socket: Socket, state: SharedState, roomManager: RoomManager) {
+export function registerTransportHandlers(socket: Socket, state: SharedState, roomManager: RoomManager, namespace: Namespace) {
   socket.on(ACTIONS.CREATE_WEBRTC_TRANSPORT, async ({ isConsumer, roomName }, callback) => {
     try {
       // get room name from peer's props
@@ -43,66 +44,21 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     const roomName = roomManager.socketToRoom.get(socket.id);
     if (!roomName) return;
 
-    leaveRoom(roomManager, roomName, socket.id)
-    // const room = roomManager.getRoom(roomName);
-    // const peer = room.getPeer(socket.id);
+    // Hybrid cleanup: handle device leave or remote unassignment before
+    // leaveRoom() removes the peer from the room (we need peer data still intact)
+    let isDevice = false;
+    try {
+      isDevice = roomManager.getRoom(roomName)?.peers.get(socket.id)?.isRoomDevice ?? false;
+    } catch { /* room may already be gone */ }
 
-    // if (peer) {
-    //   peer.close();              // cleanup resources
-    //   room.removePeer(socket.id);  // remove from room
-    //   roomManager.socketToRoom.delete(socket.id);
-    // }
+    if (isDevice) {
+      handleDeviceLeave(socket.id, namespace, roomManager);
+    } else {
+      unassignRemoteOnLeave(socket.id, namespace, roomManager);
+    }
 
-    // if (state.peers[socket.id]) {
-    //   const { roomName } = state.peers[socket.id];
-
-    //   const mainDevices = state.mainRoomDevices[roomName] || [];
-    //   const wasMainRoom = mainDevices.includes(socket.id);
-
-    // state.mainRoomDevices[roomName] = mainDevices.filter(id => id !== socket.id);
-    // if (wasMainRoom) {
-    //   console.log("mainRoom peer disconnected");
-    //   const assignments = state.remoteAssignments[roomName] || {};
-    //   Object.entries(assignments).forEach(([remoteId, assignedDevice]) => {
-    //     if (assignedDevice === socket.id) {
-    //       // Reassign this remote user to another main room device
-    //       const devices = state.mainRoomDevices[roomName];
-    //       if (devices && devices.length > 0) {
-    //         // Use your round-robin function
-    //         const newDevice = devices.reduce((a, b) => {
-    //           const aCount = Object.values(assignments).filter(id => id === a).length;
-    //           const bCount = Object.values(assignments).filter(id => id === b).length;
-    //           return aCount <= bCount ? a : b;
-    //         });
-    //         assignments[remoteId] = newDevice;
-    //       } else {
-    //         // No devices left, remove assignment
-    //         delete assignments[remoteId];
-    //       }
-    //     }
-    //   });
-    //   // Clean up all transports for this socket
-    //   state.transports = state.transports.filter((t) => {
-    //     if (t.socketId === socket.id) {
-    //       t.transport.close();
-    //       return false;
-    //     }
-    //     return true;
-    //   });
-
-    //   delete state.peers[socket.id];
-
-    //   state.remoteAssignments[roomName] = assignments;
-    // }
-
-    // remove socket from room
-    //     state.rooms[roomName] = {
-    //       router: state.rooms[roomName].router,
-    //       peers: state.rooms[roomName].peers.filter(
-    //         (socketId) => socketId !== socket.id
-    //       ),
-    //     };
-    //   }
+    // Clean up mediasoup resources (transports, producers, consumers)
+    leaveRoom(roomManager, roomName, socket.id);
   });
 
   socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }, callback) => {

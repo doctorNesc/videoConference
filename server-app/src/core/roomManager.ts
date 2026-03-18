@@ -1,7 +1,12 @@
 import { Router, WebRtcServer, Worker } from "mediasoup/node/lib/types";
+import { v4 as uuidv4 } from "uuid";
 import { Peer } from "./peer";
-import { SharedState } from "../types";
+import { SharedState, RoomTopology, ScreenSlot, ScreenSlotDTO, RoomTopologyDTO, RoomDeviceCapabilities } from "../types";
 import { mediaCodecs } from "../config/mediasoup.config";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Room
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class Room {
     roomName: string;
@@ -9,11 +14,21 @@ export class Room {
     peers: Map<string, Peer> = new Map();
     webRtcServer!: WebRtcServer;
 
+    /** Hybrid topology: all screen+camera slots in this physical room */
+    topology: RoomTopology;
+
     constructor(roomName: string, router: Router, webRtcServer: WebRtcServer) {
         this.roomName = roomName;
         this.router = router;
         this.webRtcServer = webRtcServer;
+        this.topology = {
+            roomName,
+            slots: new Map(),
+            deviceSockets: new Set(),
+        };
     }
+
+    // ─── Peer management ─────────────────────────────────────────────────────
 
     addPeer(peer: Peer) {
         this.peers.set(peer.id, peer);
@@ -34,19 +49,205 @@ export class Room {
     removePeer(peerId: string): number {
         const peer = this.peers.get(peerId);
         if (peer) {
-            peer.close();//cleanup logic for transports etc
+            peer.close();
             this.peers.delete(peerId);
         }
 
-        // Cleanup if no peers left
         if (this.peers.size === 0) {
-            // this.router.close();
             this.peers.clear();
             console.log(`Room [${this.roomName}] closed`);
         }
         return this.peers.size;
     }
+
+    // ─── Topology: room device registration ──────────────────────────────────
+
+    /**
+     * Called when a room device emits REGISTER_ROOM_DEVICE.
+     * Creates unpaired ScreenSlots (no camera assigned yet) for each screen.
+     */
+    registerDevice(deviceSocketId: string, capabilities: RoomDeviceCapabilities): ScreenSlot[] {
+        this.topology.deviceSockets.add(deviceSocketId);
+
+        const newSlots: ScreenSlot[] = capabilities.screens.map((screen) => ({
+            slotId: uuidv4(),
+            deviceSocketId,
+            screenIndex: screen.screenIndex,
+            screenLabel: screen.label || `Screen ${screen.screenIndex}`,
+            cameraDeviceId: null,
+            cameraLabel: null,
+            cameraProducerId: null,
+            assignedRemoteIds: [],
+        }));
+
+        newSlots.forEach((slot) => this.topology.slots.set(slot.slotId, slot));
+        console.log(`[Room ${this.roomName}] Device ${deviceSocketId} registered ${newSlots.length} screen slot(s)`);
+        return newSlots;
+    }
+
+    /**
+     * Called when a room device submits SCREEN_CAMERA_PAIRING.
+     * Updates each slot with its paired camera.
+     */
+    applyScreenCameraPairing(pairings: { slotId: string; cameraDeviceId: string; cameraLabel: string }[]): void {
+        for (const { slotId, cameraDeviceId, cameraLabel } of pairings) {
+            const slot = this.topology.slots.get(slotId);
+            if (slot) {
+                slot.cameraDeviceId = cameraDeviceId;
+                slot.cameraLabel = cameraLabel;
+                console.log(`[Room ${this.roomName}] Slot ${slotId} paired with camera "${cameraLabel}"`);
+            }
+        }
+    }
+
+    /**
+     * Called when a room device starts streaming a camera producer.
+     * Links the mediasoup producer ID to the slot.
+     */
+    registerCameraProducer(slotId: string, producerId: string): ScreenSlot | null {
+        const slot = this.topology.slots.get(slotId);
+        if (!slot) return null;
+        slot.cameraProducerId = producerId;
+        console.log(`[Room ${this.roomName}] Slot ${slotId} camera producer registered: ${producerId}`);
+        return slot;
+    }
+
+    /**
+     * Removes all slots owned by a device and unassigns its remotes.
+     * Returns the list of remote socket IDs that need reassignment.
+     */
+    unregisterDevice(deviceSocketId: string): string[] {
+        this.topology.deviceSockets.delete(deviceSocketId);
+
+        const displacedRemotes: string[] = [];
+        for (const [slotId, slot] of this.topology.slots) {
+            if (slot.deviceSocketId === deviceSocketId) {
+                displacedRemotes.push(...slot.assignedRemoteIds);
+                this.topology.slots.delete(slotId);
+            }
+        }
+
+        console.log(`[Room ${this.roomName}] Device ${deviceSocketId} unregistered. Displaced remotes: ${displacedRemotes.length}`);
+        return displacedRemotes;
+    }
+
+    // ─── Topology: assignment engine ─────────────────────────────────────────
+
+    /**
+     * Returns all slots that have a paired camera (ready to accept remotes).
+     */
+    getPairedSlots(): ScreenSlot[] {
+        return Array.from(this.topology.slots.values()).filter(
+            (s) => s.cameraDeviceId !== null
+        );
+    }
+
+    /**
+     * Assigns a remote participant to the slot with the fewest current assignees.
+     * Returns the assigned slot, or null if no paired slots exist.
+     */
+    assignRemoteToSlot(remoteSocketId: string): ScreenSlot | null {
+        const pairedSlots = this.getPairedSlots();
+        if (pairedSlots.length === 0) return null;
+
+        // Round-robin: pick slot with fewest assigned remotes
+        const target = pairedSlots.reduce((min, slot) =>
+            slot.assignedRemoteIds.length < min.assignedRemoteIds.length ? slot : min
+        );
+
+        if (!target.assignedRemoteIds.includes(remoteSocketId)) {
+            target.assignedRemoteIds.push(remoteSocketId);
+        }
+
+        console.log(`[Room ${this.roomName}] Remote ${remoteSocketId} assigned to slot ${target.slotId} (screen: "${target.screenLabel}")`);
+        return target;
+    }
+
+    /**
+     * Removes a remote participant from whichever slot they are assigned to.
+     * Returns the slot they were removed from, or null.
+     */
+    unassignRemote(remoteSocketId: string): ScreenSlot | null {
+        for (const slot of this.topology.slots.values()) {
+            const idx = slot.assignedRemoteIds.indexOf(remoteSocketId);
+            if (idx !== -1) {
+                slot.assignedRemoteIds.splice(idx, 1);
+                return slot;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the slot a remote participant is currently assigned to.
+     */
+    getSlotForRemote(remoteSocketId: string): ScreenSlot | undefined {
+        return Array.from(this.topology.slots.values()).find(
+            (s) => s.assignedRemoteIds.includes(remoteSocketId)
+        );
+    }
+
+    /**
+     * Rebalances all remote assignments across available paired slots.
+     * Called after a device joins or leaves.
+     */
+    rebalanceAssignments(): Map<string, ScreenSlot> {
+        const pairedSlots = this.getPairedSlots();
+
+        // Collect all currently assigned remotes
+        const allRemotes: string[] = [];
+        for (const slot of this.topology.slots.values()) {
+            allRemotes.push(...slot.assignedRemoteIds);
+            slot.assignedRemoteIds = [];
+        }
+
+        // Also collect remotes from slots that no longer exist (displaced)
+        // (already cleared above since we cleared all slots)
+
+        if (pairedSlots.length === 0) {
+            console.log(`[Room ${this.roomName}] No paired slots available for rebalancing`);
+            return new Map();
+        }
+
+        // Reassign round-robin
+        const newAssignments = new Map<string, ScreenSlot>(); // remoteSocketId → slot
+        allRemotes.forEach((remoteId, i) => {
+            const slot = pairedSlots[i % pairedSlots.length];
+            slot.assignedRemoteIds.push(remoteId);
+            newAssignments.set(remoteId, slot);
+        });
+
+        console.log(`[Room ${this.roomName}] Rebalanced ${allRemotes.length} remote(s) across ${pairedSlots.length} slot(s)`);
+        return newAssignments;
+    }
+
+    // ─── Topology serialisation ───────────────────────────────────────────────
+
+    /** Serialise topology to a plain object safe for socket.io transmission */
+    getTopologyDTO(): RoomTopologyDTO {
+        const slots: ScreenSlotDTO[] = Array.from(this.topology.slots.values()).map((s) => ({
+            slotId: s.slotId,
+            deviceSocketId: s.deviceSocketId,
+            screenIndex: s.screenIndex,
+            screenLabel: s.screenLabel,
+            cameraDeviceId: s.cameraDeviceId,
+            cameraLabel: s.cameraLabel,
+            cameraProducerId: s.cameraProducerId,
+            assignedRemoteIds: [...s.assignedRemoteIds],
+            position3D: s.position3D,
+        }));
+
+        return {
+            roomName: this.roomName,
+            slots,
+            deviceSocketIds: Array.from(this.topology.deviceSockets),
+        };
+    }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RoomManager
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class RoomManager {
     workerIndex: number = 0;
@@ -56,7 +257,6 @@ export class RoomManager {
     constructor() { }
 
     getOrAssignWorker = (state: SharedState): Worker => {
-        // console.log("#number of assigned worker for the room: ", this.workerIndex);
         const worker = state.mediasoupWorkers![this.workerIndex];
         if (++this.workerIndex == state.mediasoupWorkers!.length) {
             this.workerIndex = 0;
@@ -65,15 +265,11 @@ export class RoomManager {
     }
 
     getOrCreateRoom = async (state: SharedState, roomName: string) => {
-
         let room = this.rooms.get(roomName);
 
         if (!room) {
             const worker = this.getOrAssignWorker(state);
             const router = await worker.createRouter({ mediaCodecs });
-            // peer.setAdmin(true); //if room is new, first user to create it will be an admin
-            // console.log("Created room, webServer worker pid:", worker.pid);
-
             room = new Room(roomName, router, worker.appData.webRtcServer as WebRtcServer);
             this.rooms.set(roomName, room);
         }
