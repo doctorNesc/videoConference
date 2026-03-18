@@ -1,1 +1,82 @@
-<canvas #threeCanvas></canvas><video #videoElement autoplay playsinline></video>
+<div class="real-space-root">
+
+  <!-- ── Splat canvas container ─────────────────────────────────────────── -->
+  <div #splatContainer class="splat-container"></div>
+
+  <!-- ── Loading overlay ────────────────────────────────────────────────── -->
+  @if (loading) {
+    <div class="overlay-center">
+      <span class="material-symbols-outlined spin">progress_activity</span>
+      <p>Loading 3D room model…</p>
+    </div>
+  }
+
+  <!-- ── Error overlay ──────────────────────────────────────────────────── -->
+  @if (loadError) {
+    <div class="overlay-center error">
+      <span class="material-symbols-outlined">error</span>
+      <p>Failed to load splat scene</p>
+      <small>{{ loadError }}</small>
+    </div>
+  }
+
+  <!-- ── Topology HUD (top-right) ───────────────────────────────────────── -->
+  @if (!loading && !loadError) {
+    <div class="hud">
+
+      <!-- Room selector -->
+      @if (allTopologies.length > 1) {
+        <select class="room-select" [value]="selectedRoom"
+          (change)="onRoomChange($any($event.target).value)">
+          @for (t of allTopologies; track t.roomName) {
+            <option [value]="t.roomName">{{ t.roomName }}</option>
+          }
+        </select>
+      }
+
+      <!-- Slot legend -->
+      @if (topology) {
+        <div class="slot-legend">
+          <h4 class="legend-title">
+            <span class="material-symbols-outlined">meeting_room</span>
+            {{ topology.roomName }}
+          </h4>
+
+          @for (slot of topology.slots; track slot.slotId) {
+            <div class="legend-slot" [class.occupied]="slot.assignedRemoteIds.length > 0">
+              <span class="dot" [class.occupied]="slot.assignedRemoteIds.length > 0"></span>
+              <div class="legend-info">
+                <strong>{{ slot.screenLabel }}</strong>
+                <span class="cam-label">
+                  {{ slot.cameraLabel || 'No camera' }}
+                </span>
+                @if (slot.assignedRemoteIds.length > 0) {
+                  <span class="remote-count">
+                    {{ slot.assignedRemoteIds.length }} remote(s)
+                  </span>
+                } @else {
+                  <span class="remote-empty">Empty</span>
+                }
+              </div>
+            </div>
+          }
+
+          @if (topology.slots.length === 0) {
+            <p class="no-slots">No screen slots registered</p>
+          }
+        </div>
+      } @else {
+        <div class="slot-legend">
+          <p class="no-slots">No active rooms</p>
+        </div>
+      }
+
+      <!-- Controls hint -->
+      <div class="controls-hint">
+        <span class="material-symbols-outlined icon-sm">mouse</span>
+        Drag to orbit · Scroll to zoom
+      </div>
+    </div>
+  }
+
+</div>
