@@ -11,6 +11,7 @@ import { systemConfig } from "./config/mediasoup.config";
 import { RoomManager } from "./core/roomManager";
 import { ACTIONS } from "./config/actions";
 
+
 dotenv.config();
 
 const app = express();
@@ -23,34 +24,50 @@ app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/br
 // app.use("/api", roomRoutes);
 
 app.get("/api/roomUsers", (req: Request, res: Response) => {
-  const room = req.query.room as string | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allRooms = Object.values(sharedState.peers).reduce((rooms: any, peer: any) => {
-    const { roomName, transports, producers, consumers, peerDetails } = peer;
-    if (!rooms[roomName]) {
-      rooms[roomName] = {
-        room: roomName,
-        userCount: 0,
-        peers: [],
-      };
-    }
-    rooms[roomName].userCount += 1;
-    rooms[roomName].peers.push({
-      transports,
-      producers,
-      consumers,
-      peerDetails,
-      socketId: peer.socket.id,
-    });
-    return rooms;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }, {} as Record<string, any>);
+  const filterRoom = req.query.room as string | undefined;
 
-  if (room && allRooms[room]) {
-    res.json(Object.values(allRooms[room]));
+  // Build room list from RoomManager (new architecture)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allRooms: any[] = [];
+
+  roomManager.rooms.forEach((room, roomName) => {
+    if (filterRoom && roomName !== filterRoom) return;
+
+    const peers = room.getAllPeers().map(peer => ({
+      socketId: peer.socket.id,
+      name: peer.userName,
+      isRoomDevice: peer.isRoomDevice,
+      transports: [
+        peer.sendTransport?.id,
+        peer.recvTransport?.id,
+      ].filter(Boolean),
+      producers: Array.from(peer.producers.keys()),
+      consumers: Array.from(peer.consumers.keys()),
+      capabilities: peer.capabilities ?? null,
+      peerDetails: {
+        name: peer.userName,
+        isAdmin: peer.isAdmin,
+        isMainRoom: peer.isRoomDevice,
+      },
+    }));
+
+    allRooms.push({
+      room: roomName,
+      userCount: peers.length,
+      peers,
+    });
+  });
+
+  if (filterRoom) {
+    res.json(allRooms[0] ? [allRooms[0]] : []);
   } else {
-    res.json(Object.values(allRooms));
+    res.json(allRooms);
   }
+});
+
+/** REST endpoint: returns the hybrid topology for all rooms */
+app.get("/api/topology", (_req: Request, res: Response) => {
+  res.json(roomManager.getAllTopologies());
 });
 
 app.get("*", (req: Request, res: Response) => {

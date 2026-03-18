@@ -290,4 +290,9 @@ export class RoomManager {
         room?.router.close();
         this.rooms.delete(roomName);
     }
+
+    /** Returns topology DTOs for all rooms — used by the /api/topology REST endpoint */
+    getAllTopologies(): import('../types').RoomTopologyDTO[] {
+        return Array.from(this.rooms.values()).map(room => room.getTopologyDTO());
+    }
 }
