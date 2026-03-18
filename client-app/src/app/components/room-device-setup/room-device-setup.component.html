@@ -1,0 +1,85 @@
+<div class="wizard-overlay">
+  <div class="wizard-card">
+    <h2 class="wizard-title">
+      <span class="material-symbols-outlined">display_settings</span>
+      Room Device Setup
+    </h2>
+    <p class="wizard-subtitle">
+      Pair each physical screen with the camera mounted above it.
+    </p>
+
+    <!-- Spatial screen layout -->
+    <div class="screen-layout-container">
+      <div class="screen-layout" style="position: relative; width: 600px; height: 200px;">
+        @for (pairing of pairings; track pairing.slotId) {
+          <div class="screen-tile" [ngStyle]="getScreenStyle(pairing.screen)">
+            <div class="screen-label">{{ pairing.screen.label }}</div>
+            <div class="screen-dims">{{ pairing.screen.width }}×{{ pairing.screen.height }}</div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Per-screen pairing rows -->
+    <div class="pairing-list">
+      @for (pairing of pairings; track pairing.slotId) {
+        <div class="pairing-row">
+          <div class="pairing-screen-info">
+            <span class="material-symbols-outlined">monitor</span>
+            <span class="screen-name">{{ pairing.screen.label }}</span>
+            <span class="screen-res">{{ pairing.screen.width }}×{{ pairing.screen.height }}</span>
+          </div>
+
+          <span class="material-symbols-outlined arrow-icon">arrow_forward</span>
+
+          <div class="pairing-camera-select">
+            <span class="material-symbols-outlined">videocam</span>
+            <select
+              [(ngModel)]="pairing.selectedCameraDeviceId"
+              (ngModelChange)="onCameraChange(pairing)"
+              class="camera-select"
+            >
+              <option value="">— Select camera —</option>
+              @for (cam of cameras; track cam.deviceId) {
+                <option [value]="cam.deviceId">{{ cam.label }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Live preview -->
+          @if (pairing.previewStream) {
+            <div class="preview-container">
+              <video
+                autoplay
+                muted
+                playsinline
+                class="preview-video"
+                [attr.data-slot]="pairing.slotId"
+                #previewVideo
+                (loadedmetadata)="attachPreview(previewVideo, pairing)"
+              ></video>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (cameras.length === 0) {
+      <div class="warning-banner">
+        <span class="material-symbols-outlined">warning</span>
+        No cameras detected. Please connect cameras and refresh.
+      </div>
+    }
+
+    <div class="wizard-actions">
+      <button
+        class="confirm-btn"
+        [disabled]="!canConfirm"
+        (click)="confirm()"
+      >
+        <span class="material-symbols-outlined">check_circle</span>
+        Confirm &amp; Join Room
+      </button>
+    </div>
+  </div>
+</div>
