@@ -1,0 +1,51 @@
+<div class="slot-view-root">
+
+  <!-- ── No slot matched (wrong slotId or not yet registered) ──────────── -->
+  @if (!slot) {
+    <div class="waiting">
+      <span class="material-symbols-outlined waiting-icon">hourglass_top</span>
+      <p>Waiting for slot assignment…</p>
+      <small>Slot ID: {{ slotId }}</small>
+    </div>
+  }
+
+  <!-- ── Slot found but no remotes assigned yet ─────────────────────────── -->
+  @if (slot && remotes.length === 0) {
+    <div class="waiting">
+      <span class="material-symbols-outlined waiting-icon">person_off</span>
+      <p>No remote participant assigned to</p>
+      <strong>{{ slot.screenLabel }}</strong>
+    </div>
+  }
+
+  <!-- ── Remote participant grid ────────────────────────────────────────── -->
+  @if (remotes.length > 0) {
+    <div class="remote-grid" [style.grid-template-columns]="gridColumns">
+      @for (remote of remotes; track remote.socketId) {
+        <div class="remote-tile">
+          <video
+            class="remote-video"
+            autoplay
+            playsinline
+            [srcObject]="remote.stream"
+          ></video>
+          <div class="remote-name">{{ remote.name }}</div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ── Slot info overlay (bottom-left) ───────────────────────────────── -->
+  @if (slot) {
+    <div class="slot-info">
+      <span class="material-symbols-outlined">monitor</span>
+      {{ slot.screenLabel }}
+      @if (slot.cameraLabel) {
+        &nbsp;·&nbsp;
+        <span class="material-symbols-outlined">videocam</span>
+        {{ slot.cameraLabel }}
+      }
+    </div>
+  }
+
+</div>

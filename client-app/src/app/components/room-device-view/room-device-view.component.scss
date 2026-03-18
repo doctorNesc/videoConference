@@ -1,0 +1,107 @@
+/* ── Root container: full viewport, black background ─────────────────────── */
+:host {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+}
+
+.slot-view-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Waiting / empty state ────────────────────────────────────────────────── */
+.waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: #888;
+  text-align: center;
+
+  p {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  small {
+    font-size: 0.75rem;
+    color: #555;
+  }
+
+  strong {
+    color: #aaa;
+    font-size: 1rem;
+  }
+}
+
+.waiting-icon {
+  font-size: 4rem;
+  color: #444;
+}
+
+/* ── Remote participant grid ──────────────────────────────────────────────── */
+.remote-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 4px;
+  background: #111;
+}
+
+.remote-tile {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remote-name {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ── Slot info overlay (bottom-left of the whole view) ───────────────────── */
+.slot-info {
+  position: absolute;
+  bottom: 14px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #90cdf4;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 0.78rem;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+
+  .material-symbols-outlined {
+    font-size: 1rem;
+  }
+}
