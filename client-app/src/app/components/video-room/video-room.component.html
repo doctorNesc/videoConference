@@ -1,8 +1,24 @@
 <div class="d-flex flex-row bg-dark text-white h-100">
 
+  <!-- ─── Pairing wizard overlay (room devices only) ──────────────────────── -->
+  @if (showPairingWizard) {
+    <app-room-device-setup
+      [slotIds]="pendingSlotIds"
+      (pairingConfirmed)="onPairingConfirmed($event)"
+    ></app-room-device-setup>
+  }
+
   <div class="main-content d-flex flex-column flex-grow-1">
 
-    <!-- Big video -->
+    <!-- ─── Assignment label (remote participants) ──────────────────────────── -->
+    @if (!isRoomDevice && assignedScreenLabel) {
+      <div class="assignment-label">
+        <span class="material-symbols-outlined">monitor</span>
+        You are displayed on: <strong>{{ assignedScreenLabel }}</strong>
+      </div>
+    }
+
+    <!-- ─── Big video (main view) ───────────────────────────────────────────── -->
     <div *ngIf="mainView || participants.length > 12"
       class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container"
       (click)="removeMainParticipant()">
@@ -10,33 +26,49 @@
         [srcObject]="mainParticipant.stream"></video>
     </div>
 
-    <!-- Video grid -->
+    <!-- ─── Video grid ──────────────────────────────────────────────────────── -->
     <div class="grid-content">
       <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
-        <app-participant style="width: 400px;" *ngFor="let participant of participants" [stream]="participant.stream"
-          [userName]="participant.name" class="video-item" (setMainParticipant)="setMainParticipant(participant)"
-          (detach)="detachParticipant(participant)" appResizable></app-participant>
+        <app-participant
+          style="width: 400px;"
+          *ngFor="let participant of participants"
+          [stream]="participant.stream"
+          [userName]="participant.name"
+          class="video-item"
+          [class.assigned-camera]="participant.isAssignedCamera"
+          (setMainParticipant)="setMainParticipant(participant)"
+          (detach)="detachParticipant(participant)"
+          appResizable
+        ></app-participant>
       </div>
-
     </div>
 
-    <!-- Scrollable bar -->
+    <!-- ─── Scrollable thumbnail bar ────────────────────────────────────────── -->
     <div *ngIf="mainView || participants.length > 12" class="video-bar">
       <div class="video-thumbnail" *ngFor="let participant of participants">
-        <app-participant [stream]="participant.stream" (setMainParticipant)="setMainParticipant(participant)"
-          [userName]="participant.name" (detach)="detachParticipant(participant)"></app-participant>
+        <app-participant
+          [stream]="participant.stream"
+          (setMainParticipant)="setMainParticipant(participant)"
+          [userName]="participant.name"
+          (detach)="detachParticipant(participant)"
+        ></app-participant>
       </div>
     </div>
 
-    <!-- Local video pinned at the bottom right -->
+    <!-- ─── Local video pinned at the bottom right ──────────────────────────── -->
     <div class="local-video-container">
       <video id="localVideo" class="local-video" autoplay playsinline muted></video>
     </div>
 
-    <app-video-options (startScreenShare)="startScreenShare()"
-      (stopScreenShare)="stopScreenShare()" (videoToggle)="videoService.toggleLocalVideo()"
-      (audioToggle)="videoService.toggleLocalAudio()" [roomName]="roomName"
-      (showUsersPanel)="onSidebarToggle()" (leaveCall)="leaveCall()"></app-video-options>
+    <app-video-options
+      (startScreenShare)="startScreenShare()"
+      (stopScreenShare)="stopScreenShare()"
+      (videoToggle)="videoService.toggleLocalVideo()"
+      (audioToggle)="videoService.toggleLocalAudio()"
+      [roomName]="roomName"
+      (showUsersPanel)="onSidebarToggle()"
+      (leaveCall)="leaveCall()"
+    ></app-video-options>
   </div>
 
   <app-side-bar class="sidebar" [isSidebarCollapsed]="isSidebarCollapsed" (sidebarToggle)="onSidebarToggle()">
@@ -52,7 +84,6 @@
         <button type="submit" [disabled]="!messageForm.valid">Send</button>
       </form>
     </div>
-
   </app-side-bar>
 
 </div>
