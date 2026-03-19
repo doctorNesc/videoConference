@@ -100,9 +100,9 @@ export class HomeComponent implements OnInit {
   createNewConference() {
     const generatedRoomName = this.generateRoomName();
     this.joinPrefs.setUserName(this.userName);
-    this.joinPrefs.setIsRoomDevice(true);
+    this.joinPrefs.setIsRoomDevice(this.inTheRoom);
     this.router.navigate([`/sfu/${generatedRoomName}`], {
-      queryParams: { userName: this.userName, inTheRoom: true },
+      queryParams: { userName: this.userName, inTheRoom: this.inTheRoom },
     });
   }
 

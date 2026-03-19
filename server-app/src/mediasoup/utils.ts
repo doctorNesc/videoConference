@@ -56,17 +56,22 @@ export const createWebRtcTransport = async (
 };
 
 export function leaveRoom(roomManager: RoomManager, roomName: string, socketId: string) {
+  try {
+    const room = roomManager.getRoom(roomName);
+    const peer = room.getPeer(socketId);
 
-  const room = roomManager.getRoom(roomName);
-  const peer = room.getPeer(socketId);
+    if (peer) {
+      const userCount = room.removePeer(socketId);
+      roomManager.socketToRoom.delete(socketId);
 
-  if (peer) {
-    const userCount = room.removePeer(socketId);
-    roomManager.socketToRoom.delete(socketId);
-
-    if (!userCount) {
-      roomManager.deleteRoom(roomName);
+      if (!userCount) {
+        roomManager.deleteRoom(roomName);
+      }
     }
+  } catch (err) {
+    // Room or peer may already be gone (e.g., on socket disconnect after room cleanup)
+    console.warn(`[leaveRoom] Error cleaning up ${socketId} from ${roomName}:`, err);
+    // Still try to clean up the socket-to-room mapping
+    roomManager.socketToRoom.delete(socketId);
   }
-
 }

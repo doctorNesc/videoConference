@@ -195,22 +195,38 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
   // };
 
   const informConsumers = (roomName: string, producerSocketId: string, producerId: string) => {
-    // const isProducerMainRoom = state.mainRoomDevices[roomName]?.includes(producerSocketId);
-
-    // if (!state.remoteAssignments[roomName]) {
-    //   state.remoteAssignments[roomName] = {};
-    // }
-
-    // if (isProducerMainRoom) {
-    // Only inform remote users, not other main room devices
-    const room = roomManager.getRoom(roomName || "", "INFORM_CONSUMERS");
-    console.log(`New producer joined in room ${roomName}, user ${room.getPeer(socket.id).userName}. ID:`, producerId);
-    room?.getAllPeers().forEach(element => {
-      if (element.id != producerSocketId) {
-        console.log("User with producer ID ", producerId, " sending info about new producer to user: ", element.userName);
-        element.socket.emit(ACTIONS.NEW_PRODUCER, { producerId });
-      }
-    });
+    try {
+      const room = roomManager.getRoom(roomName || "", "INFORM_CONSUMERS");
+      const producerPeer = room.getPeer(producerSocketId);
+      
+      console.log(`New producer joined in room ${roomName}, user ${producerPeer.userName}. ID:`, producerId);
+      
+      // Determine who should be notified about this producer
+      room?.getAllPeers().forEach(consumerPeer => {
+        if (consumerPeer.id === producerSocketId) return; // Don't notify the producer itself
+        
+        // Hybrid logic: filter based on peer roles and assignments
+        if (producerPeer.isRoomDevice && consumerPeer.isRoomDevice) {
+          // Room device → room device: don't notify (devices don't consume each other's cameras)
+          return;
+        }
+        
+        if (producerPeer.isRoomDevice && !consumerPeer.isRoomDevice) {
+          // Room device → remote: check if remote is assigned to this device's slot
+          const producerSlot = room.getSlotForRemote(consumerPeer.id);
+          if (!producerSlot || producerSlot.deviceSocketId !== producerSocketId) {
+            // Remote is not assigned to this device's slot, don't notify
+            return;
+          }
+        }
+        
+        // All other cases: notify (remote → remote, remote → room device, etc.)
+        console.log("Notifying", consumerPeer.userName, "about new producer from", producerPeer.userName);
+        consumerPeer.socket.emit(ACTIONS.NEW_PRODUCER, { producerId });
+      });
+    } catch (err) {
+      console.error("[informConsumers] error:", err);
+    }
     // Object.keys(state.peers).forEach(socketId => {
     //   if (
     //     state.peers[socketId].roomName === roomName &&

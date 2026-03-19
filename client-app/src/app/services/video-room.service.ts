@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, Optional } from '@angular/core';
 import {
   Transport,
   Consumer,
@@ -13,6 +13,7 @@ import { ParticipantService } from './participant.service';
 import { SocketService } from './socket.service';
 import { JoinPreferencesService } from './join-preferences.service';
 import { RoomDeviceService } from './room-device.service';
+import { BroadcastChannelService } from './broadcast-channel.service';
 import {
   RemoteAssignment,
   RoomTopologyDTO,
@@ -89,6 +90,7 @@ export class VideoRoomService {
     public socketService: SocketService,
     private joinPrefs: JoinPreferencesService,
     public roomDeviceService: RoomDeviceService,
+    @Optional() private broadcastChannel: BroadcastChannelService,
   ) { }
 
   // ─── Initialisation ───────────────────────────────────────────────────────
@@ -99,7 +101,11 @@ export class VideoRoomService {
     this.isRoomDevice = isRoomDevice;
 
     this.socketService.on(ACTIONS.CONNECTION_SUCCESS, async ({ socketId }: any) => {
-      await this.getLocalStream();
+      // Room devices skip getLocalStream() — they open per-slot streams after pairing wizard
+      if (!this.isRoomDevice) {
+        await this.getLocalStream();
+      }
+
       await this.joinRoom();
       await this.createDevice();
       await this.createRecvTransport();
@@ -134,7 +140,13 @@ export class VideoRoomService {
         // Update room device slot state
         const mySocketId = this.getMySocketId();
         if (mySocketId) {
-          this.roomDeviceService.onTopologyUpdate(topology, mySocketId);
+          // On first topology update (after REGISTER_ROOM_DEVICE), initialize slots from topology
+          if (this.roomDeviceService.slotsSnapshot.length === 0) {
+            this.roomDeviceService.initSlotsFromTopology(topology, mySocketId);
+          } else {
+            // Subsequent updates: just update existing slots
+            this.roomDeviceService.onTopologyUpdate(topology, mySocketId);
+          }
         }
       }
     });
@@ -475,7 +487,13 @@ export class VideoRoomService {
       isAssignedCamera,
     });
     this.participantService.participants.pipe(take(1)).subscribe(
-      val => console.log('Added participant:', val)
+      val => {
+        console.log('Added participant:', val);
+        // Broadcast to slot-view windows
+        if (this.broadcastChannel) {
+          this.broadcastChannel.broadcastParticipants(val);
+        }
+      }
     );
   }
 

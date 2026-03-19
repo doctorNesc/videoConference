@@ -1,10 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { combineLatest, Subscription } from 'rxjs';
+import { combineLatest, Subscription, switchMap, of } from 'rxjs';
 
 import { RoomDeviceService, SlotState } from '../../services/room-device.service';
 import { ParticipantService } from '../../services/participant.service';
+import { BroadcastChannelService } from '../../services/broadcast-channel.service';
 import { Participant } from '../../utils/types';
 
 export interface SlotRemote {
@@ -44,17 +45,33 @@ export class RoomDeviceViewComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private roomDeviceService: RoomDeviceService,
     private participantService: ParticipantService,
+    private broadcastChannel: BroadcastChannelService,
   ) {}
 
   ngOnInit() {
     this.slotId = this.route.snapshot.queryParamMap.get('slotId') ?? '';
     this.roomName = this.route.snapshot.queryParamMap.get('roomName') ?? '';
 
+    if (!this.slotId || !this.roomName) {
+      console.error('[RoomDeviceView] Missing slotId or roomName in query params');
+      return;
+    }
+
+    // Use BroadcastChannel to receive data from main window
+    // Falls back to local services if BroadcastChannel is not available
+    const slotsSource = this.broadcastChannel.slots.pipe(
+      // Fallback to local service if broadcast is empty
+      switchMap(slots => slots.length > 0 ? of(slots) : this.roomDeviceService.slots)
+    );
+    const participantsSource = this.broadcastChannel.participants.pipe(
+      switchMap(participants => participants.length > 0 ? of(participants) : this.participantService.participants)
+    );
+
     // Reactively combine slot state + participant list
     this.subs.add(
       combineLatest([
-        this.roomDeviceService.slots,
-        this.participantService.participants,
+        slotsSource,
+        participantsSource,
       ]).subscribe(([slots, participants]) => {
         this.slot = slots.find(s => s.slotId === this.slotId) ?? null;
         this.remotes = this.resolveRemotes(this.slot, participants);
