@@ -1,0 +1,61 @@
+FROM node:20-bullseye-slim AS builder
+
+# Install build dependencies
+RUN set -x \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy both apps
+COPY server-app ./server-app
+COPY client-app ./client-app
+
+# Build client-app
+WORKDIR /app/client-app
+RUN npm ci --only=production
+RUN npm run build
+
+# Build server-app
+WORKDIR /app/server-app
+RUN npm ci --only=production
+RUN npm run build
+
+# Production stage
+FROM node:20-bullseye-slim
+
+# Install runtime dependencies only
+RUN set -x \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy built artifacts from builder
+COPY --from=builder /app/server-app/dist ./dist
+COPY --from=builder /app/server-app/node_modules ./node_modules
+COPY --from=builder /app/server-app/package.json ./package.json
+COPY --from=builder /app/client-app/dist ./public
+
+# Create logs directory
+RUN mkdir -p /app/logs && chmod 755 /app/logs
+
+# Non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["node", "dist/server.js"]
