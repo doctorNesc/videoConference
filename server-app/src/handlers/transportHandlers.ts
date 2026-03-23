@@ -222,7 +222,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
         
         // All other cases: notify (remote → remote, remote → room device, etc.)
         console.log("Notifying", consumerPeer.userName, "about new producer from", producerPeer.userName);
-        consumerPeer.socket.emit(ACTIONS.NEW_PRODUCER, { producerId });
+        consumerPeer.socket.emit(ACTIONS.NEW_PRODUCER, { producerId, socketId: producerSocketId });
       });
     } catch (err) {
       console.error("[informConsumers] error:", err);

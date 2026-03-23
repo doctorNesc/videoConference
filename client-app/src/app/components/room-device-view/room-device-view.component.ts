@@ -1,12 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { combineLatest, Subscription, switchMap, of } from 'rxjs';
+import { combineLatest, Subscription, interval } from 'rxjs';
+import { startWith } from 'rxjs/operators';
 
 import { RoomDeviceService, SlotState } from '../../services/room-device.service';
-import { ParticipantService } from '../../services/participant.service';
-import { BroadcastChannelService } from '../../services/broadcast-channel.service';
-import { Participant } from '../../utils/types';
+import { BroadcastChannelService, ParticipantRef } from '../../services/broadcast-channel.service';
 
 export interface SlotRemote {
   socketId: string;
@@ -21,6 +20,11 @@ export interface SlotRemote {
  *
  * Displays the video stream(s) of remote participant(s) assigned to this slot,
  * full-screen. When multiple remotes share a slot (overflow), they appear in a grid.
+ *
+ * Architecture note:
+ *   MediaStream objects cannot be transferred via BroadcastChannel (DataCloneError).
+ *   This window uses window.opener to access the parent window's Angular services
+ *   and retrieve the actual MediaStream for each participant.
  */
 @Component({
   selector: 'app-room-device-view',
@@ -44,7 +48,6 @@ export class RoomDeviceViewComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private roomDeviceService: RoomDeviceService,
-    private participantService: ParticipantService,
     private broadcastChannel: BroadcastChannelService,
   ) {}
 
@@ -57,24 +60,23 @@ export class RoomDeviceViewComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Use BroadcastChannel to receive data from main window
-    // Falls back to local services if BroadcastChannel is not available
-    const slotsSource = this.broadcastChannel.slots.pipe(
-      // Fallback to local service if broadcast is empty
-      switchMap(slots => slots.length > 0 ? of(slots) : this.roomDeviceService.slots)
-    );
-    const participantsSource = this.broadcastChannel.participants.pipe(
-      switchMap(participants => participants.length > 0 ? of(participants) : this.participantService.participants)
-    );
+    console.log('[RoomDeviceView] Initialised for slot', this.slotId);
 
-    // Reactively combine slot state + participant list
+    // Combine slot state (from BroadcastChannel) with participant refs,
+    // then resolve streams from window.opener's ParticipantService.
     this.subs.add(
       combineLatest([
-        slotsSource,
-        participantsSource,
-      ]).subscribe(([slots, participants]) => {
-        this.slot = slots.find(s => s.slotId === this.slotId) ?? null;
-        this.remotes = this.resolveRemotes(this.slot, participants);
+        this.broadcastChannel.slots,
+        this.broadcastChannel.participantRefs,
+        // Poll every 500ms as a fallback to catch stream availability after refs arrive
+        interval(500).pipe(startWith(0)),
+      ]).subscribe(([slots, refs]) => {
+        const slot = slots.find(s => s.slotId === this.slotId) ?? null;
+        if (slot !== this.slot) {
+          this.slot = slot;
+          console.log('[RoomDeviceView] Slot updated:', slot);
+        }
+        this.remotes = this.resolveRemotes(slot, refs);
       })
     );
   }
@@ -100,16 +102,62 @@ export class RoomDeviceViewComponent implements OnInit, OnDestroy {
 
   // ─── Private ─────────────────────────────────────────────────────────────
 
-  private resolveRemotes(slot: SlotState | null, participants: Participant[]): SlotRemote[] {
-    if (!slot) return [];
+  /**
+   * Resolves MediaStream objects for assigned remotes.
+   * Since MediaStream cannot cross BroadcastChannel, we look up streams from:
+   * 1. window.opener's participantStreams map (if available)
+   * 2. window.opener's Angular ParticipantService (via __ngParticipantService__)
+   */
+  private resolveRemotes(slot: SlotState | null, refs: ParticipantRef[]): SlotRemote[] {
+    if (!slot || slot.assignedRemotes.length === 0) return [];
+
     const result: SlotRemote[] = [];
+
     for (const remote of slot.assignedRemotes) {
-      // Participants are keyed by producerId (id), but also carry socketId
-      const match = participants.find(p => p.socketId === remote.socketId);
-      if (match) {
-        result.push({ socketId: remote.socketId, name: match.name, stream: match.stream });
+      // Find the participant ref for this remote
+      const ref = refs.find(r => r.socketId === remote.socketId);
+      const name = ref?.name ?? remote.name ?? 'Unknown';
+
+      // Try to get the MediaStream from the opener window
+      const stream = this.getStreamFromOpener(remote.socketId, ref?.id);
+      if (stream) {
+        result.push({ socketId: remote.socketId, name, stream });
+      } else {
+        console.log('[RoomDeviceView] Stream not yet available for remote', remote.socketId);
       }
     }
+
     return result;
+  }
+
+  /**
+   * Retrieves a MediaStream from the parent (opener) window.
+   * The main window exposes participant streams via window.__participantStreams__
+   * which is a Map<socketId, MediaStream> populated by VideoRoomService.
+   */
+  private getStreamFromOpener(socketId: string, producerId?: string): MediaStream | null {
+    try {
+      const opener = window.opener as any;
+      if (!opener) return null;
+
+      // Primary: look up by socketId in the exposed streams map
+      const streamsBySocketId: Map<string, MediaStream> = opener.__participantStreamsBySocketId__;
+      if (streamsBySocketId instanceof Map) {
+        const stream = streamsBySocketId.get(socketId);
+        if (stream) return stream;
+      }
+
+      // Fallback: look up by producerId (the participant's id in ParticipantService)
+      if (producerId) {
+        const streamsByProducerId: Map<string, MediaStream> = opener.__participantStreams__;
+        if (streamsByProducerId instanceof Map) {
+          const stream = streamsByProducerId.get(producerId);
+          if (stream) return stream;
+        }
+      }
+    } catch (err) {
+      console.warn('[RoomDeviceView] Cannot access opener:', err);
+    }
+    return null;
   }
 }

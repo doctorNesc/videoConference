@@ -120,9 +120,10 @@ export class VideoRoomService {
       }
     });
 
-    this.socketService.on(ACTIONS.NEW_PRODUCER, async ({ producerId }: any) => {
+    this.socketService.on(ACTIONS.NEW_PRODUCER, async ({ producerId, socketId }: any) => {
+      console.log('[VideoRoomService] NEW_PRODUCER event received — producerId:', producerId, '| socketId from event:', socketId, '| isRoomDevice:', this.isRoomDevice);
       if (!this.producers.find((p) => p.id === producerId)) {
-        await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id);
+        await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId);
       }
     });
 
@@ -143,9 +144,17 @@ export class VideoRoomService {
           // On first topology update (after REGISTER_ROOM_DEVICE), initialize slots from topology
           if (this.roomDeviceService.slotsSnapshot.length === 0) {
             this.roomDeviceService.initSlotsFromTopology(topology, mySocketId);
+            if (this.broadcastChannel) {
+              console.log('[VideoRoomService] Broadcasting initial slots to slot windows');
+              this.broadcastChannel.broadcastSlots(this.roomDeviceService.slotsSnapshot);
+            }
           } else {
             // Subsequent updates: just update existing slots
             this.roomDeviceService.onTopologyUpdate(topology, mySocketId);
+            if (this.broadcastChannel) {
+              console.log('[VideoRoomService] Broadcasting updated slots to slot windows');
+              this.broadcastChannel.broadcastSlots(this.roomDeviceService.slotsSnapshot);
+            }
           }
         }
       }
@@ -154,10 +163,18 @@ export class VideoRoomService {
     // ─── Hybrid: slot notifications (room devices) ────────────────────────
     this.socketService.on(ACTIONS.SLOT_REMOTE_JOINED, (event: SlotRemoteJoinedEvent) => {
       this.roomDeviceService.onRemoteJoined(event);
+      if (this.broadcastChannel) {
+        console.log('[VideoRoomService] SLOT_REMOTE_JOINED for slot', event.slotId, 'remote', event.remoteSocketId);
+        this.broadcastChannel.broadcastSlots(this.roomDeviceService.slotsSnapshot);
+      }
     });
 
     this.socketService.on(ACTIONS.SLOT_REMOTE_LEFT, (event: SlotRemoteLeftEvent) => {
       this.roomDeviceService.onRemoteLeft(event);
+      if (this.broadcastChannel) {
+        console.log('[VideoRoomService] SLOT_REMOTE_LEFT for slot', event.slotId, 'remote', event.remoteSocketId);
+        this.broadcastChannel.broadcastSlots(this.roomDeviceService.slotsSnapshot);
+      }
     });
 
     // ─── Producer closed ──────────────────────────────────────────────────
@@ -415,6 +432,7 @@ export class VideoRoomService {
     serverConsumerTransportId: string,
     socketId?: string,
   ) {
+    console.log('[VideoRoomService] connectRecvTransport() — producerId:', remoteProducerId, '| socketId:', socketId);
     try {
       const { params } = await this.socketService.emit(ACTIONS.CONSUME, {
         rtpCapabilities: this.device.rtpCapabilities,
@@ -463,7 +481,9 @@ export class VideoRoomService {
     const response: { producerId: string; socketId: string }[] =
       await this.socketService.emit(ACTIONS.GET_PRODUCERS);
 
+    console.log('[VideoRoomService] getProducers() response:', JSON.stringify(response));
     response.forEach(async ({ producerId, socketId }) => {
+      console.log('[VideoRoomService] getProducers() — consuming producerId:', producerId, '| socketId:', socketId);
       if (!this.producers.find((p) => p.id === producerId)) {
         await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId);
       }
@@ -486,10 +506,15 @@ export class VideoRoomService {
       socketId,
       isAssignedCamera,
     });
+
+    // Expose streams on window so slot-view windows can access via window.opener
+    // (MediaStream cannot be transferred via BroadcastChannel)
+    this.exposeStreamsOnWindow(remoteProducerId, stream, socketId);
+
     this.participantService.participants.pipe(take(1)).subscribe(
       val => {
         console.log('Added participant:', val);
-        // Broadcast to slot-view windows
+        // Broadcast serialisable refs (no MediaStream) to slot-view windows
         if (this.broadcastChannel) {
           this.broadcastChannel.broadcastParticipants(val);
         }
@@ -497,12 +522,46 @@ export class VideoRoomService {
     );
   }
 
+  /**
+   * Exposes participant streams on window so slot-view windows can access them
+   * via window.opener.__participantStreams__ (by producerId) and
+   * window.opener.__participantStreamsBySocketId__ (by socketId).
+   */
+  private exposeStreamsOnWindow(producerId: string, stream: MediaStream, socketId?: string) {
+    const win = window as any;
+    if (!win.__participantStreams__) {
+      win.__participantStreams__ = new Map<string, MediaStream>();
+    }
+    if (!win.__participantStreamsBySocketId__) {
+      win.__participantStreamsBySocketId__ = new Map<string, MediaStream>();
+    }
+    win.__participantStreams__.set(producerId, stream);
+    if (socketId) {
+      win.__participantStreamsBySocketId__.set(socketId, stream);
+    }
+    console.log('[VideoRoomService] Exposed stream for producerId', producerId, 'socketId', socketId);
+  }
+
   handleProducerClosed(remoteProducerId: string) {
     const consumerToClose = this.consumers.find((item) => item.producerId === remoteProducerId);
     consumerToClose?.close();
     this.consumers = this.consumers.filter((item) => item.producerId !== remoteProducerId);
+
+    // Remove from window stream maps
+    const win = window as any;
+    if (win.__participantStreams__) {
+      win.__participantStreams__.delete(remoteProducerId);
+    }
+
     this.participantService.remove(remoteProducerId);
     this.participantService.removeDetached(remoteProducerId);
+
+    // Broadcast updated refs after removal
+    this.participantService.participants.pipe(take(1)).subscribe(val => {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.broadcastParticipants(val);
+      }
+    });
   }
 
   getParticipants(): Observable<{ socketId?: string; id: string; stream: MediaStream; name: string; assignedMainRoomDevice?: string; isAssignedCamera?: boolean }[]> {
