@@ -14,7 +14,8 @@ import { ACTIONS } from "./config/actions";
 dotenv.config();
 
 const app = express();
-app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/browser")));
+//will be hndled by nginx
+// app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/browser")));
 // app.use(cors({
 //   origin: ["http://192.168.1.241:3000"],
 //   methods: ["GET", "POST"]
