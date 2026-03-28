@@ -1,5 +1,43 @@
 // ─── Mirror of server-side hybrid types (safe for browser) ───────────────────
 
+// ─── Room Configuration: Static admin-defined display positions ───────────────
+export interface DisplayConfig {
+  displayId: string;               // stable uuid, set once by admin
+  label: string;                   // e.g. "Front Left Screen"
+  position3D: { x: number; y: number; z: number };
+  rotationY: number;               // facing direction in radians
+  widthM: number;                  // physical width in meters
+  heightM: number;                 // physical height in meters
+}
+
+export interface CameraPosition {
+  position: { x: number; y: number; z: number };
+  lookAt: { x: number; y: number; z: number };
+}
+
+export interface RoomConfig {
+  roomName: string;
+  splatPath: string;               // relative path to .splat file
+  displays: DisplayConfig[];       // pre-configured displays
+  cameraPosition?: CameraPosition; // default camera position set by admin
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Device Pairing Config: Saved per device per room ────────────────────────
+export interface DevicePairingConfig {
+  deviceFingerprint: string;       // stable ID for the physical machine
+  roomName: string;
+  pairings: {
+    displayId: string;             // which configured display
+    screenIndex: number;           // which of the device's physical screens
+    cameraDeviceId: string;        // which camera
+    cameraLabel: string;
+  }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ScreenInfo {
   screenIndex: number;
   label: string;
@@ -29,6 +67,8 @@ export interface ScreenSlotDTO {
   cameraLabel: string | null;
   cameraProducerId: string | null;
   assignedRemoteIds: string[];
+  displayId?: string;              // links to RoomConfig.displays[].displayId
+  excluded: boolean;               // screen reserved for local work
   position3D?: { x: number; y: number; z: number };
 }
 

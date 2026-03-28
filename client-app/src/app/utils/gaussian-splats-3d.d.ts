@@ -7,6 +7,13 @@ declare module '@mkkellogg/gaussian-splats-3d' {
     Instant: number;
   };
 
+  export const SceneFormat: {
+    Splat: 0;
+    KSplat: 1;
+    Ply: 2;
+    Spz: 3;
+  };
+
   export interface ViewerOptions {
     rootElement?: HTMLElement | null;
     useBuiltInControls?: boolean;
@@ -44,6 +51,7 @@ declare module '@mkkellogg/gaussian-splats-3d' {
     scale?: [number, number, number];
     progressiveLoad?: boolean;
     streamView?: boolean;
+    format?: number;
     onProgress?: (progress: number, progressMessage: string, stage: string) => void;
   }
 
