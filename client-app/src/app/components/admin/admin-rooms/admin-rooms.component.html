@@ -1,0 +1,110 @@
+<div class="admin-rooms-container">
+  <!-- Header -->
+  <div class="header">
+    <h1>🏢 Room Management</h1>
+    <button class="btn-primary" (click)="toggleNewRoomForm()">
+      {{ showNewRoomForm ? '✕ Cancel' : '+ New Room' }}
+    </button>
+  </div>
+
+  <!-- New room form -->
+  <div *ngIf="showNewRoomForm" class="new-room-form">
+    <div class="form-content">
+      <h2>Create New Room</h2>
+      <div class="form-group">
+        <label>Room Name</label>
+        <input
+          type="text"
+          [(ngModel)]="newRoomName"
+          placeholder="e.g., Conference Room A"
+          (keyup.enter)="createNewRoom()"
+        />
+      </div>
+      <div *ngIf="createError" class="error-message">
+        {{ createError }}
+      </div>
+      <button
+        class="btn-save"
+        (click)="createNewRoom()"
+        [disabled]="creatingRoom || !newRoomName.trim()"
+      >
+        {{ creatingRoom ? 'Creating...' : 'Create Room' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>Loading rooms...</p>
+  </div>
+
+  <!-- Error state -->
+  <div *ngIf="loadError && !loading" class="error-message">
+    <strong>Error:</strong> {{ loadError }}
+  </div>
+
+  <!-- Rooms list -->
+  <div *ngIf="!loading && !loadError" class="rooms-grid">
+    <div *ngIf="rooms.length === 0" class="empty-state">
+      <p>No rooms yet. Create one to get started!</p>
+    </div>
+
+    <div *ngFor="let room of rooms" class="room-card">
+      <div class="room-header">
+        <h3>{{ room.roomName }}</h3>
+        <div class="room-actions">
+          <button
+            class="btn-icon"
+            (click)="editRoom(room.roomName)"
+            title="Edit room"
+          >
+            ✏️
+          </button>
+          <button
+            class="btn-icon btn-danger"
+            (click)="deleteRoom(room.roomName)"
+            title="Delete room"
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+
+      <div class="room-info">
+        <div class="info-row">
+          <span class="label">Displays:</span>
+          <span class="value">{{ room.displays.length || 0 }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Created:</span>
+          <span class="value">{{ formatDate(room.createdAt) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Updated:</span>
+          <span class="value">{{ formatDate(room.updatedAt) }}</span>
+        </div>
+      </div>
+
+      <div class="room-splat">
+        <div class="splat-status">
+          <span *ngIf="room.splatPath" class="status-ok">✓ Splat uploaded</span>
+          <span *ngIf="!room.splatPath" class="status-missing">⚠ No splat file</span>
+        </div>
+        <label class="btn-upload">
+          📤 Upload Splat
+          <input
+            type="file"
+            accept=".splat"
+            (change)="uploadSplat(room.roomName, $event)"
+            style="display: none"
+          />
+        </label>
+      </div>
+
+      <button class="btn-edit-full" (click)="editRoom(room.roomName)">
+        → Edit Room Configuration
+      </button>
+    </div>
+  </div>
+</div>

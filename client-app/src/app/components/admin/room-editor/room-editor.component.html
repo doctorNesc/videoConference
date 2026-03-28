@@ -1,0 +1,183 @@
+<div class="room-editor-container">
+  <!-- Header -->
+  <div class="header">
+    <h1>Edit Room: {{ roomName }}</h1>
+    <button class="btn-back" (click)="goBack()">← Back to Admin</button>
+  </div>
+
+  <!-- Loading state -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>Loading room configuration...</p>
+  </div>
+
+  <!-- Error state -->
+  <div *ngIf="loadError && !loading" class="error-message">
+    <strong>Error:</strong> {{ loadError }}
+  </div>
+
+  <!-- Main content -->
+  <div *ngIf="!loading && !loadError" class="content">
+    <!-- 3D Viewer -->
+    <div class="viewer-section">
+      <div #splatContainer class="splat-container"></div>
+
+      <!-- Click-to-place mode indicator -->
+      <div class="mode-indicator" [class.active]="clickToPlaceMode">
+        <span *ngIf="clickToPlaceMode">📍 Click in the 3D view to place a display</span>
+        <span *ngIf="!clickToPlaceMode">Click "Add Display" to enter placement mode</span>
+      </div>
+    </div>
+
+    <!-- Control panel -->
+    <div class="control-panel">
+
+      <!-- Camera position section -->
+      <div class="panel-section">
+        <h2>📷 Camera Start Position</h2>
+        <p class="hint">Navigate to the desired starting viewpoint in the 3D view, then click the button below to save it.</p>
+
+        <button
+          class="btn-camera"
+          [class.saved]="cameraPositionSaved"
+          (click)="captureCurrentCameraPosition()"
+        >
+          {{ cameraPositionSaved ? '✓ Position Captured!' : '📍 Set Current View as Default' }}
+        </button>
+
+        <div *ngIf="savedCameraPosition" class="camera-info">
+          <small>
+            Position: ({{ savedCameraPosition.position.x }}, {{ savedCameraPosition.position.y }}, {{ savedCameraPosition.position.z }})<br>
+            LookAt: ({{ savedCameraPosition.lookAt.x }}, {{ savedCameraPosition.lookAt.y }}, {{ savedCameraPosition.lookAt.z }})
+          </small>
+        </div>
+        <div *ngIf="!savedCameraPosition" class="camera-info">
+          <small>No default camera position saved yet.</small>
+        </div>
+      </div>
+
+      <!-- Displays section -->
+      <div class="panel-section">
+        <h2>Displays</h2>
+
+        <!-- Add display button -->
+        <button
+          class="btn-primary"
+          (click)="toggleClickToPlace()"
+          [class.active]="clickToPlaceMode"
+        >
+          {{ clickToPlaceMode ? '✓ Placement Mode Active' : '+ Add Display' }}
+        </button>
+
+        <!-- Display list -->
+        <div class="display-list">
+          <div
+            *ngFor="let display of displays"
+            class="display-item"
+            [class.selected]="selectedDisplayId === display.displayId"
+            (click)="selectedDisplayId = display.displayId"
+          >
+            <div class="display-label">{{ display.label }}</div>
+            <button
+              class="btn-delete"
+              (click)="deleteDisplay(display.displayId); $event.stopPropagation()"
+              title="Delete display"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit selected display -->
+      <div class="panel-section" *ngIf="getSelectedDisplay()">
+        <h2>Edit Display</h2>
+        <div class="form-group">
+          <label>Label</label>
+          <input
+            type="text"
+            [(ngModel)]="getSelectedDisplay()!.label"
+            (change)="updateSelectedDisplay('label', getSelectedDisplay()!.label)"
+            placeholder="e.g., Front Left Screen"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Width (meters)</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.widthM"
+            (change)="updateSelectedDisplay('widthM', getSelectedDisplay()!.widthM)"
+            step="0.1"
+            min="0.1"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Height (meters)</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.heightM"
+            (change)="updateSelectedDisplay('heightM', getSelectedDisplay()!.heightM)"
+            step="0.1"
+            min="0.1"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Rotation Y (radians)</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.rotationY"
+            (change)="updateSelectedDisplay('rotationY', getSelectedDisplay()!.rotationY)"
+            step="0.1"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Position X</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.position3D.x"
+            (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
+            step="0.01"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Position Y</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.position3D.y"
+            (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
+            step="0.01"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Position Z</label>
+          <input
+            type="number"
+            [(ngModel)]="getSelectedDisplay()!.position3D.z"
+            (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
+            step="0.01"
+          />
+        </div>
+      </div>
+
+      <!-- Save button -->
+      <div class="panel-section">
+        <button
+          class="btn-save"
+          (click)="saveRoomConfig()"
+          [disabled]="saving"
+        >
+          {{ saving ? 'Saving...' : '💾 Save Configuration' }}
+        </button>
+        <div *ngIf="saveError" class="error-message">
+          {{ saveError }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
