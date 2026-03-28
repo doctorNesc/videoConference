@@ -1,0 +1,42 @@
+<div class="display-picker-overlay">
+  <!-- Loading state -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading 3D room...</p>
+  </div>
+
+  <!-- Error state -->
+  <div *ngIf="loadError && !loading" class="error-state">
+    <p>Failed to load 3D room: {{ loadError }}</p>
+    <p>Falling back to display list...</p>
+  </div>
+
+  <!-- 3D Splat Viewer -->
+  <div #splatContainer class="splat-container" [class.hidden]="loading || loadError"></div>
+
+  <!-- Fallback: Display List -->
+  <div *ngIf="loadError" class="display-list-fallback">
+    <h2>Select a Display</h2>
+    <div class="display-buttons">
+      <button
+        *ngFor="let display of availableDisplays"
+        (click)="selectDisplayFromList(display.displayId)"
+        [disabled]="selectedDisplayId !== null"
+        class="display-button"
+      >
+        {{ display.label }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Instructions overlay -->
+  <div class="instructions" *ngIf="!loading && !loadError && !selectedDisplayId">
+    <p>Click on a display to choose where you want to appear</p>
+  </div>
+
+  <!-- Selection feedback -->
+  <div *ngIf="selectedDisplayId" class="selection-feedback">
+    <p>Connecting to display...</p>
+    <div class="spinner"></div>
+  </div>
+</div>
