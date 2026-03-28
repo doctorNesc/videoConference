@@ -118,6 +118,66 @@ export class RoomDeviceService {
     };
   }
 
+  // ─── Device fingerprinting ────────────────────────────────────────────────
+
+  /**
+   * Generates or retrieves a stable device fingerprint from localStorage.
+   * Used to persist pairing config across sessions.
+   */
+  generateFingerprint(): string {
+    const key = 'hybrid-device-id';
+    let id = localStorage.getItem(key);
+    if (!id) {
+      // Generate a new UUID-like ID
+      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  /**
+   * Loads saved pairing config from the server for this device and room.
+   */
+  async loadSavedConfig(roomName: string, fingerprint: string): Promise<any | null> {
+    try {
+      const response = await fetch(`/api/rooms/${roomName}/device-config/${fingerprint}`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (err) {
+      console.warn('[RoomDeviceService] Failed to load saved config:', err);
+    }
+    return null;
+  }
+
+  /**
+   * Saves pairing config to the server for this device and room.
+   */
+  async savePairingConfig(roomName: string, fingerprint: string, pairings: any[]): Promise<boolean> {
+    try {
+      const config = {
+        roomName,
+        deviceFingerprint: fingerprint,
+        pairings,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const response = await fetch(`/api/rooms/${roomName}/device-config/${fingerprint}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      return response.ok;
+    } catch (err) {
+      console.error('[RoomDeviceService] Failed to save pairing config:', err);
+      return false;
+    }
+  }
+
   // ─── Slot management (driven by server events) ────────────────────────────
 
   /**

@@ -242,23 +242,45 @@ export class VideoRoomService {
 
   /**
    * Phase 4: Enumerates screens and cameras, sends capabilities to server.
-   * The pairing wizard component will call submitScreenCameraPairing() after
+   * Attempts to load saved pairing config. If found, sends it with registration.
+   * Otherwise, the pairing wizard component will call submitScreenCameraPairing() after
    * the operator assigns cameras to screens.
    */
-  async registerAsRoomDevice(): Promise<string[]> {
+  async registerAsRoomDevice(): Promise<{ slots: string[]; hasSavedConfig: boolean }> {
     await this.roomDeviceService.enumerateScreens();
     await this.roomDeviceService.enumerateCameras();
 
     const capabilities = this.roomDeviceService.getCapabilities();
-    const result = await this.socketService.emit(ACTIONS.REGISTER_ROOM_DEVICE, { capabilities });
+    const fingerprint = this.roomDeviceService.generateFingerprint();
 
-    console.log('[VideoRoomService] Registered as room device, slot IDs:', result?.slots);
-    return result?.slots ?? [];
+    // Try to load saved pairing config
+    let savedPairings = null;
+    let hasSavedConfig = false;
+    try {
+      const savedConfig = await this.roomDeviceService.loadSavedConfig(this.roomName, fingerprint);
+      if (savedConfig && savedConfig.pairings) {
+        savedPairings = savedConfig.pairings;
+        hasSavedConfig = true;
+        console.log('[VideoRoomService] Loaded saved pairing config for device', fingerprint);
+      }
+    } catch (err) {
+      console.warn('[VideoRoomService] Failed to load saved config:', err);
+    }
+
+    const payload: any = { capabilities, fingerprint };
+    if (savedPairings) {
+      payload.savedPairings = savedPairings;
+    }
+
+    const result = await this.socketService.emit(ACTIONS.REGISTER_ROOM_DEVICE, payload);
+
+    console.log('[VideoRoomService] Registered as room device, slot IDs:', result?.slots, 'hasSavedConfig:', hasSavedConfig);
+    return { slots: result?.slots ?? [], hasSavedConfig };
   }
 
   /**
    * Phase 5: Called by the pairing wizard after the operator assigns cameras.
-   * Sends pairings to server, then starts producing camera streams.
+   * Sends pairings to server, saves config locally, then starts producing camera streams.
    */
   async submitScreenCameraPairing(pairings: ScreenCameraPairing[]): Promise<void> {
     // Apply locally for immediate UI feedback
@@ -269,6 +291,13 @@ export class VideoRoomService {
     // Send to server
     await this.socketService.emit(ACTIONS.SCREEN_CAMERA_PAIRING, { pairings });
 
+    // Save pairing config to server for future joins
+    const fingerprint = this.roomDeviceService.generateFingerprint();
+    const saved = await this.roomDeviceService.savePairingConfig(this.roomName, fingerprint, pairings as any);
+    if (saved) {
+      console.log('[VideoRoomService] Saved pairing config for device', fingerprint);
+    }
+
     // Start producing a camera stream for each paired slot
     for (const pairing of pairings) {
       await this.produceCameraForSlot(pairing.slotId, pairing.cameraDeviceId);
@@ -276,6 +305,13 @@ export class VideoRoomService {
 
     // Now consume existing producers from other peers
     await this.getProducers();
+  }
+
+  /**
+   * Emits CHOOSE_DISPLAY to server when a remote participant selects a display.
+   */
+  chooseDisplay(displayId: string): Promise<any> {
+    return this.socketService.emit(ACTIONS.CHOOSE_DISPLAY, { displayId });
   }
 
   /**
