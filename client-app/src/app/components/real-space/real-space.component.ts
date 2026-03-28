@@ -79,8 +79,8 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
         selfDrivenMode: true,              // viewer manages its own RAF loop
         threeScene: this.threeScene,       // our overlay scene
         cameraUp: [0, 1, 0],
-        initialCameraPosition: [0, 2, 6],
-        initialCameraLookAt: [0, 0, 0],
+        initialCameraPosition: [0, 0, 0],
+        initialCameraLookAt: [0, 0, -5],
         sceneRevealMode: SceneRevealMode.Gradual,
       });
 

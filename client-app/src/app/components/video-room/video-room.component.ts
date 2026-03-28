@@ -132,12 +132,16 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
     const originalRegister = this.videoService.registerAsRoomDevice.bind(this.videoService);
     this.videoService.registerAsRoomDevice = async () => {
-      const slotIds = await originalRegister();
-      if (slotIds.length > 0) {
+      const result = await originalRegister();
+      const slotIds = result.slots || [];
+      const hasSavedConfig = result.hasSavedConfig || false;
+
+      if (slotIds.length > 0 && !hasSavedConfig) {
+        // Only show wizard if no saved config was applied
         this.pendingSlotIds = slotIds;
         this.showPairingWizard = true;
       }
-      return slotIds;
+      return result;
     };
   }
 
@@ -308,8 +312,11 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
   /**
    * Builds the initial HTML for a slot window.
+   * Handles both normal slots and excluded (reserved) screens.
    */
   private buildSlotWindowHtml(slot: SlotState): string {
+    const isExcluded = (slot as any).excluded === true;
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -322,14 +329,24 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     .remote-name { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 4px; font-size: 0.9rem; }
     #slot-status { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; flex-direction: column; gap: 12px; color: #aaa; }
     #slot-info { position: fixed; bottom: 12px; right: 12px; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; color: #ccc; }
+    #excluded-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; z-index: 1000; }
+    #excluded-overlay h2 { font-size: 32px; font-weight: 600; color: #fff; }
+    #excluded-overlay p { font-size: 18px; color: #aaa; }
   </style>
 </head>
 <body>
+  ${isExcluded ? `
+  <div id="excluded-overlay">
+    <h2>Screen Reserved</h2>
+    <p>This screen is reserved for local work</p>
+  </div>
+  ` : `
   <div id="slot-status" style="display:flex">
     <p>Waiting for remote participant…</p>
     <small>Slot: ${slot.screenLabel}</small>
   </div>
   <div id="video-container"></div>
+  `}
   <div id="slot-info"><span id="slot-label">${slot.screenLabel}</span></div>
 </body>
 </html>`;

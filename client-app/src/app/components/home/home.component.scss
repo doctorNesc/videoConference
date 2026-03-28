@@ -1,3 +1,30 @@
+header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  padding: 16px 24px;
+  z-index: 100;
+
+  .admin-link {
+    .btn-admin {
+      padding: 8px 16px;
+      background: #4a90d9;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: inline-block;
+
+      &:hover {
+        background: #357abd;
+        box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+      }
+    }
+  }
+}
+
 main {
   display: flex;
   flex-direction: row; /* Stack items vertically */
