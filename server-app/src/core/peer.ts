@@ -15,6 +15,8 @@ export class Peer {
     isRoomDevice: boolean = false;
     /** Capabilities advertised by the room device on registration */
     capabilities: RoomDeviceCapabilities | null = null;
+    /** Stable device fingerprint for persisting pairing config */
+    deviceFingerprint?: string;
 
     // ─── Mediasoup resources ─────────────────────────────────────────────────
     sendTransport!: WebRtcTransport;

@@ -78,6 +78,7 @@ export class Room {
             cameraLabel: null,
             cameraProducerId: null,
             assignedRemoteIds: [],
+            excluded: false,
         }));
 
         newSlots.forEach((slot) => this.topology.slots.set(slot.slotId, slot));
@@ -135,10 +136,11 @@ export class Room {
 
     /**
      * Returns all slots that have a paired camera (ready to accept remotes).
+     * Excludes slots marked as excluded.
      */
     getPairedSlots(): ScreenSlot[] {
         return Array.from(this.topology.slots.values()).filter(
-            (s) => s.cameraDeviceId !== null
+            (s) => s.cameraDeviceId !== null && !s.excluded
         );
     }
 
@@ -188,6 +190,28 @@ export class Room {
     }
 
     /**
+     * Assigns a remote participant to a specific display by displayId.
+     * Returns the assigned slot, or null if the display is not available.
+     */
+    assignRemoteToDisplay(remoteSocketId: string, displayId: string): ScreenSlot | null {
+        const slot = Array.from(this.topology.slots.values()).find(
+            (s) => s.displayId === displayId && s.cameraDeviceId !== null && !s.excluded
+        );
+        if (!slot) return null;
+
+        // Remove from any previous assignment
+        this.unassignRemote(remoteSocketId);
+
+        // Assign to the new slot
+        if (!slot.assignedRemoteIds.includes(remoteSocketId)) {
+            slot.assignedRemoteIds.push(remoteSocketId);
+        }
+
+        console.log(`[Room ${this.roomName}] Remote ${remoteSocketId} assigned to display ${displayId} (slot: ${slot.slotId})`);
+        return slot;
+    }
+
+    /**
      * Rebalances all remote assignments across available paired slots.
      * Called after a device joins or leaves.
      */
@@ -221,6 +245,30 @@ export class Room {
         return newAssignments;
     }
 
+    // ─── Screen exclusion ─────────────────────────────────────────────────────
+
+    /**
+     * Marks a screen slot as excluded (reserved for local work).
+     */
+    excludeSlot(slotId: string): ScreenSlot | null {
+        const slot = this.topology.slots.get(slotId);
+        if (!slot) return null;
+        slot.excluded = true;
+        console.log(`[Room ${this.roomName}] Slot ${slotId} excluded`);
+        return slot;
+    }
+
+    /**
+     * Marks a screen slot as included (available for conference).
+     */
+    includeSlot(slotId: string): ScreenSlot | null {
+        const slot = this.topology.slots.get(slotId);
+        if (!slot) return null;
+        slot.excluded = false;
+        console.log(`[Room ${this.roomName}] Slot ${slotId} included`);
+        return slot;
+    }
+
     // ─── Topology serialisation ───────────────────────────────────────────────
 
     /** Serialise topology to a plain object safe for socket.io transmission */
@@ -234,6 +282,7 @@ export class Room {
             cameraLabel: s.cameraLabel,
             cameraProducerId: s.cameraProducerId,
             assignedRemoteIds: [...s.assignedRemoteIds],
+            excluded: s.excluded,
             position3D: s.position3D,
         }));
 

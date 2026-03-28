@@ -5,6 +5,7 @@ import { Peer } from "../core/peer";
 import { RoomManager } from "../core/roomManager";
 import { leaveRoom } from "../mediasoup/utils";
 import { assignRemoteOnJoin, unassignRemoteOnLeave, handleDeviceLeave } from "./hybridHandlers";
+import * as roomConfigService from "../services/roomConfigService";
 
 export function registerRoomHandlers(
     socket: Socket,
@@ -41,9 +42,13 @@ export function registerRoomHandlers(
                 }
             }
 
+            // Load room config for 3D display picker (remotes need this)
+            const roomConfig = roomConfigService.loadRoomConfig(roomName);
+
             callback({
                 rtpCapabilities: room.router.rtpCapabilities,
                 assignment, // null for room devices or when no paired slots exist yet
+                roomConfig: roomConfig ?? null, // for 3D display picker
             });
         } catch (err) {
             console.error("[JOIN_ROOM] error:", err);

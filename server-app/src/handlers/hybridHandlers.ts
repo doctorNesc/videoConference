@@ -21,9 +21,21 @@ export function registerHybridHandlers(
     // ─── REGISTER_ROOM_DEVICE ─────────────────────────────────────────────────
     // Emitted by a physical room device after joining the room.
     // Creates unpaired ScreenSlots for each advertised screen.
+    // If savedPairings are provided, applies them immediately (skip wizard).
     socket.on(
         ACTIONS.REGISTER_ROOM_DEVICE,
-        ({ capabilities }: { capabilities: RoomDeviceCapabilities }, callback?: Function) => {
+        (
+            {
+                capabilities,
+                fingerprint,
+                savedPairings,
+            }: {
+                capabilities: RoomDeviceCapabilities;
+                fingerprint?: string;
+                savedPairings?: { displayId: string; screenIndex: number; cameraDeviceId: string; cameraLabel: string; excluded: boolean }[];
+            },
+            callback?: Function
+        ) => {
             try {
                 const roomName = roomManager.socketToRoom.get(socket.id);
                 if (!roomName) {
@@ -35,11 +47,51 @@ export function registerHybridHandlers(
                 const room = roomManager.getRoom(roomName, "REGISTER_ROOM_DEVICE");
                 const peer = room.getPeer(socket.id);
 
-                // Store capabilities on the peer
+                // Store capabilities and fingerprint on the peer
                 peer.setCapabilities(capabilities);
+                if (fingerprint) {
+                    peer.deviceFingerprint = fingerprint;
+                }
 
                 // Create unpaired slots
                 const newSlots = room.registerDevice(socket.id, capabilities);
+
+                // If saved pairings provided, apply them immediately
+                let hasSavedConfig = false;
+                if (savedPairings && savedPairings.length > 0) {
+                    // Apply pairings
+                    room.applyScreenCameraPairing(
+                        savedPairings.map((p) => ({
+                            slotId: newSlots.find((s) => s.screenIndex === p.screenIndex)?.slotId ?? "",
+                            cameraDeviceId: p.cameraDeviceId,
+                            cameraLabel: p.cameraLabel,
+                        }))
+                    );
+
+                    // Set displayId and excluded flag on slots
+                    savedPairings.forEach((p) => {
+                        const slot = newSlots.find((s) => s.screenIndex === p.screenIndex);
+                        if (slot) {
+                            slot.displayId = p.displayId;
+                            slot.excluded = p.excluded;
+                        }
+                    });
+
+                    // Rebalance remotes to include newly paired slots
+                    const newAssignments = room.rebalanceAssignments();
+                    newAssignments.forEach((slot, remoteSocketId) => {
+                        const assignment: RemoteAssignment = {
+                            slotId: slot.slotId,
+                            screenLabel: slot.screenLabel,
+                            cameraProducerId: slot.cameraProducerId,
+                            deviceSocketId: slot.deviceSocketId,
+                        };
+                        namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
+                    });
+
+                    hasSavedConfig = true;
+                    console.log(`[HYBRID] Device ${socket.id} applied saved pairing config`);
+                }
 
                 // Broadcast updated topology to everyone in the socket.io room
                 const topologyDTO = room.getTopologyDTO();
@@ -51,7 +103,7 @@ export function registerHybridHandlers(
                     capabilities.cameras.length, "camera(s)"
                 );
 
-                callback?.({ success: true, slots: newSlots.map(s => s.slotId) });
+                callback?.({ success: true, slots: newSlots.map(s => s.slotId), hasSavedConfig });
             } catch (err) {
                 console.error("[REGISTER_ROOM_DEVICE] error:", err);
                 callback?.({ error: String(err) });
@@ -175,6 +227,134 @@ export function registerHybridHandlers(
     socket.on(ACTIONS.UNREGISTER_ROOM_DEVICE, (_: any, callback?: Function) => {
         handleDeviceLeave(socket.id, namespace, roomManager);
         callback?.({ success: true });
+    });
+
+    // ─── CHOOSE_DISPLAY ───────────────────────────────────────────────────────
+    // Emitted by a remote participant to choose a specific display.
+    socket.on(ACTIONS.CHOOSE_DISPLAY, ({ displayId }: { displayId: string }, callback?: Function) => {
+        try {
+            const roomName = roomManager.socketToRoom.get(socket.id);
+            if (!roomName) {
+                callback?.({ error: "not-in-room" });
+                return;
+            }
+
+            const room = roomManager.getRoom(roomName, "CHOOSE_DISPLAY");
+            const slot = room.assignRemoteToDisplay(socket.id, displayId);
+
+            if (!slot) {
+                callback?.({ error: "display-not-available" });
+                return;
+            }
+
+            const assignment: RemoteAssignment = {
+                slotId: slot.slotId,
+                screenLabel: slot.screenLabel,
+                cameraProducerId: slot.cameraProducerId,
+                deviceSocketId: slot.deviceSocketId,
+            };
+
+            // Notify the remote of their assignment
+            namespace.to(socket.id).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
+
+            // Notify the room device that owns this slot
+            namespace.to(slot.deviceSocketId).emit(ACTIONS.SLOT_REMOTE_JOINED, {
+                slotId: slot.slotId,
+                remoteSocketId: socket.id,
+                remoteName: room.getPeer(socket.id)?.userName ?? "Unknown",
+            });
+
+            // Broadcast updated topology to all peers
+            const topologyDTO = room.getTopologyDTO();
+            namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
+
+            callback?.({ success: true, assignment });
+        } catch (err) {
+            console.error("[CHOOSE_DISPLAY] error:", err);
+            callback?.({ error: String(err) });
+        }
+    });
+
+    // ─── EXCLUDE_SCREEN ───────────────────────────────────────────────────────
+    // Emitted by a room device to exclude a screen from conference.
+    socket.on(ACTIONS.EXCLUDE_SCREEN, ({ slotId }: { slotId: string }, callback?: Function) => {
+        try {
+            const roomName = roomManager.socketToRoom.get(socket.id);
+            if (!roomName) {
+                callback?.({ error: "not-in-room" });
+                return;
+            }
+
+            const room = roomManager.getRoom(roomName, "EXCLUDE_SCREEN");
+            const slot = room.excludeSlot(slotId);
+
+            if (!slot) {
+                callback?.({ error: "slot-not-found" });
+                return;
+            }
+
+            // Rebalance remotes away from this slot
+            const newAssignments = room.rebalanceAssignments();
+            newAssignments.forEach((s, remoteSocketId) => {
+                const assignment: RemoteAssignment = {
+                    slotId: s.slotId,
+                    screenLabel: s.screenLabel,
+                    cameraProducerId: s.cameraProducerId,
+                    deviceSocketId: s.deviceSocketId,
+                };
+                namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
+            });
+
+            // Broadcast updated topology
+            const topologyDTO = room.getTopologyDTO();
+            namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
+
+            callback?.({ success: true });
+        } catch (err) {
+            console.error("[EXCLUDE_SCREEN] error:", err);
+            callback?.({ error: String(err) });
+        }
+    });
+
+    // ─── INCLUDE_SCREEN ───────────────────────────────────────────────────────
+    // Emitted by a room device to include a previously excluded screen.
+    socket.on(ACTIONS.INCLUDE_SCREEN, ({ slotId }: { slotId: string }, callback?: Function) => {
+        try {
+            const roomName = roomManager.socketToRoom.get(socket.id);
+            if (!roomName) {
+                callback?.({ error: "not-in-room" });
+                return;
+            }
+
+            const room = roomManager.getRoom(roomName, "INCLUDE_SCREEN");
+            const slot = room.includeSlot(slotId);
+
+            if (!slot) {
+                callback?.({ error: "slot-not-found" });
+                return;
+            }
+
+            // Rebalance remotes to include this slot
+            const newAssignments = room.rebalanceAssignments();
+            newAssignments.forEach((s, remoteSocketId) => {
+                const assignment: RemoteAssignment = {
+                    slotId: s.slotId,
+                    screenLabel: s.screenLabel,
+                    cameraProducerId: s.cameraProducerId,
+                    deviceSocketId: s.deviceSocketId,
+                };
+                namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
+            });
+
+            // Broadcast updated topology
+            const topologyDTO = room.getTopologyDTO();
+            namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
+
+            callback?.({ success: true });
+        } catch (err) {
+            console.error("[INCLUDE_SCREEN] error:", err);
+            callback?.({ error: String(err) });
+        }
     });
 }
 

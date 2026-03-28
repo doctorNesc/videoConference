@@ -102,6 +102,39 @@ export const ACTIONS = {
      */
     SLOT_REMOTE_LEFT: "slotRemoteLeft",
 
+    // ─── Hybrid: Room configuration & assignment ──────────────────────────────
+    /**
+     * Emitted by a remote participant to choose a specific display.
+     * Payload: { displayId: string }
+     * Server assigns remote to the slot linked to that displayId.
+     */
+    CHOOSE_DISPLAY: "chooseDisplay",
+
+    /**
+     * Emitted by a room device to exclude a screen from conference.
+     * Payload: { slotId: string }
+     */
+    EXCLUDE_SCREEN: "excludeScreen",
+
+    /**
+     * Emitted by a room device to include a previously excluded screen.
+     * Payload: { slotId: string }
+     */
+    INCLUDE_SCREEN: "includeScreen",
+
+    /**
+     * Emitted by a remote participant to request assignment to a specific slot.
+     * Payload: { slotId: string }
+     * Server responds with ASSIGNMENT_UPDATE if successful.
+     */
+    REQUEST_SLOT_ASSIGNMENT: "requestSlotAssignment",
+
+    /**
+     * Emitted by a room device to update display-to-slot mappings.
+     * Payload: { slotId: string; displayId: string }[]
+     */
+    UPDATE_DISPLAY_MAPPING: "updateDisplayMapping",
+
     // ─── Errors & system ─────────────────────────────────────────────────────
     ERROR: "error",
     DISCONNECT: "disconnect",

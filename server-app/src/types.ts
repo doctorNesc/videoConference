@@ -33,6 +33,44 @@ export interface RoomDeviceCapabilities {
   cameras: CameraInfo[];
 }
 
+// ─── Room Configuration: Static admin-defined display positions ───────────────
+export interface DisplayConfig {
+  displayId: string;               // stable uuid, set once by admin
+  label: string;                   // e.g. "Front Left Screen"
+  position3D: { x: number; y: number; z: number };
+  rotationY: number;               // facing direction in radians
+  widthM: number;                  // physical width in meters
+  heightM: number;                 // physical height in meters
+}
+
+export interface CameraPosition {
+  position: { x: number; y: number; z: number };
+  lookAt: { x: number; y: number; z: number };
+}
+
+export interface RoomConfig {
+  roomName: string;
+  splatPath: string;               // relative path to .splat file
+  displays: DisplayConfig[];       // pre-configured displays
+  cameraPosition?: CameraPosition; // default camera position set by admin
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Device Pairing Config: Saved per device per room ────────────────────────
+export interface DevicePairingConfig {
+  deviceFingerprint: string;       // stable ID for the physical machine
+  roomName: string;
+  pairings: {
+    displayId: string;             // which configured display
+    screenIndex: number;           // which of the device's physical screens
+    cameraDeviceId: string;        // which camera
+    cameraLabel: string;
+  }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Hybrid: A single screen+camera pair on a physical room device ────────────
 export interface ScreenSlot {
   slotId: string;                  // stable uuid
@@ -43,6 +81,8 @@ export interface ScreenSlot {
   cameraLabel: string | null;      // human-readable camera name
   cameraProducerId: string | null; // mediasoup producer ID once streaming
   assignedRemoteIds: string[];     // socket IDs of assigned remote participants
+  displayId?: string;              // links to RoomConfig.displays[].displayId
+  excluded: boolean;               // screen reserved for local work, not for conference
   // Physical position for 3D visualization (optional, set after pairing)
   position3D?: { x: number; y: number; z: number };
 }
@@ -72,6 +112,8 @@ export interface ScreenSlotDTO {
   cameraLabel: string | null;
   cameraProducerId: string | null;
   assignedRemoteIds: string[];
+  displayId?: string;              // links to RoomConfig.displays[].displayId
+  excluded: boolean;               // screen reserved for local work
   position3D?: { x: number; y: number; z: number };
 }
 
