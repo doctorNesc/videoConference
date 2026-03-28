@@ -171,12 +171,15 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
 
       this.viewer.start();
 
-      // Set OrbitControls target = camera position → zero orbit radius → spins in place (first-person look-around)
+      // Set target just in front of camera for first-person look-around
       const controls = (this.viewer as any).controls;
       if (controls) {
         const cam = controls.object;
         if (cam) {
-          controls.target.copy(cam.position);
+          const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+          controls.target.copy(cam.position).addScaledVector(lookDir, 0.01);
+          controls.minDistance = 0;
+          controls.maxDistance = 0.01;
           controls.update();
         }
       }
