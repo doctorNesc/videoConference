@@ -46,7 +46,7 @@
                   "type": "initial",
                   "maximumWarning": "500kB",
                   "maximumError": "3MB"
-                },  
+                },
                 {
                   "type": "anyComponentStyle",
                   "maximumWarning": "2mB",
@@ -75,7 +75,11 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "proxyConfig": "src/proxy.conf.json"
+            "proxyConfig": "src/proxy.conf.json",
+            "headers": {
+              "Cross-Origin-Opener-Policy": "same-origin",
+              "Cross-Origin-Embedder-Policy": "require-corp"
+            }
           }
         },
         "extract-i18n": {
