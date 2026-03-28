@@ -171,11 +171,14 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
 
       this.viewer.start();
 
-      // Set OrbitControls target to saved lookAt (if available)
+      // Set OrbitControls target = camera position → zero orbit radius → spins in place (first-person look-around)
       const controls = (this.viewer as any).controls;
-      if (controls && camLookAt) {
-        controls.target.set(camLookAt.x, camLookAt.y, camLookAt.z);
-        controls.update();
+      if (controls) {
+        const cam = controls.object;
+        if (cam) {
+          controls.target.copy(cam.position);
+          controls.update();
+        }
       }
     } catch (err) {
       console.error('[RoomEditor] Failed to initialize viewer:', err);

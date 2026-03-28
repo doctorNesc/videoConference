@@ -136,13 +136,15 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       this.viewer.start();
 
       // Restrict common users to orbit-only: disable pan and zoom on the built-in OrbitControls
-      // Also set target to the saved lookAt so the camera spins around that point
+      // Set target = camera position so the camera spins around itself (first-person look-around)
       const controls = (this.viewer as any).controls;
       if (controls) {
         controls.enablePan = false;
         controls.enableZoom = false;
-        if (camLookAt) {
-          controls.target.set(camLookAt.x, camLookAt.y, camLookAt.z);
+        // Place the orbit pivot at the camera's own position → zero orbit radius → spins in place
+        const cam = controls.object;
+        if (cam) {
+          controls.target.copy(cam.position);
           controls.update();
         }
       }
