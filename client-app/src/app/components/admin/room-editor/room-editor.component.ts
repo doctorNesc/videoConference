@@ -49,6 +49,12 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
+  // Original library focal-point handler (saved so it can be toggled)
+  private _originalFocalPointFn: (() => void) | null = null;
+
+  // Listener that keeps controls.target pinned just ahead of camera in bound mode
+  private _boundModeListener: (() => void) | null = null;
+
   // Display marker meshes
   private displayMarkers: Map<string, THREE.Mesh> = new Map();
   private displayLabels: Map<string, THREE.Sprite> = new Map();
@@ -166,23 +172,23 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       // Render existing displays
       this.renderDisplayMarkers();
 
-      // Setup click handler
-      this.setupClickHandler();
-
       this.viewer.start();
 
-      // Disable the library's built-in click-to-set-orbit-target behaviour entirely.
-      // The Viewer class stores checkForFocalPointChange as an instance field (arrow
-      // function), so we can override it on the instance to make it a no-op.
-      (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
+      // Save the library's original click-to-set-orbit-target handler so we can
+      // toggle it on/off when switching between free and bound camera modes.
+      this._originalFocalPointFn = (this.viewer as any).checkForFocalPointChange?.bind(this.viewer);
+
+      // Setup click handler AFTER viewer.start() so the canvas element exists
+      this.setupClickHandler();
 
       // If a camera position is already saved, start in bound (first-person) mode
+      // _applyBoundControls() will also disable the focal-point click handler.
       if (this.savedCameraPosition) {
         this.cameraPreviewMode = true;
         this._applyBoundControls();
         this.cdr.detectChanges(); // force OnPush to re-render the button label
       }
-      // Otherwise leave controls in free-navigation mode
+      // Otherwise leave controls in free-navigation mode (focal-point click active)
     } catch (err) {
       console.error('[RoomEditor] Failed to initialize viewer:', err);
       this.loadError = `Failed to load splat: ${err}`;
@@ -231,26 +237,76 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  /** Locks OrbitControls to first-person look-around (orbit around itself). */
+  /** Locks OrbitControls to first-person look-around (orbit around itself).
+   *  Uses a 'change' event listener to continuously pin controls.target just
+   *  ahead of the camera so OrbitControls never snaps the camera position.
+   *  Also disables the library's click-to-set-orbit-target. */
   private _applyBoundControls() {
     const controls = (this.viewer as any)?.controls;
     if (!controls || !this.camera) return;
+
+    // Cancel any in-progress camera target transition from the library
+    if (this.viewer) {
+      (this.viewer as any).transitioningCameraTarget = false;
+    }
+
+    // Remove any previous bound-mode listener
+    if (this._boundModeListener) {
+      controls.removeEventListener('change', this._boundModeListener);
+      this._boundModeListener = null;
+    }
+
+    // Set initial target 0.01 units ahead of camera
     const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     controls.target.copy(this.camera.position).addScaledVector(lookDir, 0.01);
     controls.minDistance = 0;
-    controls.maxDistance = 0.01;
+    controls.maxDistance = Infinity; // don't let OrbitControls snap the camera
     controls.update();
+
+    // After every OrbitControls update, re-pin the target just ahead of camera,
+    // but only if the distance hasn't changed (i.e., only during rotation, not zoom).
+    // This keeps the orbit pivot glued to the camera (first-person look-around).
+    const cam = this.camera;
+    let lastDistance = controls.target.distanceTo(cam.position);
+    this._boundModeListener = () => {
+      const currentDistance = controls.target.distanceTo(cam.position);
+      // Only re-pin if distance is stable (rotation, not zoom)
+      if (Math.abs(currentDistance - lastDistance) < 0.001) {
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+        controls.target.copy(cam.position).addScaledVector(dir, 0.01);
+      }
+      lastDistance = currentDistance;
+    };
+    controls.addEventListener('change', this._boundModeListener);
+
+    // Disable click-to-orbit-target while camera is fixed
+    if (this.viewer) {
+      (this.viewer as any).checkForFocalPointChange = () => { /* disabled in bound mode */ };
+    }
   }
 
-  /** Restores OrbitControls to free navigation (pan, zoom, orbit). */
+  /** Restores OrbitControls to free navigation (pan, zoom, orbit).
+   *  Also re-enables the library's click-to-set-orbit-target. */
   private _applyFreeControls() {
     const controls = (this.viewer as any)?.controls;
     if (!controls || !this.camera) return;
+
+    // Remove the bound-mode listener so target is no longer pinned
+    if (this._boundModeListener) {
+      controls.removeEventListener('change', this._boundModeListener);
+      this._boundModeListener = null;
+    }
+
     controls.minDistance = 0;
     controls.maxDistance = Infinity;
     const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     controls.target.copy(this.camera.position).addScaledVector(lookDir, 3);
     controls.update();
+
+    // Restore click-to-orbit-target for free navigation
+    if (this.viewer && this._originalFocalPointFn) {
+      (this.viewer as any).checkForFocalPointChange = this._originalFocalPointFn;
+    }
   }
 
   // ─── Render display markers ────────────────────────────────────────────────
@@ -278,6 +334,7 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       transparent: true,
       opacity: 0.6,
       emissive: 0x2a5a99,
+      side: THREE.DoubleSide, // visible from both sides
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -292,13 +349,15 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     this.threeScene.add(mesh);
     this.displayMarkers.set(display.displayId, mesh);
 
-    // Add label
+    // Add label above the display mesh
     const label = this.makeTextSprite(display.label || 'Display');
+    const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     label.position.set(
       display.position3D.x,
-      display.position3D.y + (display.heightM || 1) / 2 + 0.3,
+      display.position3D.y + (display.heightM || 0.25) / 2 + 0.2,
       display.position3D.z
     );
+    label.position.addScaledVector(lookDir, 0.01); // slightly in front so it's not z-fighting
     this.threeScene.add(label);
     this.displayLabels.set(display.displayId, label);
   }
@@ -308,7 +367,8 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(2, 1, 1);
+    // Scale down to 0.06 x 0.03 units (5x smaller than before)
+    sprite.scale.set(0.06, 0.03, 1);
     return sprite;
   }
 
@@ -340,15 +400,23 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     canvas.addEventListener('click', (event) => {
       if (!this.clickToPlaceMode) return;
 
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      let point: THREE.Vector3;
 
-      this.raycaster.setFromCamera(this.mouse, this.camera);
-
-      // Find intersection with floor plane
-      const point = new THREE.Vector3();
-      this.raycaster.ray.intersectPlane(this.floorPlane, point);
+      if (this.cameraPreviewMode) {
+        // In bound (first-person) mode the floor-plane intersection is unreliable
+        // because the camera coordinate system is flipped (cameraUp=[0,-1,0]).
+        // Instead, place the display 0.5 m in front of the camera along its look direction.
+        const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        point = this.camera.position.clone().addScaledVector(lookDir, 0.5);
+      } else {
+        // In free mode, raycast against the floor plane (y = 0)
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        point = new THREE.Vector3();
+        this.raycaster.ray.intersectPlane(this.floorPlane, point);
+      }
 
       // Create new display at this position
       this.createNewDisplay(point);
@@ -369,6 +437,7 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     this.createDisplayMarker(newDisplay);
     this.selectedDisplayId = newDisplay.displayId;
     this.clickToPlaceMode = false;
+    this.cdr.detectChanges(); // OnPush: update display list and selected panel
   }
 
   // ─── Edit display ─────────────────────────────────────────────────────────
@@ -393,11 +462,13 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       if (label) {
         this.threeScene.remove(label);
         const newLabel = this.makeTextSprite(value);
+        const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         newLabel.position.set(
           display.position3D.x,
-          display.position3D.y + (display.heightM || 1) / 2 + 0.3,
+          display.position3D.y + (display.heightM || 0.25) / 2 + 0.2,
           display.position3D.z
         );
+        newLabel.position.addScaledVector(lookDir, 0.01);
         this.threeScene.add(newLabel);
         this.displayLabels.set(display.displayId, newLabel);
       }
@@ -409,11 +480,13 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       }
       const label = this.displayLabels.get(display.displayId);
       if (label) {
+        const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         label.position.set(
           display.position3D.x,
-          display.position3D.y + (display.heightM || 0.25) / 2 + 0.1,
+          display.position3D.y + (display.heightM || 0.25) / 2 + 0.2,
           display.position3D.z
         );
+        label.position.addScaledVector(lookDir, 0.01);
       }
     } else if (
       field === 'widthM' ||
