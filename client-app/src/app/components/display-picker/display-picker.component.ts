@@ -135,6 +135,9 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.viewer.start();
 
+      // Disable the library's built-in click-to-set-orbit-target behaviour entirely.
+      (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
+
       // Restrict common users to orbit-only: disable pan and zoom on the built-in OrbitControls
       // Set target just in front of camera (tiny distance) for first-person look-around
       const controls = (this.viewer as any).controls;

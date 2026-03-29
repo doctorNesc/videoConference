@@ -40,7 +40,7 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
 
   // Camera position state
   savedCameraPosition: CameraPosition | null = null;
-  cameraPositionSaved = false; // flash feedback
+  cameraPreviewMode = false; // true = first-person preview of saved position
 
   // Three.js scene and viewer
   private viewer: Viewer | null = null;
@@ -171,18 +171,18 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
 
       this.viewer.start();
 
-      // Set target just in front of camera for first-person look-around
-      const controls = (this.viewer as any).controls;
-      if (controls) {
-        const cam = controls.object;
-        if (cam) {
-          const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-          controls.target.copy(cam.position).addScaledVector(lookDir, 0.01);
-          controls.minDistance = 0;
-          controls.maxDistance = 0.01;
-          controls.update();
-        }
+      // Disable the library's built-in click-to-set-orbit-target behaviour entirely.
+      // The Viewer class stores checkForFocalPointChange as an instance field (arrow
+      // function), so we can override it on the instance to make it a no-op.
+      (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
+
+      // If a camera position is already saved, start in bound (first-person) mode
+      if (this.savedCameraPosition) {
+        this.cameraPreviewMode = true;
+        this._applyBoundControls();
+        this.cdr.detectChanges(); // force OnPush to re-render the button label
       }
+      // Otherwise leave controls in free-navigation mode
     } catch (err) {
       console.error('[RoomEditor] Failed to initialize viewer:', err);
       this.loadError = `Failed to load splat: ${err}`;
@@ -193,31 +193,64 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
   // ─── Camera position capture ───────────────────────────────────────────────
 
   /**
-   * Captures the current camera position and lookAt from the live viewer
-   * and stores it as the default camera position for this room.
+   * Toggles camera binding:
+   *
+   * When UNBOUND (free navigation):
+   *   - Captures current camera position as the saved default
+   *   - Locks controls to first-person orbit (spins around itself)
+   *   - Button shows "📍 Camera Bound — Click to Unbind"
+   *
+   * When BOUND (first-person orbit):
+   *   - Clears the saved camera position
+   *   - Restores free navigation (pan, zoom, orbit freely)
+   *   - Button shows "🔗 Bind Camera to Current View"
    */
   captureCurrentCameraPosition() {
     if (!this.camera) return;
 
-    const pos = this.camera.position;
+    if (!this.cameraPreviewMode) {
+      // ── Bind: capture position + lock to first-person ───────────────
+      const pos = this.camera.position;
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      const lookAt = pos.clone().add(dir.multiplyScalar(5));
 
-    // Compute lookAt: camera looks along its -Z axis in world space
-    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    const lookAt = pos.clone().add(dir.multiplyScalar(5)); // 5 units ahead
+      this.savedCameraPosition = {
+        position: { x: +pos.x.toFixed(3), y: +pos.y.toFixed(3), z: +pos.z.toFixed(3) },
+        lookAt: { x: +lookAt.x.toFixed(3), y: +lookAt.y.toFixed(3), z: +lookAt.z.toFixed(3) },
+      };
 
-    this.savedCameraPosition = {
-      position: { x: +pos.x.toFixed(3), y: +pos.y.toFixed(3), z: +pos.z.toFixed(3) },
-      lookAt: { x: +lookAt.x.toFixed(3), y: +lookAt.y.toFixed(3), z: +lookAt.z.toFixed(3) },
-    };
+      this.cameraPreviewMode = true;
+      this._applyBoundControls();
+    } else {
+      // ── Unbind: clear saved position + restore free navigation ───────
+      this.savedCameraPosition = null;
+      this.cameraPreviewMode = false;
+      this._applyFreeControls();
+    }
 
-    this.cameraPositionSaved = true;
     this.cdr.detectChanges();
+  }
 
-    // Clear the flash after 2 seconds
-    setTimeout(() => {
-      this.cameraPositionSaved = false;
-      this.cdr.detectChanges();
-    }, 2000);
+  /** Locks OrbitControls to first-person look-around (orbit around itself). */
+  private _applyBoundControls() {
+    const controls = (this.viewer as any)?.controls;
+    if (!controls || !this.camera) return;
+    const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    controls.target.copy(this.camera.position).addScaledVector(lookDir, 0.01);
+    controls.minDistance = 0;
+    controls.maxDistance = 0.01;
+    controls.update();
+  }
+
+  /** Restores OrbitControls to free navigation (pan, zoom, orbit). */
+  private _applyFreeControls() {
+    const controls = (this.viewer as any)?.controls;
+    if (!controls || !this.camera) return;
+    controls.minDistance = 0;
+    controls.maxDistance = Infinity;
+    const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    controls.target.copy(this.camera.position).addScaledVector(lookDir, 3);
+    controls.update();
   }
 
   // ─── Render display markers ────────────────────────────────────────────────
