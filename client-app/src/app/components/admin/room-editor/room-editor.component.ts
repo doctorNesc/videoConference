@@ -212,12 +212,15 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
    *   - Button shows "🔗 Bind Camera to Current View"
    */
   captureCurrentCameraPosition() {
-    if (!this.camera) return;
+    // Get the actual camera from the viewer's controls (not the cached this.camera)
+    const controls = (this.viewer as any)?.controls;
+    const camera = controls?.object;
+    if (!camera) return;
 
     if (!this.cameraPreviewMode) {
       // ── Bind: capture position + lock to first-person ───────────────
-      const pos = this.camera.position;
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      const pos = camera.position;
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const lookAt = pos.clone().add(dir.multiplyScalar(5));
 
       this.savedCameraPosition = {
@@ -255,6 +258,10 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       controls.removeEventListener('change', this._boundModeListener);
       this._boundModeListener = null;
     }
+
+    // Disable pan and zoom in bound mode (camera is fixed)
+    controls.enablePan = false;
+    controls.enableZoom = false;
 
     // Set initial target 0.01 units ahead of camera
     const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -296,6 +303,10 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
       controls.removeEventListener('change', this._boundModeListener);
       this._boundModeListener = null;
     }
+
+    // Re-enable pan and zoom in free mode
+    controls.enablePan = true;
+    controls.enableZoom = true;
 
     controls.minDistance = 0;
     controls.maxDistance = Infinity;
@@ -354,7 +365,7 @@ export class RoomEditorComponent implements AfterViewInit, OnDestroy {
     const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     label.position.set(
       display.position3D.x,
-      display.position3D.y + (display.heightM || 0.25) / 2 + 0.2,
+      display.position3D.y + (display.heightM || 0.25) / 2 + 0.5,
       display.position3D.z
     );
     label.position.addScaledVector(lookDir, 0.01); // slightly in front so it's not z-fighting
