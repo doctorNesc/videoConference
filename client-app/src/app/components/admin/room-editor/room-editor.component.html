@@ -1,4 +1,4 @@
-<div class="room-editor-container">
+<div class="room-editor-container" xmlns:appDraggableInput="http://www.w3.org/1999/xhtml">
   <!-- Header -->
   <div class="header">
     <h1>Edit Room: {{ roomName }}</h1>
@@ -144,9 +144,11 @@
           <label>Position X</label>
           <input
             type="number"
+            appDraggableInput
+            [step]="0.01"
             [(ngModel)]="getSelectedDisplay()!.position3D.x"
+            (valueChange)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
             (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
-            step="0.01"
           />
         </div>
 
@@ -154,9 +156,11 @@
           <label>Position Y</label>
           <input
             type="number"
+            appDraggableInput
+            [step]="0.01"
             [(ngModel)]="getSelectedDisplay()!.position3D.y"
+            (valueChange)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
             (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
-            step="0.01"
           />
         </div>
 
@@ -164,9 +168,11 @@
           <label>Position Z</label>
           <input
             type="number"
+            appDraggableInput
+            [step]="0.01"
             [(ngModel)]="getSelectedDisplay()!.position3D.z"
+            (valueChange)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
             (change)="updateSelectedDisplay('position3D', getSelectedDisplay()!.position3D)"
-            step="0.01"
           />
         </div>
       </div>

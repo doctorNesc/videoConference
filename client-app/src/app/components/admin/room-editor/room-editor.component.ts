@@ -15,11 +15,12 @@ import * as THREE from 'three';
 import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats-3d';
 
 import { RoomConfig, DisplayConfig, CameraPosition } from '../../../utils/hybrid-types';
+import { DraggableInputDirective } from '../../../directives/draggable-input.directive';
 
 @Component({
   selector: 'app-room-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DraggableInputDirective],
   templateUrl: './room-editor.component.html',
   styleUrl: './room-editor.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
