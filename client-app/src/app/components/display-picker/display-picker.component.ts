@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three';
 import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats-3d';
@@ -53,11 +54,12 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   constructor(
     private videoService: VideoRoomService,
     private http: HttpClient,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit() {
-    // Get room name and config from VideoRoomService
-    this.roomName = this.videoService['roomName'] || '';
+    // Get room name from route parameter first, then fall back to VideoRoomService
+    this.roomName = this.route.snapshot.paramMap.get('roomName') || this.videoService['roomName'] || '';
     if (!this.roomName) {
       this.loadError = 'No room name provided';
       this.loading = false;
@@ -135,8 +137,20 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.viewer.start();
 
+      // Create display planes immediately if we have room config and topology
+      // Don't wait for topology subscription to fire
+      if (this.roomConfig && this.topology) {
+        this.updateDisplayPlanes();
+      } else if (this.roomConfig && !this.topology) {
+        // If we have room config but no topology yet, create placeholder planes
+        // They will be updated when topology arrives
+        this.updateDisplayPlanes();
+      }
+
       // Disable the library's built-in click-to-set-orbit-target behaviour entirely.
       (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
+      // Cancel any in-progress camera target transition
+      (this.viewer as any).transitioningCameraTarget = false;
 
       // Restrict common users to orbit-only: disable pan and zoom on the built-in OrbitControls
       // Set target just in front of camera (tiny distance) for first-person look-around
@@ -150,8 +164,20 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
           const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
           controls.target.copy(cam.position).addScaledVector(lookDir, 0.01);
           controls.minDistance = 0;
-          controls.maxDistance = 0.01;
+          controls.maxDistance = Infinity; // don't let OrbitControls snap the camera
           controls.update();
+          // Keep target pinned just ahead of camera on every update (first-person look-around),
+          // but only if distance is stable (rotation, not zoom).
+          let lastDistance = controls.target.distanceTo(cam.position);
+          controls.addEventListener('change', () => {
+            const currentDistance = controls.target.distanceTo(cam.position);
+            // Only re-pin if distance is stable (rotation, not zoom)
+            if (Math.abs(currentDistance - lastDistance) < 0.001) {
+              const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+              controls.target.copy(cam.position).addScaledVector(dir, 0.01);
+            }
+            lastDistance = currentDistance;
+          });
         }
       }
 
@@ -173,7 +199,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Each plane shows the live camera feed from that display's paired camera.
    */
   private updateDisplayPlanes() {
-    if (!this.roomConfig || !this.topology || !this.threeScene) return;
+    if (!this.roomConfig || !this.threeScene) return;
 
     const displays = this.roomConfig.displays || [];
 
@@ -187,9 +213,9 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
     // Create new planes for each display
     displays.forEach((display) => {
-      // Find the slot linked to this display
-      const slot = this.topology!.slots.find((s) => s.displayId === display.displayId);
-      if (!slot || slot.excluded) return; // Skip excluded slots
+      // Find the slot linked to this display (if topology is available)
+      const slot = this.topology?.slots.find((s) => s.displayId === display.displayId);
+      if (slot && slot.excluded) return; // Skip excluded slots
 
       // Create video element for this display's camera feed
       const videoElement = document.createElement('video');
@@ -214,13 +240,15 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(display.position3D.x, display.position3D.y, display.position3D.z);
       mesh.rotation.y = display.rotationY;
-      mesh.userData = { displayId: display.displayId, slotId: slot.slotId };
+      mesh.userData = { displayId: display.displayId, slotId: slot?.slotId };
 
       this.threeScene.add(mesh);
       this.displayPlanes.set(display.displayId, { mesh, videoElement });
 
-      // Try to attach the camera stream from the consumer
-      this.attachCameraStreamToPlane(display.displayId, slot);
+      // Try to attach the camera stream from the consumer (if slot is available)
+      if (slot) {
+        this.attachCameraStreamToPlane(display.displayId, slot);
+      }
     });
   }
 
