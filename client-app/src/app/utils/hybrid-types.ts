@@ -90,10 +90,11 @@ export interface RemoteAssignment {
 /** Pairing submitted by a room device after the wizard */
 export interface ScreenCameraPairing {
   slotId: string;
+  screenIndex?: number;  // physical screen index — persisted in saved config for stable re-matching
   cameraDeviceId: string;
   cameraLabel: string;
-  displayId?: string;    // NEW — links to RoomConfig.displays[].displayId
-  excluded?: boolean;    // NEW — marks slot as excluded from conference
+  displayId?: string;    // links to RoomConfig.displays[].displayId
+  excluded?: boolean;    // marks slot as excluded from conference
 }
 
 /** Notification sent to a room device when a remote joins its slot */

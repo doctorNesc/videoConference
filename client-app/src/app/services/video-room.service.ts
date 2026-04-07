@@ -252,7 +252,7 @@ export class VideoRoomService {
     const fingerprint = this.roomDeviceService.generateFingerprint();
 
     // Try to load saved pairing config
-    let savedPairings = null;
+    let savedPairings: { slotId?: string; screenIndex: number; cameraDeviceId: string; cameraLabel: string; displayId?: string; excluded?: boolean }[] | null = null;
     let hasSavedConfig = false;
     try {
       const savedConfig = await this.roomDeviceService.loadSavedConfig(this.roomName, fingerprint);
@@ -273,6 +273,40 @@ export class VideoRoomService {
     const result = await this.socketService.emit(ACTIONS.REGISTER_ROOM_DEVICE, payload);
 
     console.log('[VideoRoomService] Registered as room device, slot IDs:', result?.slots, 'hasSavedConfig:', hasSavedConfig);
+
+    // When saved config is applied, the server already paired the slots.
+    // We must produce camera streams now (same as submitScreenCameraPairing does),
+    // because the component skips the wizard and never calls submitScreenCameraPairing.
+    if (hasSavedConfig && savedPairings && result?.slots) {
+      // The server creates slots in the same order as capabilities.screens (screenIndex 0, 1, 2...).
+      // result.slots is newSlots.map(s => s.slotId) — index i corresponds to screen i.
+      // Saved pairings may not have screenIndex (older saves), so match by array position.
+      const slotIds: string[] = result.slots;
+
+      for (let i = 0; i < savedPairings.length; i++) {
+        const pairing = savedPairings[i];
+        if (!pairing.cameraDeviceId || pairing.excluded) continue;
+
+        // Match by screenIndex if present, otherwise fall back to positional index
+        let slotId: string | undefined;
+        if (pairing.screenIndex !== undefined) {
+          slotId = slotIds[pairing.screenIndex];
+        } else {
+          slotId = slotIds[i];
+        }
+
+        if (!slotId) {
+          console.warn(`[VideoRoomService] No slotId found for pairing index ${i}, skipping`);
+          continue;
+        }
+
+        console.log(`[VideoRoomService] Producing camera for saved slot ${slotId} (index ${i}, camera: ${pairing.cameraLabel})`);
+        await this.produceCameraForSlot(slotId, pairing.cameraDeviceId);
+      }
+      // Now consume any existing producers from other peers
+      await this.getProducers();
+    }
+
     return { slots: result?.slots ?? [], hasSavedConfig };
   }
 
@@ -289,9 +323,15 @@ export class VideoRoomService {
     // Send to server
     await this.socketService.emit(ACTIONS.SCREEN_CAMERA_PAIRING, { pairings });
 
-    // Save pairing config to server for future joins
+    // Save pairing config to server for future joins.
+    // Enrich each pairing with screenIndex (looked up from local slot state) so the
+    // saved config can be matched back to the correct slot on the next session.
     const fingerprint = this.roomDeviceService.generateFingerprint();
-    const saved = await this.roomDeviceService.savePairingConfig(this.roomName, fingerprint, pairings as any);
+    const enrichedPairings = pairings.map(p => {
+      const slot = this.roomDeviceService.slotsSnapshot.find(s => s.slotId === p.slotId);
+      return { ...p, screenIndex: slot?.screenIndex };
+    });
+    const saved = await this.roomDeviceService.savePairingConfig(this.roomName, fingerprint, enrichedPairings as any);
     if (saved) {
       console.log('[VideoRoomService] Saved pairing config for device', fingerprint);
     }

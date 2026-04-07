@@ -59,21 +59,31 @@ export function registerHybridHandlers(
                 // If saved pairings provided, apply them immediately
                 let hasSavedConfig = false;
                 if (savedPairings && savedPairings.length > 0) {
-                    // Apply pairings
+                    // Apply pairings.
+                    // Saved pairings may not have screenIndex (older saves use slotId from a previous session).
+                    // Match by screenIndex if present, otherwise fall back to positional index.
                     room.applyScreenCameraPairing(
-                        savedPairings.map((p) => ({
-                            slotId: newSlots.find((s) => s.screenIndex === p.screenIndex)?.slotId ?? "",
-                            cameraDeviceId: p.cameraDeviceId,
-                            cameraLabel: p.cameraLabel,
-                        }))
+                        savedPairings.map((p, i) => {
+                            let slotId: string;
+                            if (p.screenIndex !== undefined) {
+                                slotId = newSlots.find((s) => s.screenIndex === p.screenIndex)?.slotId ?? "";
+                            } else {
+                                // Positional fallback: pairing[i] → newSlots[i]
+                                slotId = newSlots[i]?.slotId ?? "";
+                            }
+                            return { slotId, cameraDeviceId: p.cameraDeviceId, cameraLabel: p.cameraLabel };
+                        })
                     );
 
-                    // Set displayId and excluded flag on slots
-                    savedPairings.forEach((p) => {
-                        const slot = newSlots.find((s) => s.screenIndex === p.screenIndex);
+                    // Set displayId and excluded flag on slots.
+                    // Use same screenIndex-or-positional matching as above.
+                    savedPairings.forEach((p, i) => {
+                        const slot = p.screenIndex !== undefined
+                            ? newSlots.find((s) => s.screenIndex === p.screenIndex)
+                            : newSlots[i];
                         if (slot) {
-                            slot.displayId = p.displayId;
-                            slot.excluded = p.excluded;
+                            if (p.displayId) slot.displayId = p.displayId;
+                            if (p.excluded !== undefined) slot.excluded = p.excluded;
                         }
                     });
 
