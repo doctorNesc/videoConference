@@ -101,10 +101,8 @@ export class VideoRoomService {
     this.isRoomDevice = isRoomDevice;
 
     this.socketService.on(ACTIONS.CONNECTION_SUCCESS, async ({ socketId }: any) => {
-      // Room devices skip getLocalStream() — they open per-slot streams after pairing wizard
-      if (!this.isRoomDevice) {
-        await this.getLocalStream();
-      }
+      // All users need local stream for display
+      await this.getLocalStream();
 
       await this.joinRoom();
       await this.createDevice();
@@ -320,11 +318,14 @@ export class VideoRoomService {
    */
   async produceCameraForSlot(slotId: string, cameraDeviceId: string): Promise<void> {
     try {
+      console.log(`[VideoRoomService] produceCameraForSlot() starting for slot ${slotId}, cameraDeviceId: ${cameraDeviceId}`);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: cameraDeviceId } },
         audio: false,
       });
+      console.log(`[VideoRoomService] Got media stream for slot ${slotId}`);
       const track = stream.getVideoTracks()[0];
+      console.log(`[VideoRoomService] Got video track for slot ${slotId}, calling producerTransport.produce()`);
       const producer = await this.producerTransport.produce({
         track,
         encodings: this.params.encodings,
@@ -332,6 +333,7 @@ export class VideoRoomService {
         appData: { slotId, cameraDeviceId },
       });
 
+      console.log(`[VideoRoomService] producerTransport.produce() returned producer ${producer.id} for slot ${slotId}`);
       producer.on('trackended', () => console.log(`[Slot ${slotId}] Track ended`));
       producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log(`[Slot ${slotId}] Transport closed`));
 
@@ -374,7 +376,7 @@ export class VideoRoomService {
 
       this.producerTransport.on('connect', async ({ dtlsParameters }: any, callback: Function) => {
         try {
-          await this.socketService.emit(ACTIONS.CONNECT_SEND_TRANSPORT, { dtlsParameters });
+          await this.socketService.emit(ACTIONS.CONNECT_SEND_TRANSPORT, { dtlsParameters, roomName: this.roomName });
           callback();
         } catch (error) {
           callback(error);
@@ -383,13 +385,17 @@ export class VideoRoomService {
 
       this.producerTransport.on(ACTIONS.PRODUCE, async (parameters: any, callback: Function) => {
         try {
+          console.log('[VideoRoomService] PRODUCE event triggered, kind:', parameters.kind);
           const { id, producersExist } = await this.socketService.emit(ACTIONS.TRANSPORT_PRODUCE, {
             kind: parameters.kind,
             rtpParameters: parameters.rtpParameters,
+            roomName: this.roomName,
           });
+          console.log('[VideoRoomService] TRANSPORT_PRODUCE returned id:', id, 'producersExist:', producersExist);
           if (producersExist) this.getProducers();
           callback({ id });
         } catch (error) {
+          console.error('[VideoRoomService] Error in PRODUCE handler:', error);
           callback(error);
         }
       });
@@ -513,11 +519,20 @@ export class VideoRoomService {
 
   // ─── Producers list ───────────────────────────────────────────────────────
 
-  async getProducers() {
+  async getProducers(retryCount: number = 0, maxRetries: number = 5) {
     const response: { producerId: string; socketId: string }[] =
       await this.socketService.emit(ACTIONS.GET_PRODUCERS);
 
-    console.log('[VideoRoomService] getProducers() response:', JSON.stringify(response));
+    console.log('[VideoRoomService] getProducers() response:', JSON.stringify(response), 'attempt:', retryCount + 1);
+
+    // If no producers found and we haven't exceeded max retries, retry with exponential backoff
+    if (response.length === 0 && retryCount < maxRetries) {
+      const delayMs = Math.min(1000 * Math.pow(2, retryCount), 10000); // exponential backoff, max 10s
+      console.log(`[VideoRoomService] No producers found, retrying in ${delayMs}ms (attempt ${retryCount + 1}/${maxRetries})`);
+      setTimeout(() => this.getProducers(retryCount + 1, maxRetries), delayMs);
+      return;
+    }
+
     response.forEach(async ({ producerId, socketId }) => {
       console.log('[VideoRoomService] getProducers() — consuming producerId:', producerId, '| socketId:', socketId);
       if (!this.producers.find((p) => p.id === producerId)) {
