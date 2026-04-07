@@ -89,7 +89,7 @@ export class AdminRoomsComponent implements OnInit {
   // ─── Edit room ────────────────────────────────────────────────────────────
 
   editRoom(roomName: string) {
-    this.router.navigate(['/admin/rooms', roomName, 'setup']);
+    this.router.navigate(['/admin/room', roomName]);
   }
 
   // ─── Delete room ──────────────────────────────────────────────────────────
