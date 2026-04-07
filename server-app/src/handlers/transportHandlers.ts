@@ -61,10 +61,16 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
     leaveRoom(roomManager, roomName, socket.id);
   });
 
-  socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters }, callback) => {
+  socket.on(ACTIONS.CONNECT_SEND_TRANSPORT, async ({ dtlsParameters, roomName: payloadRoomName }, callback) => {
     try {
-      const roomName = roomManager.socketToRoom.get(socket.id);
+      const roomName = payloadRoomName || roomManager.socketToRoom.get(socket.id);
       const sendTransport = roomManager.getRoom(roomName || "", "CONNECT_SEND_TRANSPORT")?.getPeer(socket.id)?.sendTransport;
+      
+      if (!sendTransport) {
+        console.error('[CONNECT_SEND_TRANSPORT] Send transport not found for socket', socket.id, 'room', roomName);
+        return callback({ error: 'Send transport not found' });
+      }
+      
       // const transport = getTransport(socket.id);
       await sendTransport.connect({ dtlsParameters });
       callback({ connected: true });
@@ -76,35 +82,51 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
 
   socket.on(
     ACTIONS.TRANSPORT_PRODUCE,
-    async ({ kind, rtpParameters, }, callback) => {
-      // call produce based on the prameters from the client
-      const roomName = roomManager.socketToRoom.get(socket.id);
-      const peer = roomManager.getRoom(roomName || "", "TRANSPORT_PRODUCE")?.getPeer(socket.id);
+    async ({ kind, rtpParameters, roomName: payloadRoomName }, callback) => {
+      try {
+        // call produce based on the parameters from the client
+        const roomName = payloadRoomName || roomManager.socketToRoom.get(socket.id);
+        const peer = roomManager.getRoom(roomName || "", "TRANSPORT_PRODUCE")?.getPeer(socket.id);
 
-      const transport = peer?.sendTransport;
-      const producer = await transport!.produce({ kind, rtpParameters });
-      // console.log("Created server-side producer with id: ", producer.id, " for user: ", peer.userName);
+        if (!peer) {
+          console.error('[TRANSPORT_PRODUCE] Peer not found for socket', socket.id);
+          return callback({ error: 'Peer not found' });
+        }
 
-      // if (isScreen && producer) { //add screenProducer to a list to close it later
-      //   state.screenProducerTransports[producer.id] = {
-      //     socketId: socket.id,
-      //     transport: transport,
-      //   };
-      // }
-      peer?.addProducer(producer);
-      // addProducer(producer, roomName, isScreen ? "screen" : "camera");
+        const transport = peer.sendTransport;
+        if (!transport) {
+          console.error('[TRANSPORT_PRODUCE] Send transport not ready for peer', socket.id);
+          return callback({ error: 'Send transport not ready' });
+        }
 
-      informConsumers(
-        roomName!,
-        socket.id,
-        producer.id,
-      );
-      // Send back to the client the Producer's id
-      console.log("peer count: ", roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size);
-      callback({
-        id: producer.id,
-        producersExist: roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size > 1, //check, if there are other producers, when connection into the room
-      });
+        const producer = await transport.produce({ kind, rtpParameters });
+        console.log("[TRANSPORT_PRODUCE] Created server-side producer with id: ", producer.id, " for user: ", peer.userName, " isRoomDevice:", peer.isRoomDevice);
+
+        // if (isScreen && producer) { //add screenProducer to a list to close it later
+        //   state.screenProducerTransports[producer.id] = {
+        //     socketId: socket.id,
+        //     transport: transport,
+        //   };
+        // }
+        peer.addProducer(producer);
+        console.log("[TRANSPORT_PRODUCE] Peer", peer.id, "now has", peer.producers.size, "producers");
+        // addProducer(producer, roomName, isScreen ? "screen" : "camera");
+
+        informConsumers(
+          roomName!,
+          socket.id,
+          producer.id,
+        );
+        // Send back to the client the Producer's id
+        console.log("peer count: ", roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size);
+        callback({
+          id: producer.id,
+          producersExist: roomManager.getRoom(roomName!, "TRANSPORT_PRODUCE")!.peers.size > 1, //check, if there are other producers, when connection into the room
+        });
+      } catch (err) {
+        console.error('[TRANSPORT_PRODUCE] Error:', err);
+        callback({ error: String(err) });
+      }
     }
   );
 

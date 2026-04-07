@@ -113,11 +113,11 @@ export function registerHybridHandlers(
 
     // ─── SCREEN_CAMERA_PAIRING ────────────────────────────────────────────────
     // Emitted by a room device after the pairing wizard is completed.
-    // Links each slot to a specific camera device.
+    // Links each slot to a specific camera device, and optionally to a display position.
     socket.on(
         ACTIONS.SCREEN_CAMERA_PAIRING,
         (
-            { pairings }: { pairings: { slotId: string; cameraDeviceId: string; cameraLabel: string }[] },
+            { pairings }: { pairings: { slotId: string; cameraDeviceId: string; cameraLabel: string; displayId?: string; excluded?: boolean }[] },
             callback?: Function
         ) => {
             try {
@@ -131,6 +131,15 @@ export function registerHybridHandlers(
 
                 // Apply pairings
                 room.applyScreenCameraPairing(pairings);
+
+                // Set displayId and excluded flag on slots
+                pairings.forEach((p) => {
+                    const slot = room.topology.slots.get(p.slotId);
+                    if (slot) {
+                        if (p.displayId) slot.displayId = p.displayId;
+                        if (p.excluded !== undefined) slot.excluded = p.excluded;
+                    }
+                });
 
                 // Rebalance: now that slots are paired, assign any waiting remotes
                 const newAssignments = room.rebalanceAssignments();

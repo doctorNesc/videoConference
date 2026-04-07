@@ -15,11 +15,13 @@ export function registerProducerHandlers(socket: Socket, state: SharedState, roo
 
         room?.getAllPeers().forEach(peer => {
             if (peer.id !== socket.id) {
-                peer.producers.forEach(producer => {
+                console.log(`[GET_PRODUCERS] Peer ${peer.id} (${peer.userName}, isRoomDevice: ${peer.isRoomDevice}) has ${peer.producers.size} producers`);
+                peer.producers.forEach((producer) => {
                     producerList.push({ producerId: producer.id, socketId: peer.id });
                 });
             }
         });
+        console.log(`[GET_PRODUCERS] socket ${socket.id} requested producers, found ${producerList.length} producers from ${room?.getAllPeers().length || 0} peers`);
         callback(producerList);
         //     state.producers.forEach((producerData) => {
         //         if (producerData.socketId !== socket.id && producerData.roomName === roomName) {
