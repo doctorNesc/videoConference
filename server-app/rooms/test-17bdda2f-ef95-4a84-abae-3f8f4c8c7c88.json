@@ -1,0 +1,15 @@
+{
+  "roomName": "test",
+  "deviceFingerprint": "17bdda2f-ef95-4a84-abae-3f8f4c8c7c88",
+  "pairings": [
+    {
+      "slotId": "ca3cc58c-f29b-47b5-b9ab-cf3b30eb43b9",
+      "cameraDeviceId": "11f9ebf79c19786e2b6a1f1d74eb96b76741eb36d9d4b0f8d746c0e55b09dc6c",
+      "cameraLabel": "Integrated Webcam (0bda:5650)",
+      "displayId": "display-1774964706193",
+      "excluded": false
+    }
+  ],
+  "createdAt": "2026-04-04T19:10:25.972Z",
+  "updatedAt": "2026-04-04T19:10:25.995Z"
+}

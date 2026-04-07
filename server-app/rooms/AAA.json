@@ -1,9 +1,46 @@
 {
   "roomName": "AAA",
   "splatPath": "splats/AAA.splat",
-  "displays": [],
+  "displays": [
+    {
+      "displayId": "display-1774790488139",
+      "label": "Display 1",
+      "position3D": {
+        "x": -0.24,
+        "y": -0.02,
+        "z": -0.63
+      },
+      "widthM": 0.3,
+      "heightM": 0.2,
+      "rotationY": 0.8
+    },
+    {
+      "displayId": "display-1774791400857",
+      "label": "Display 2",
+      "position3D": {
+        "x": 0.52,
+        "y": -0.06,
+        "z": -0.79
+      },
+      "widthM": 0.56,
+      "heightM": 0.32,
+      "rotationY": 5.5
+    },
+    {
+      "displayId": "display-1774791841980",
+      "label": "Display 3",
+      "position3D": {
+        "x": 0.93,
+        "y": -0.06,
+        "z": -0.39
+      },
+      "widthM": 0.51,
+      "heightM": 0.31,
+      "rotationY": -0.8
+    }
+  ],
   "createdAt": "2026-03-28T22:34:50.191Z",
-  "updatedAt": "2026-03-28T22:37:08.642Z",
+  "updatedAt": "2026-03-29T14:02:48.799Z",
   "cameraPosition": {
     "position": {
       "x": 0,

@@ -1,0 +1,13 @@
+{
+  "roomName": "AAA",
+  "deviceFingerprint": "17bdda2f-ef95-4a84-abae-3f8f4c8c7c88",
+  "pairings": [
+    {
+      "slotId": "b167cd0e-8268-4f7f-8700-32e06107db4b",
+      "cameraDeviceId": "",
+      "cameraLabel": ""
+    }
+  ],
+  "createdAt": "2026-04-04T22:18:42.592Z",
+  "updatedAt": "2026-04-04T22:18:42.606Z"
+}

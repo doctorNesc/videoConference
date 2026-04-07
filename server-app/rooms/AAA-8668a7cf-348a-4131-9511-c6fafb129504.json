@@ -1,0 +1,13 @@
+{
+  "roomName": "AAA",
+  "deviceFingerprint": "8668a7cf-348a-4131-9511-c6fafb129504",
+  "pairings": [
+    {
+      "slotId": "3e4e7692-4226-4f27-bf5e-5d5edb431783",
+      "cameraDeviceId": "d91612913a514f9ae57046db0c145cea8414e48d0d56b39bde21bbe853e2cf02",
+      "cameraLabel": "Integrated Webcam (0bda:5650)"
+    }
+  ],
+  "createdAt": "2026-04-01T11:13:59.093Z",
+  "updatedAt": "2026-04-01T11:13:59.107Z"
+}
