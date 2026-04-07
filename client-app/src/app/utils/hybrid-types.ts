@@ -92,6 +92,8 @@ export interface ScreenCameraPairing {
   slotId: string;
   cameraDeviceId: string;
   cameraLabel: string;
+  displayId?: string;    // NEW — links to RoomConfig.displays[].displayId
+  excluded?: boolean;    // NEW — marks slot as excluded from conference
 }
 
 /** Notification sent to a room device when a remote joins its slot */
