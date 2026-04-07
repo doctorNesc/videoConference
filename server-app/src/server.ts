@@ -236,6 +236,17 @@ app.put("/api/rooms/:name/device-config/:fingerprint", express.json(), (req: Req
   }
 });
 
+/** DELETE /api/rooms/:name/device-config/:fingerprint — delete device pairing config */
+app.delete("/api/rooms/:name/device-config/:fingerprint", (req: Request, res: Response): void => {
+  try {
+    roomConfigService.deleteDevicePairingConfig(req.params.name, req.params.fingerprint);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] Error deleting device pairing config:', err);
+    res.status(500).json({ error: 'Failed to delete device pairing config' });
+  }
+});
+
 app.get("*", (req: Request, res: Response): void => {
   res.sendFile(
     path.join(__dirname, "../../client-app/dist/client-app/browser/index.html")
