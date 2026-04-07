@@ -178,6 +178,21 @@ export class RoomDeviceService {
     }
   }
 
+  /**
+   * Deletes the saved pairing config for this device and room.
+   */
+  async deleteSavedConfig(roomName: string, fingerprint: string): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/rooms/${roomName}/device-config/${fingerprint}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (err) {
+      console.error('[RoomDeviceService] Failed to delete saved config:', err);
+      return false;
+    }
+  }
+
   // ─── Slot management (driven by server events) ────────────────────────────
 
   /**
