@@ -1,0 +1,132 @@
+<div class="display-linker-overlay">
+
+  <!-- The splat container must always be in the DOM so ViewChild can find it -->
+  <!-- It is hidden via CSS until loading completes -->
+  <div class="split-panel" [style.display]="(!loading && !loadError) ? 'flex' : 'none'">
+    <!-- Left: 3D Splat Viewer -->
+    <div class="viewer-section">
+      <div #splatContainer class="splat-container"></div>
+      <div class="instructions">
+        @if (activeSlotIndex < slotLinkStates.length) {
+          <p class="instruction-active">
+            <span class="material-symbols-outlined">ads_click</span>
+            Click a display in the 3D room to assign it to
+            <strong>{{ slotLinkStates[activeSlotIndex].screenLabel }}</strong>
+          </p>
+        } @else {
+          <p class="instruction-done">
+            <span class="material-symbols-outlined">check_circle</span>
+            All screens assigned — click Confirm to continue
+          </p>
+        }
+      </div>
+    </div>
+
+    <!-- Right: Sidebar with slot list -->
+    <div class="sidebar-section">
+      <h2 class="sidebar-title">
+        <span class="material-symbols-outlined">monitor</span>
+        Link Screens to Displays
+      </h2>
+
+      <div class="slot-list">
+        @for (state of slotLinkStates; track state.slotId; let i = $index) {
+          <div
+            class="slot-row"
+            [class.active-slot]="i === activeSlotIndex && !state.excluded"
+            [class.assigned]="!!state.selectedDisplayId && !state.excluded"
+            [class.excluded-row]="state.excluded"
+            (click)="setActiveSlot(i)"
+          >
+            <div class="slot-header">
+              <span class="slot-index">{{ i + 1 }}</span>
+              <span class="slot-label">{{ state.screenLabel }}</span>
+              <label class="exclude-checkbox" (click)="$event.stopPropagation()">
+                <input
+                  type="checkbox"
+                  [checked]="state.excluded"
+                  (change)="toggleExcluded(state.slotId)"
+                />
+                <span>Exclude</span>
+              </label>
+            </div>
+
+            @if (!state.excluded) {
+              <div class="slot-content">
+                <!-- Dropdown to select display manually -->
+                <select
+                  #displaySelect
+                  [value]="state.selectedDisplayId || ''"
+                  (change)="onDisplayDropdownChange(state.slotId, displaySelect.value)"
+                  class="display-select"
+                  (click)="$event.stopPropagation()"
+                >
+                  <option value="">— Select display —</option>
+                  @for (display of roomConfig?.displays; track display.displayId) {
+                    <option [value]="display.displayId">{{ display.label }}</option>
+                  }
+                </select>
+
+                <!-- Show assigned display -->
+                @if (state.selectedDisplayId) {
+                  <div class="selected-display">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    {{ getDisplayLabel(state.selectedDisplayId) }}
+                  </div>
+                } @else if (i === activeSlotIndex) {
+                  <div class="waiting-hint">
+                    <span class="material-symbols-outlined">touch_app</span>
+                    Click a display in the 3D view
+                  </div>
+                }
+              </div>
+            }
+
+            @if (state.excluded) {
+              <div class="excluded-label">
+                <span class="material-symbols-outlined">block</span>
+                Excluded from conference
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Action buttons -->
+      <div class="sidebar-actions">
+        <button
+          (click)="confirm()"
+          [disabled]="!canConfirm"
+          class="confirm-btn"
+        >
+          <span class="material-symbols-outlined">check_circle</span>
+          Confirm
+        </button>
+        <button (click)="onCancel()" class="cancel-btn">
+          <span class="material-symbols-outlined">close</span>
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading state (shown on top while split-panel is hidden) -->
+  @if (loading) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading 3D room...</p>
+    </div>
+  }
+
+  <!-- Error state -->
+  @if (loadError && !loading) {
+    <div class="error-state">
+      <p>Failed to load 3D room: {{ loadError }}</p>
+      <button (click)="onCancel()" class="cancel-btn">
+        <span class="material-symbols-outlined">close</span>
+        Cancel
+      </button>
+    </div>
+  }
+
+</div>
