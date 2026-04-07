@@ -8,6 +8,33 @@
     ></app-room-device-setup>
   }
 
+  <!-- ─── Display linker overlay (step 2 of wizard, optional) ──────────────── -->
+  @if (showDisplayLinker) {
+    <app-room-device-display-linker
+      [roomName]="roomName"
+      [slots]="pendingPairings"
+      (displayLinkingConfirmed)="onDisplayLinkingConfirmed($event)"
+      (cancelled)="onDisplayLinkingCancelled()"
+    ></app-room-device-display-linker>
+  }
+
+  <!-- ─── 3D Room visualization (if configured) ──────────────────────────── -->
+  @if (showSplatViewer) {
+    <div class="splat-viewer-container">
+      @if (splatLoading) {
+        <div class="loading-overlay">
+          <p>Loading 3D room...</p>
+        </div>
+      }
+      @if (splatLoadError) {
+        <div class="error-overlay">
+          <p>Failed to load 3D room: {{ splatLoadError }}</p>
+        </div>
+      }
+      <div #splatContainer class="splat-container"></div>
+    </div>
+  }
+
   <div class="main-content d-flex flex-column flex-grow-1">
 
     <!-- ─── Assignment label (remote participants) ──────────────────────────── -->
@@ -15,6 +42,18 @@
       <div class="assignment-label">
         <span class="material-symbols-outlined">monitor</span>
         You are displayed on: <strong>{{ assignedScreenLabel }}</strong>
+      </div>
+    }
+
+    <!-- ─── Reconfigure banner (room devices with saved config) ─────────────── -->
+    @if (isRoomDevice && hasSavedConfig) {
+      <div class="reconfigure-banner">
+        <span class="material-symbols-outlined">settings</span>
+        <span>Using saved configuration</span>
+        <button (click)="reconfigure()" class="reconfigure-btn">
+          <span class="material-symbols-outlined">tune</span>
+          Reconfigure
+        </button>
       </div>
     }
 

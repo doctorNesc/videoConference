@@ -85,9 +85,102 @@
   }
 }
 
+/* ── Reconfigure banner (room devices with saved config) ────────────────── */
+.reconfigure-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(251, 191, 36, 0.12);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fcd34d;
+  font-size: 0.85rem;
+  font-weight: 500;
+
+  .material-symbols-outlined {
+    font-size: 1.1rem;
+  }
+
+  .reconfigure-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 4px 12px;
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    border-radius: 6px;
+    color: #fcd34d;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+
+    .material-symbols-outlined {
+      font-size: 1rem;
+    }
+
+    &:hover {
+      background: rgba(251, 191, 36, 0.35);
+      border-color: rgba(251, 191, 36, 0.75);
+    }
+
+    &:active {
+      background: rgba(251, 191, 36, 0.5);
+    }
+  }
+}
+
 /* ── Assigned-camera highlight on participant tile ──────────────────────── */
 .assigned-camera {
   outline: 2px solid #63b3ed;
   outline-offset: 2px;
   border-radius: 8px;
+}
+
+/* ── 3D Room visualization ────────────────────────────────────────────────── */
+.splat-viewer-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.splat-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.loading-overlay,
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.error-overlay {
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
 }
