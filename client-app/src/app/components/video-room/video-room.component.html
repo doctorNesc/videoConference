@@ -31,7 +31,23 @@
           <p>Failed to load 3D room: {{ splatLoadError }}</p>
         </div>
       }
-      <div #splatContainer class="splat-container"></div>
+      <div #splatContainer class="splat-container" [class.picker-mode]="displayPickerMode"></div>
+
+      <!-- Picker mode: instruct user to click a display -->
+      @if (displayPickerMode && !selectedDisplayId && !splatLoading) {
+        <div class="picker-instructions">
+          <span class="material-symbols-outlined">touch_app</span>
+          <p>Click on a display to choose where you want to appear</p>
+        </div>
+      }
+
+      <!-- Connecting feedback after click -->
+      @if (selectedDisplayId) {
+        <div class="picker-connecting">
+          <span class="material-symbols-outlined spin">progress_activity</span>
+          <p>Connecting to display…</p>
+        </div>
+      }
     </div>
   }
 

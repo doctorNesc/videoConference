@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -37,7 +37,7 @@ import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats
   templateUrl: './video-room.component.html',
   styleUrls: ['./video-room.component.scss'],
 })
-export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
+export class VideoRoomComponent implements OnInit, OnDestroy {
   @ViewChild('splatContainer', { static: false })
   splatContainerRef!: ElementRef<HTMLDivElement>;
 
@@ -79,10 +79,16 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
   public showSplatViewer: boolean = false;
   public splatLoading: boolean = false;
   public splatLoadError: string | null = null;
+  /** True while the user hasn't chosen a display yet (picker mode) */
+  public displayPickerMode: boolean = false;
+  /** The displayId the user clicked — shows "Connecting…" feedback */
+  public selectedDisplayId: string | null = null;
 
   private viewer: Viewer | null = null;
   private threeScene!: THREE.Scene;
   private displayPlanes: Map<string, { mesh: THREE.Mesh; videoElement: HTMLVideoElement }> = new Map();
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
 
   /** Map of slotId → opened Window reference */
   private slotWindows = new Map<string, Window>();
@@ -170,12 +176,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
-  ngAfterViewInit(): void {
-    if (this.showSplatViewer && this.splatContainerRef) {
-      this.initViewer();
-    }
-  }
-
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
 
@@ -222,7 +222,15 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
         // Room devices use the pairing wizard instead
         if (!this.isRoomDevice && configResponse.displays && configResponse.displays.length > 0) {
           this.showSplatViewer = true;
+          // Start in picker mode — user must click a display to choose their slot.
+          // Switches to passive view once assignment is confirmed.
+          this.displayPickerMode = true;
+          // detectChanges() renders the @if (showSplatViewer) block and creates
+          // the #splatContainer element in the DOM before initViewer() accesses it.
           this.cdr.detectChanges();
+          // ngAfterViewInit already ran before showSplatViewer was set, so we
+          // must call initViewer() explicitly here after the DOM is updated.
+          await this.initViewer();
         }
       }
     } catch (err) {
@@ -305,12 +313,65 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
       // Create display planes
       this.updateDisplayPlanes();
 
+      // Set up click handler for display selection (picker mode)
+      this.splatContainerRef.nativeElement.addEventListener('click', (event: MouseEvent) => this.onCanvasClick(event));
+
       this.splatLoading = false;
       this.cdr.detectChanges();
     } catch (err) {
       console.error('[VideoRoomComponent] Failed to initialize viewer:', err);
       this.splatLoadError = String(err);
       this.splatLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  // ─── Display picker interaction ───────────────────────────────────────────
+
+  private onCanvasClick(event: MouseEvent) {
+    // Only handle clicks in picker mode and when not already selecting
+    if (!this.displayPickerMode || this.selectedDisplayId || !this.viewer || !this.threeScene) return;
+
+    const canvas = this.splatContainerRef?.nativeElement.querySelector('canvas');
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const camera = (this.viewer as any).camera;
+    this.raycaster.setFromCamera(this.mouse, camera);
+
+    const planes = Array.from(this.displayPlanes.values()).map(p => p.mesh);
+    const intersects = this.raycaster.intersectObjects(planes);
+
+    if (intersects.length > 0) {
+      const clicked = intersects[0].object as THREE.Mesh;
+      const displayId = clicked.userData['displayId'];
+      if (displayId) this.selectDisplay(displayId);
+    }
+  }
+
+  async selectDisplay(displayId: string) {
+    this.selectedDisplayId = displayId;
+    this.cdr.detectChanges();
+    console.log('[VideoRoomComponent] Selecting display:', displayId);
+
+    try {
+      const result = await this.videoService.chooseDisplay(displayId);
+      if (result && result.success) {
+        console.log('[VideoRoomComponent] Display choice confirmed');
+        this.displayPickerMode = false;
+        this.selectedDisplayId = null;
+        this.cdr.detectChanges();
+      } else {
+        console.error('[VideoRoomComponent] Server rejected display choice:', result?.error);
+        this.selectedDisplayId = null;
+        this.cdr.detectChanges();
+      }
+    } catch (err) {
+      console.error('[VideoRoomComponent] Failed to choose display:', err);
+      this.selectedDisplayId = null;
       this.cdr.detectChanges();
     }
   }
@@ -405,6 +466,69 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
         this.attachCameraStreamToPlane(displayId, slot);
       }
     });
+  }
+
+  /**
+   * Handles the race condition where a participant's stream arrives before
+   * SLOT_REMOTE_JOINED has populated assignedRemotes.
+   * Iterates all open slot windows and tries to attach any participant whose
+   * socketId matches a remote that is now in the slot's assignedRemotes.
+   * Also handles the case where assignedRemotes is populated but the stream
+   * wasn't available yet when the slot subscription fired.
+   */
+  private tryAttachOrphanedParticipants(participants: { id: string; stream: MediaStream; name: string; socketId?: string }[]) {
+    for (const [slotId, win] of this.slotWindows) {
+      if (win.closed) continue;
+      const slot = this.roomDeviceService.slotsSnapshot.find(s => s.slotId === slotId);
+      if (!slot) continue;
+
+      const container = win.document.getElementById('video-container');
+      if (!container) continue;
+
+      // For each participant, check if they are assigned to this slot
+      for (const participant of participants) {
+        if (!participant.socketId) continue;
+
+        // Check if this participant is in the slot's assignedRemotes
+        const isAssigned = slot.assignedRemotes.some(r => r.socketId === participant.socketId);
+        if (!isAssigned) continue;
+
+        // Check if video element already exists and has stream
+        let videoEl = win.document.getElementById(`video-${participant.socketId}`) as HTMLVideoElement;
+        if (videoEl && videoEl.srcObject === participant.stream) continue; // already attached
+
+        if (!videoEl) {
+          // Create tile
+          const tile = win.document.createElement('div');
+          tile.className = 'remote-tile';
+          tile.id = `tile-${participant.socketId}`;
+
+          videoEl = win.document.createElement('video');
+          videoEl.id = `video-${participant.socketId}`;
+          videoEl.autoplay = true;
+          videoEl.playsInline = true;
+          videoEl.muted = false;
+          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;';
+
+          const nameEl = win.document.createElement('div');
+          nameEl.className = 'remote-name';
+          nameEl.textContent = participant.name;
+
+          tile.appendChild(videoEl);
+          tile.appendChild(nameEl);
+          container.appendChild(tile);
+
+          // Hide the "waiting" status overlay
+          const statusEl = win.document.getElementById('slot-status');
+          if (statusEl) statusEl.style.display = 'none';
+        }
+
+        // Attach stream
+        videoEl.srcObject = participant.stream;
+        videoEl.play().catch(err => console.warn('[VideoRoomComponent] orphan video.play() failed:', err));
+        console.log('[VideoRoomComponent] Attached orphaned participant', participant.socketId, 'to slot window', slotId);
+      }
+    }
   }
 
   // ─── Room device setup interception ──────────────────────────────────────
@@ -535,10 +659,15 @@ export class VideoRoomComponent implements OnInit, OnDestroy, AfterViewInit {
     // This is critical for showing remote users when they connect
     this.subs.push(
       this.videoService.getParticipants().subscribe(participants => {
-        // Update all slots whenever participants change
-        for (const slot of this.roomDeviceService.slotsSnapshot) {
+        // Use latest slot snapshot (may have been updated by SLOT_REMOTE_JOINED)
+        const latestSlots = this.roomDeviceService.slotsSnapshot;
+        for (const slot of latestSlots) {
           this.updateSlotWindow(slot, participants);
         }
+
+        // Also handle participants that may not yet be in assignedRemotes
+        // by checking all open slot windows for any unattached streams
+        this.tryAttachOrphanedParticipants(participants);
       })
     );
 
