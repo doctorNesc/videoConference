@@ -80,7 +80,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
         threeScene: this.threeScene,       // our overlay scene
         cameraUp: [0, 1, 0],
         initialCameraPosition: [0, 0, 0],
-        initialCameraLookAt: [0, 0, -5],
+        initialCameraLookAt: [0, 0, 0],
         sceneRevealMode: SceneRevealMode.Gradual,
       });
 
