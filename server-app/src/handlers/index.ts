@@ -4,7 +4,7 @@ import { SharedState } from "../types";
 import { registerTransportHandlers } from "./transportHandlers";
 import { registerConsumerHandlers } from "./consumerHandlers";
 import { registerProducerHandlers } from "./producerHandlers";
-import { registerChatHandlers } from "./chatHandlers";
+import { registerDataChannelHandlers } from "./dataChannelHandlers";
 import { registerHybridHandlers } from "./hybridHandlers";
 import { RoomManager } from "../core/roomManager";
 import { ACTIONS } from "../config/actions";
@@ -28,6 +28,8 @@ export function registerSocketHandlers(io: Server, state: SharedState, roomManag
     registerTransportHandlers(socket, state, roomManager, nsp);
     registerProducerHandlers(socket, state, roomManager);
     registerConsumerHandlers(socket, state, roomManager);
-    registerChatHandlers(socket, state);
+
+    // Chat is now handled entirely via mediasoup SCTP DataChannels
+    registerDataChannelHandlers(socket, nsp, roomManager);
   });
 }
