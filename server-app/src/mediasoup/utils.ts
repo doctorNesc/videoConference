@@ -36,6 +36,8 @@ export const createWebRtcTransport = async (
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
+    enableSctp: true,
+    numSctpStreams: { OS: 1024, MIS: 1024 },
   });
 
   transport.on("dtlsstatechange", (dtlsState) => {
