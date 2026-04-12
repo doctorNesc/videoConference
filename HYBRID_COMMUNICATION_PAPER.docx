@@ -6,7 +6,7 @@ Modern video conferencing systems typically treat remote participants as isolate
 
 We present a hybrid communication architecture that transforms a Mediasoup-based Selective Forwarding Unit (SFU) video conference into a room-aware system. The core innovation is the concept of screen slots—pairings of physical monitors with cameras in a conference room—that serve as the primary interface between remote participants and the physical space.
 
-The system operates on three key principles: (1) device-count agnostic topology, where any number of physical devices with any number of monitors and cameras can join a room; (2) explicit spatial assignment, where remote participants choose which physical display they appear on; and (3) persistent configuration, where device pairings are saved and automatically restored on subsequent joins.
+The system operates on three key principles: device-count agnostic topology, where any number of physical devices with any number of monitors and cameras can join a room; explicit spatial assignment, where remote participants choose which physical display they appear on; and persistent configuration, where device pairings are saved and automatically restored on subsequent joins.
 
 This paper describes the architecture, implementation phases, and the novel 3D display picker interface that allows remote participants to see live video feeds on physical monitors within a 3D reconstruction of the conference room.
 
@@ -16,182 +16,151 @@ This paper describes the architecture, implementation phases, and the novel 3D d
 
 The hybrid communication system is built around the concept of a room topology—a dynamic representation of all physical devices, their screens, cameras, and the assignment of remote participants to specific display slots.
 
-The fundamental data structure is the ScreenSlot, which represents a single screen-camera pairing on a physical room device:
+The fundamental data structure is the ScreenSlot, which represents a single screen-camera pairing on a physical room device. Each slot has a stable UUID identifier that persists across device reconnections, allowing the system to maintain continuity even when devices temporarily disconnect. The slot tracks which physical device owns it, the ordinal position of the screen on that device, and a human-readable label obtained from the Window Management API. Critically, each slot maintains a reference to a paired camera device and, once streaming begins, the Mediasoup producer ID that carries the video feed. The system also tracks which remote participants are assigned to each slot and whether the slot is linked to a pre-configured 3D display position.
 
-• slotId: A stable UUID that persists across device reconnections
-• deviceSocketId: The socket identifier of the physical device owning this slot
-• screenIndex: The ordinal position of the screen on the device
-• screenLabel: Human-readable label from the Window Management API
-• cameraDeviceId: The MediaDeviceInfo identifier of the paired camera
-• cameraProducerId: The Mediasoup producer ID once streaming begins
-• assignedRemoteIds: Array of remote participant socket IDs assigned to this slot
-• displayId: Link to a pre-configured DisplayConfig for 3D positioning
-• excluded: Boolean flag for screens reserved for local work
+A RoomTopology aggregates all ScreenSlots for a given conference room, maintaining a map of slot IDs to ScreenSlot objects and a set of active device socket IDs. This topology is broadcast to all participants whenever it changes, ensuring consistent state across the system. The separation of dynamic topology from static configuration is intentional and powerful: administrators can set up room geometry once, while devices can join and leave without disrupting the spatial model.
 
-A RoomTopology aggregates all ScreenSlots for a given conference room, maintaining a map of slot IDs to ScreenSlot objects and a set of active device socket IDs. This topology is broadcast to all participants whenever it changes, ensuring consistent state across the system.
-
-The DisplayConfig represents the static, admin-configured spatial properties of a display:
-
-• displayId: Stable UUID set once by the administrator
-• label: Human-readable name (e.g., "Front Left Screen")
-• position3D: 3D coordinates in the room's coordinate system
-• rotationY: Rotation angle in radians for display orientation
-• widthM and heightM: Physical dimensions in meters
-
-This separation of dynamic topology (ScreenSlot) from static configuration (DisplayConfig) allows administrators to set up room geometry once, while devices can join and leave without disrupting the spatial model.
+The DisplayConfig represents the static, admin-configured spatial properties of a display. Each display has a stable UUID set once by the administrator, a human-readable label such as "Front Left Screen", and precise 3D coordinates in the room's coordinate system. The system also stores the display's rotation angle and physical dimensions in meters, allowing the 3D viewer to render display planes at the correct size and orientation.
 
 2.2 Device Registration and Capability Enumeration
 
-When a physical room device joins a conference, it must advertise its capabilities: the number and properties of its screens and cameras. The system uses two modern browser APIs for this enumeration:
+When a physical room device joins a conference, it must advertise its capabilities to the server. The system uses two modern browser APIs to accomplish this automatically without requiring manual configuration. The Window Management API provides detailed information about all connected displays, including their physical positions, dimensions, and labels. This enables the system to understand the spatial layout of monitors on a device. The MediaDevices API lists all available cameras and microphones, allowing the device to present pairing options to the operator.
 
-1. Window Management API (getScreenDetails): Provides detailed information about all connected displays, including their physical positions, dimensions, and labels. This enables the system to understand the spatial layout of monitors on a device.
-
-2. MediaDevices API (enumerateDevices): Lists all available cameras and microphones, allowing the device to present pairing options to the operator.
-
-The device sends a REGISTER_ROOM_DEVICE message containing:
-
-• capabilities: An array of screens (with position and dimension metadata) and cameras
-• fingerprint: A stable device identifier stored in localStorage
-• savedPairings: Previously saved screen-camera pairings (if this is a returning device)
-
-If savedPairings are provided, the server applies them immediately, skipping the pairing wizard. Otherwise, the device displays an interactive wizard where the operator visually maps each screen to a camera and optionally marks screens as excluded from the conference.
+When a device joins, it sends a registration message containing its capabilities—an array of screens with position and dimension metadata, and an array of available cameras. The message also includes a stable device identifier stored in localStorage and, if the device has previously joined this room, the previously saved screen-camera pairings. If saved pairings are provided, the server applies them immediately, skipping the pairing wizard entirely. This is critical for production deployments where room devices are stationary and their configurations are stable. If no saved pairings exist, the device displays an interactive wizard where the operator visually maps each screen to a camera and optionally marks screens as excluded from the conference.
 
 2.3 Assignment Engine and Load Balancing
 
-The assignment engine is responsible for distributing remote participants across available screen slots. The algorithm operates on two principles:
+The assignment engine is responsible for distributing remote participants across available screen slots in a way that is both fair and responsive to user choice. When a remote joins the conference, the system assigns them to the slot with the fewest currently assigned remotes, ensuring balanced load across displays. This round-robin approach prevents any single display from becoming overloaded while maintaining simplicity.
 
-1. Round-robin distribution: When a remote joins, they are assigned to the slot with the fewest currently assigned remotes, ensuring balanced load across displays.
+However, the system also respects explicit user choice. When a remote uses the 3D display picker to choose a specific display, the system assigns them to the slot linked to that display, provided the slot is not excluded and has a paired camera. This gives remotes agency in the meeting while maintaining the system's ability to balance load when explicit choices are not made.
 
-2. Display-aware assignment: When a remote explicitly chooses a display via the 3D picker, the system assigns them to the slot linked to that display, provided the slot is not excluded and has a paired camera.
-
-When a device disconnects, all its slots are removed from the topology, and any remotes assigned to those slots are rebalanced across remaining slots. This ensures the system remains stable even with dynamic device participation.
+When a device disconnects, all its slots are removed from the topology, and any remotes assigned to those slots are automatically rebalanced across remaining slots. This ensures the system remains stable even with dynamic device participation. The rebalancing algorithm is deterministic and fair, ensuring that remotes are distributed evenly across the remaining displays.
 
 2.4 Mediasoup Integration
 
-The system extends the Mediasoup SFU architecture with hybrid-aware producer and consumer management:
+The system extends the Mediasoup SFU architecture with hybrid-aware producer and consumer management. Room devices produce one video stream per camera, with each producer tagged with metadata containing the slot ID and camera device ID. This metadata allows the server to correlate producers with topology slots. Remote participants consume all camera producers before the 3D picker renders, ensuring that all display planes show live video. The assignment mechanism then directs each remote to consume the producer corresponding to their assigned slot's camera.
 
-• Room devices produce one video stream per camera (one per slot)
-• Each producer is tagged with appData containing the slotId and cameraDeviceId
-• Remote participants consume all camera producers before the 3D picker renders
-• The assignment mechanism directs each remote to consume the producer corresponding to their assigned slot's camera
-
-When a remote is assigned to a slot, they receive an ASSIGNMENT_UPDATE message containing the cameraProducerId they should display as their main view. This allows smooth transitions when remotes are reassigned to different displays.
+When a remote is assigned to a slot, they receive an assignment update containing the producer ID they should display as their main view. This allows smooth transitions when remotes are reassigned to different displays, with the main view camera feed switching seamlessly.
 
 3 Implementation Architecture
 
 3.1 Server-Side Components
 
-The server implementation extends the existing Mediasoup SFU with hybrid-specific handlers and topology management:
+The server implementation extends the existing Mediasoup SFU with hybrid-specific handlers and topology management. The RoomManager class is extended with topology management methods that handle device registration, screen-camera pairing, remote assignment, and rebalancing. The Room class maintains a topology property containing all current slots and device sockets, and provides methods to query and modify the topology.
 
-RoomManager: Extended with topology management methods including registerDevice(), applyScreenCameraPairing(), assignRemoteToSlot(), assignRemoteToDisplay(), and rebalanceAssignments(). The Room class maintains a topology property containing all current slots and device sockets.
+The HybridHandlers module is a dedicated socket handler that processes all hybrid-specific events. When a room device registers, the handler creates unpaired slots for each advertised screen. When the pairing wizard completes, the handler links cameras to screens and triggers rebalancing. When a device starts streaming, it registers the producer ID with the server so remotes can consume it. When a remote chooses a display, the handler assigns them to the corresponding slot and notifies both the remote and the room device.
 
-HybridHandlers: A dedicated socket handler module that processes all hybrid-specific events:
-• REGISTER_ROOM_DEVICE: Creates unpaired slots or applies saved pairings
-• SCREEN_CAMERA_PAIRING: Links cameras to screens after wizard completion
-• CAMERA_PRODUCER_REGISTERED: Associates Mediasoup producer IDs with slots
-• CHOOSE_DISPLAY: Assigns a remote to a specific display
-• EXCLUDE_SCREEN / INCLUDE_SCREEN: Toggles screen participation
-
-RoomConfigService: Persists room configurations (display positions, metadata) and device pairing configurations (screen-camera mappings per device per room) to disk, enabling automatic restoration on device reconnection.
+The RoomConfigService persists room configurations and device pairing configurations to disk. Room configurations store display positions, metadata, and other static properties. Device pairing configurations store screen-camera mappings per device per room, keyed by device fingerprint. This enables automatic restoration on device reconnection, eliminating the need to re-run the pairing wizard.
 
 3.2 Client-Side Components
 
-The client implementation provides both room device and remote participant interfaces:
+The client implementation provides both room device and remote participant interfaces. The RoomDeviceService manages device-specific state including fingerprint generation, capability enumeration, saved configuration loading, and slot window management. It handles the pairing wizard flow and communicates with the server via socket events.
 
-RoomDeviceService: Manages device-specific state including fingerprint generation, capability enumeration, saved configuration loading, and slot window management. It handles the pairing wizard flow and communicates with the server via socket events.
+The VideoRoomService is extended to support hybrid mode, tracking the current assignment for remote participants and managing multi-producer consumption. It listens for assignment update events and switches the main view camera feed accordingly. This service is the bridge between the socket layer and the UI components.
 
-VideoRoomService: Extended to support hybrid mode, tracking the current assignment for remote participants and managing multi-producer consumption. It listens for ASSIGNMENT_UPDATE events and switches the main view camera feed accordingly.
+The RoomDeviceSetupComponent is an interactive wizard that displays the physical screen layout rendered proportionally using Window Management API coordinates. The operator can select a camera for each screen and toggle screens as excluded from the conference. The wizard provides a live preview of the selected camera and validates the pairing before submission.
 
-RoomDeviceSetupComponent: An interactive wizard that displays the physical screen layout (rendered proportionally using Window Management API coordinates) and allows the operator to select a camera for each screen. It includes toggles for excluding screens from the conference.
+The DisplayPickerComponent is a 3D viewer that renders the conference room using Gaussian Splats and overlays interactive display planes. Each plane shows live video from the corresponding camera or remote participant. Remotes hover over a plane to see its label and click to choose their display. The component includes a fallback list-based interface for accessibility in environments where 3D rendering is unavailable.
 
-DisplayPickerComponent: A 3D viewer that renders the conference room using Gaussian Splats and overlays interactive display planes. Each plane shows live video from the corresponding camera or remote participant. Remotes click a plane to choose their display, emitting CHOOSE_DISPLAY to the server.
-
-VideoRoomComponent: Adapted to handle both room device and remote participant modes. For room devices, it opens separate browser windows positioned on each physical screen. For remotes, it shows the main assigned camera feed with a sidebar of other streams.
+The VideoRoomComponent is adapted to handle both room device and remote participant modes. For room devices, it opens separate browser windows positioned on each physical screen using the Window Management API. For remotes, it shows the main assigned camera feed with a sidebar of other streams.
 
 3.3 Data Persistence
 
-The system implements two levels of persistence:
+The system implements two levels of persistence that work together to minimize setup overhead. Room configurations are stored once by administrators and contain display positions, rotations, and dimensions. These configurations are served via REST API and rarely change. Device pairing configurations are stored per device per room, keyed by device fingerprint. On subsequent joins to the same room, the device automatically loads and applies these pairings, skipping the wizard entirely.
 
-1. Room Configuration: Administrators configure displays once per room (position, rotation, dimensions). This is stored in a RoomConfig JSON file and served via REST API.
-
-2. Device Pairing Configuration: Each device's screen-camera mappings are saved per room, keyed by device fingerprint. On subsequent joins to the same room, the device automatically loads and applies these pairings, skipping the wizard.
-
-This design minimizes setup overhead while maintaining flexibility for room reconfiguration.
+This two-level approach allows administrators to set up room geometry once while devices can join and leave without manual intervention. The system gracefully handles cases where a device's hardware changes (new monitors or cameras) by detecting the mismatch and prompting the operator to re-run the wizard.
 
 4 The 3D Display Picker Interface
 
-The most visually distinctive feature of the system is the 3D display picker—a spatial interface where remote participants see the physical conference room rendered in 3D with live video feeds playing on the display planes.
+The most visually distinctive feature of the system is the 3D display picker—a spatial interface where remote participants see the physical conference room rendered in 3D with live video feeds playing on the display planes. This interface transforms the abstract concept of display assignment into a concrete, spatial experience.
 
 4.1 Visual Representation
 
-The display picker loads a Gaussian Splats 3D model of the physical room (captured by the administrator). For each configured display, a semi-transparent plane is rendered at the 3D position specified in the DisplayConfig. Each plane has a VideoTexture applied to it, sourced from a Mediasoup consumer connected to the corresponding camera producer.
+The display picker loads a Gaussian Splats 3D model of the physical room, which is captured by the administrator using a 3D scanning device. For each configured display, a semi-transparent plane is rendered at the 3D position specified in the room configuration. Each plane has a video texture applied to it, sourced from a Mediasoup consumer connected to the corresponding camera producer.
 
-The video texture pipeline works as follows:
+The video texture pipeline is carefully orchestrated to ensure smooth playback. When a remote participant joins, they receive the room configuration containing all display configurations. The client then consumes all camera producers from room devices via Mediasoup, establishing media connections for each camera. For each consumer, a hidden video element is created and attached to the MediaStream. A THREE.VideoTexture is created from the video element and applied to the PlaneGeometry positioned at the display's 3D coordinates. The plane is rotated according to the display's rotation angle.
 
-1. Remote participant joins and receives roomConfig containing all DisplayConfigs
-2. Client consumes all camera producers (one per slot) via Mediasoup
-3. For each consumer, a hidden <video> element is created and attached to the MediaStream
-4. A THREE.VideoTexture is created from the video element
-5. The texture is applied to the PlaneGeometry positioned at the display's 3D coordinates
-6. The plane is rotated according to the display's rotationY value
-
-The result is an immersive view where remotes see the actual conference room with live video feeds playing on the physical monitors.
+The result is an immersive view where remotes see the actual conference room with live video feeds playing on the physical monitors. This creates a powerful sense of presence and spatial awareness that traditional grid-based video conferencing cannot achieve.
 
 4.2 Display Selection and Assignment
 
-When a remote hovers over a display plane, it highlights and shows a tooltip with the display label. Clicking the plane emits a CHOOSE_DISPLAY event to the server, which:
+When a remote hovers over a display plane, it highlights and shows a tooltip with the display label. Clicking the plane emits a display choice event to the server. The server then finds the screen slot linked to that display, assigns the remote to that slot, and sends an assignment update to the remote with the new camera producer ID. The room device that owns the slot is notified that a new remote is assigned to it. The updated topology is broadcast to all participants.
 
-1. Finds the ScreenSlot linked to that display
-2. Assigns the remote to that slot
-3. Sends ASSIGNMENT_UPDATE to the remote with the new camera producer ID
-4. Notifies the room device that a new remote is assigned to that slot
-5. Broadcasts the updated topology to all participants
-
-The remote's video feed then appears on the physical screen in the room, and they see the camera feed from that display as their main view.
+The remote's video feed then appears on the physical screen in the room, and they see the camera feed from that display as their main view. This creates a direct correspondence between the remote's choice in the 3D viewer and their appearance in the physical room.
 
 4.3 Fallback Interface
 
-For environments where 3D rendering is unavailable or unsupported, the system provides a simple list-based display picker showing all available displays with "Choose" buttons. This ensures accessibility across different browsers and devices.
+For environments where 3D rendering is unavailable or unsupported, the system provides a simple list-based display picker showing all available displays with "Choose" buttons. This ensures accessibility across different browsers and devices, allowing remotes to participate even if they cannot render the 3D scene.
 
-5 Key Design Decisions
+5 System Idea and Motivation
 
-5.1 Device Fingerprinting
+5.1 The Problem Statement
 
-Rather than relying on IP addresses or browser cookies, the system uses crypto.randomUUID() stored in localStorage under the key "hybrid-device-id". This provides a stable identifier that persists across browser sessions and device reboots, while remaining local to the device. The fingerprint is passed to the server on every REGISTER_ROOM_DEVICE event, enabling the server to recognize returning devices and load their saved configurations.
+Traditional hybrid video conferencing systems suffer from a critical disconnect between the physical and digital worlds. When remote participants join a meeting, they see a grid of video tiles with no awareness of where they appear in the physical room. Conversely, people in the room see remote participants on screens but have no control over which remote appears on which display. This creates several practical problems that degrade the meeting experience.
 
-5.2 Screen Exclusion
+Remote participants feel disconnected from the physical space because they cannot see the room or understand its layout. They do not know which screen displays them, making it difficult to establish eye contact or understand the room's spatial context. This lack of spatial awareness reduces their sense of presence and engagement in the meeting.
 
-Physical devices often have monitors used for local work (presenter notes, control panels, etc.) that should not be part of the conference. The system allows operators to mark screens as excluded during the pairing wizard. Excluded screens still get ScreenSlots on the server but are filtered out from the assignment pool and display picker. The slot window for an excluded screen shows a "Reserved for local work" overlay.
+From the room's perspective, remotes are assigned to displays in an unpredictable manner. Without explicit control, important participants might be relegated to secondary screens while less important participants occupy primary displays. This arbitrary assignment can create awkward social dynamics and reduce meeting effectiveness.
 
-5.3 Separation of Concerns: Topology vs. Configuration
+The physical room's geometry and display arrangement are invisible to remotes, further reducing their sense of presence. They cannot see the room's layout, the positions of displays, or the spatial relationships between participants. This makes it difficult to understand the meeting's context and reduces the sense of shared space.
 
-The system maintains a clear separation between dynamic topology (which devices are connected, which slots are paired, which remotes are assigned) and static configuration (where displays are positioned in 3D space, what are their dimensions). This allows:
+Finally, configuring which camera feeds to which displays requires manual intervention and is error-prone. Operators must manually specify which camera should feed which display, and this configuration must be repeated every time a device joins. This setup complexity is a barrier to adoption and a source of errors.
 
-• Administrators to set up room geometry once
-• Devices to join and leave without disrupting the spatial model
-• Topology to be broadcast frequently without redundant configuration data
-• Configuration to be updated independently without affecting active connections
+5.2 Core Innovation: Screen Slots and Spatial Assignment
 
-5.4 Persistent Pairing Configuration
+The central innovation of this system is the concept of screen slots—explicit pairings of physical monitors with cameras that serve as the primary unit of communication. Rather than treating cameras and displays as separate entities, the system binds them together into slots, each representing a "window" into the physical room.
 
-By saving device pairing configurations keyed by device fingerprint and room name, the system eliminates the need to re-run the pairing wizard on every join. This is critical for production deployments where room devices are stationary and their screen-camera mappings are stable. The configuration includes the displayId mapping, allowing the system to automatically link slots to their 3D positions on reconnection.
+This design enables several key capabilities that address the problems identified above. First, it enables explicit spatial mapping. Each slot has a display ID that links to a 3D position in the room. This allows the system to maintain a spatial model of the room and present it to remotes in the 3D display picker. Remotes can see the room's layout and understand where they appear.
+
+Second, it enables balanced load distribution. The assignment engine distributes remotes across slots using round-robin logic, ensuring no single display becomes overloaded. This prevents the situation where important participants are relegated to secondary screens.
+
+Third, it gives remotes user choice. Rather than being assigned arbitrarily, remotes can explicitly choose which display they appear on via the 3D picker. This gives them agency in the meeting and allows them to choose displays that match their role or preference.
+
+Fourth, it enables automatic recovery. When devices disconnect, remotes are automatically rebalanced across remaining slots, maintaining system stability. The system does not require manual intervention to recover from device failures.
+
+Fifth, it enables persistent configuration. Device pairings are saved and restored, eliminating setup overhead on subsequent joins. Operators do not need to re-run the pairing wizard every time a device joins.
+
+The screen slot abstraction is powerful because it unifies several concerns: it represents a physical display, a camera feed, a Mediasoup producer, and a remote assignment target. This unification simplifies the system architecture and makes the topology management logic straightforward.
+
+5.3 Implementation Strategy
+
+The implementation follows a phased approach, building from the data model upward. The first phase establishes the core data structures and implements the topology management logic in the server. This includes methods for registering devices, applying pairings, assigning remotes, and rebalancing on device disconnect. The server-side logic is purely functional and does not depend on client-side code.
+
+The second phase implements the socket event handlers that allow clients to communicate topology changes to the server. The HybridHandlers module processes registration events, pairing events, producer registration events, and display choice events. Each handler updates the topology and broadcasts changes to all participants.
+
+The third phase implements the client-side device registration flow. The RoomDeviceService uses the Window Management API and MediaDevices API to enumerate screens and cameras, generates a stable device fingerprint, and loads saved pairing configurations. If no saved configuration exists, it displays the pairing wizard.
+
+The fourth phase implements the interactive pairing wizard that allows operators to visually map screens to cameras. The wizard displays the physical screen layout proportionally and provides camera selection dropdowns. On completion, the pairings are saved to the server via REST API.
+
+The fifth phase implements the remote participant experience. The DisplayPickerComponent renders the 3D room using Gaussian Splats and overlays interactive display planes with live video feeds. Remotes click a plane to choose their display, emitting a display choice event to the server. The component includes a fallback list-based interface for accessibility.
+
+The sixth phase implements the room device view, which opens separate browser windows positioned on each physical screen. Each window displays the remotes assigned to that slot and uses BroadcastChannel to share MediaStream objects across windows.
+
+The final phase integrates all components, wires up the routing, and performs end-to-end testing. This includes testing device join and leave scenarios, remote assignment and rebalancing, display picker interaction, and configuration persistence.
+
+5.4 Technical Challenges and Solutions
+
+Several technical challenges arose during implementation, each requiring careful consideration and creative solutions. The Window Management API is not yet widely supported across browsers, so the system implements a fallback to window.screen for single-screen devices and gracefully degrades to a single-window mode if the API is unavailable. This ensures the system works across a wide range of devices and browsers.
+
+Room devices need to display different remotes on different physical screens, requiring communication between browser windows. The system uses the BroadcastChannel API to share MediaStream objects and topology updates across windows in the same origin. This allows windows to coordinate without requiring a server round-trip.
+
+Mediasoup producers need to be tagged with slot information so the server can correlate them with topology. The system uses the appData field in the producer configuration to store slot ID and camera device ID. This allows the server to maintain the mapping between producers and slots.
+
+With multiple clients and dynamic device participation, maintaining consistent topology state is challenging. The system implements a server-authoritative topology model where the server is the single source of truth. All clients receive topology update broadcasts whenever the topology changes, ensuring consistency.
+
+Mapping 2D mouse clicks in the 3D viewer to specific display planes requires raycasting. The system uses THREE.Raycaster to detect intersections with display planes and emits a display choice event for the clicked plane. This allows remotes to interact with the 3D scene intuitively.
+
+Applying live video feeds to 3D planes requires careful synchronization of MediaStream objects and THREE.VideoTexture updates. The system creates hidden video elements for each consumer, attaches the MediaStream, and updates the VideoTexture on each animation frame. This ensures smooth playback and synchronization.
 
 6 Conclusion
 
 The hybrid communication system presented in this paper addresses a fundamental gap in modern video conferencing: the lack of spatial awareness and intentional display assignment. By combining device topology management, intelligent assignment algorithms, and an immersive 3D interface, the system creates a more natural and intuitive experience for hybrid meetings.
 
-The architecture is device-count agnostic, supporting any number of physical devices with any number of monitors and cameras. The use of modern browser APIs (Window Management API, MediaDevices API) enables automatic capability enumeration without manual configuration. The 3D display picker provides an innovative interface where remote participants can see the actual conference room and choose which display they appear on.
+The architecture is device-count agnostic, supporting any number of physical devices with any number of monitors and cameras. The use of modern browser APIs enables automatic capability enumeration without manual configuration. The 3D display picker provides an innovative interface where remote participants can see the actual conference room and choose which display they appear on.
 
-Key contributions include:
+    Key contributions of this work include a flexible topology model that supports dynamic device participation, an assignment engine that balances load while respecting explicit display choices, a persistent configuration system that minimizes setup overhead, and a 3D spatial interface that makes display assignment intuitive and immersive. The system has been implemented as an extension to an existing Mediasoup-based video conference platform and is ready for deployment in hybrid meeting environments.
 
-1. A flexible topology model that supports dynamic device participation
-2. An assignment engine that balances load while respecting explicit display choices
-3. A persistent configuration system that minimizes setup overhead
-4. A 3D spatial interface that makes display assignment intuitive and immersive
-
-Future work could explore additional features such as automatic camera selection based on participant gaze direction, dynamic display layout optimization, and integration with room booking systems to automatically load room configurations.
-
-The system has been implemented as an extension to an existing Mediasoup-based video conference platform and is ready for deployment in hybrid meeting environments.
+The modular architecture allows for future enhancements such as automatic camera selection based on participant gaze direction, dynamic display layout optimization, and integration with room booking systems to automatically load room configurations. The system demonstrates that spatial awareness and explicit assignment can significantly improve the hybrid meeting experience.
 
 Literature
 
