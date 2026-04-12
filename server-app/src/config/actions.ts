@@ -38,9 +38,31 @@ export const ACTIONS = {
     SCREEN_PRODUCER_CREATED: "screenProducerCreated",
     SCREEN_CONSUMER_CREATED: "screenConsumerCreated",
 
-    // ─── Chat ─────────────────────────────────────────────────────────────────
-    SEND_MESSAGE: "sendMessage",
-    NEW_MESSAGE: "newMessage",
+    // ─── DataChannel (chat via mediasoup SCTP DataChannels) ──────────────────
+    /**
+     * Emitted by client → server to create a DataProducer on the send transport.
+     * Callback: { id: string } — the server-side DataProducer ID.
+     */
+    PRODUCE_DATA: "produceData",
+
+    /**
+     * Emitted by server → a peer when a new DataProducer is available in the room.
+     * Payload: { dataProducerId: string }
+     */
+    NEW_DATA_PRODUCER: "newDataProducer",
+
+    /**
+     * Emitted by client → server to consume a remote DataProducer.
+     * Payload: { dataProducerId: string; serverConsumerTransportId: string }
+     * Callback: { id, dataProducerId, sctpStreamParameters, label, protocol }
+     */
+    CONSUME_DATA: "consumeData",
+
+    /**
+     * Emitted by client → server to resume a DataConsumer.
+     * Payload: { serverDataConsumerId: string }
+     */
+    DATA_CONSUMER_RESUME: "dataConsumerResume",
 
     // ─── Hybrid: Room device lifecycle ───────────────────────────────────────
     /**
