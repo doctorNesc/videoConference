@@ -1,4 +1,4 @@
-import { Consumer, Producer, WebRtcTransport } from "mediasoup/node/lib/types";
+import { Consumer, DataConsumer, DataProducer, Producer, WebRtcTransport } from "mediasoup/node/lib/types";
 import { Socket } from "socket.io";
 import { RoomDeviceCapabilities } from "../types";
 
@@ -23,6 +23,8 @@ export class Peer {
     recvTransport!: WebRtcTransport;
     producers: Map<string, Producer> = new Map();
     consumers: Map<string, Consumer> = new Map();
+    dataProducers: Map<string, DataProducer> = new Map();
+    dataConsumers: Map<string, DataConsumer> = new Map();
 
     constructor(
         id: string,
@@ -76,13 +78,33 @@ export class Peer {
         this.consumers.delete(consumerId);
     }
 
+    addDataProducer(dataProducer: DataProducer) {
+        this.dataProducers.set(dataProducer.id, dataProducer);
+    }
+
+    removeDataProducer(dataProducerId: string) {
+        this.dataProducers.delete(dataProducerId);
+    }
+
+    addDataConsumer(dataConsumer: DataConsumer) {
+        this.dataConsumers.set(dataConsumer.id, dataConsumer);
+    }
+
+    removeDataConsumer(dataConsumerId: string) {
+        this.dataConsumers.delete(dataConsumerId);
+    }
+
     close() {
         // Clean up everything when peer disconnects
         this.producers.forEach((p) => p.close());
         this.consumers.forEach((c) => c.close());
+        this.dataProducers.forEach((dp) => dp.close());
+        this.dataConsumers.forEach((dc) => dc.close());
         this.recvTransport?.close();
         this.sendTransport?.close();
         this.producers.clear();
         this.consumers.clear();
+        this.dataProducers.clear();
+        this.dataConsumers.clear();
     }
 }
