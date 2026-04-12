@@ -28,6 +28,7 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
           iceParameters: transport.iceParameters,
           iceCandidates: transport.iceCandidates,
           dtlsParameters: transport.dtlsParameters,
+          sctpParameters: transport.sctpParameters,
         },
       });
     } catch (error) {
@@ -242,7 +243,15 @@ export function registerTransportHandlers(socket: Socket, state: SharedState, ro
           }
         }
         
-        // All other cases: notify (remote → remote, remote → room device, etc.)
+        if (!producerPeer.isRoomDevice && consumerPeer.isRoomDevice) {
+          // Remote → room device: ALWAYS notify room devices about remote producers
+          // Room devices need to consume all remote producers for display on splat viewer
+          console.log("Notifying room device", consumerPeer.userName, "about new producer from remote", producerPeer.userName);
+          consumerPeer.socket.emit(ACTIONS.NEW_PRODUCER, { producerId, socketId: producerSocketId });
+          return;
+        }
+        
+        // All other cases: notify (remote → remote, etc.)
         console.log("Notifying", consumerPeer.userName, "about new producer from", producerPeer.userName);
         consumerPeer.socket.emit(ACTIONS.NEW_PRODUCER, { producerId, socketId: producerSocketId });
       });
