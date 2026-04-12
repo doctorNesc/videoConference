@@ -2,6 +2,8 @@ import { inject, Injectable, Optional } from '@angular/core';
 import {
   Transport,
   Consumer,
+  DataConsumer,
+  DataProducer,
   Producer,
   RtpCapabilities,
 } from 'mediasoup-client/types';
@@ -71,9 +73,14 @@ export class VideoRoomService {
   public localVideo!: any;
   public videoStream!: MediaStream;
 
-  // ─── Chat ─────────────────────────────────────────────────────────────────
+  // ─── Chat (DataChannel) ───────────────────────────────────────────────────
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   public messages$: Observable<ChatMessage[]> = this.messagesSubject.asObservable();
+
+  /** The local DataProducer used to send chat messages */
+  private chatDataProducer: DataProducer | null = null;
+  /** All active DataConsumers keyed by their server-side DataConsumer ID */
+  private dataConsumers: Map<string, DataConsumer> = new Map();
 
   // ─── Encoding params ──────────────────────────────────────────────────────
   public params: any = {
@@ -108,6 +115,9 @@ export class VideoRoomService {
       await this.createDevice();
       await this.createRecvTransport();
       await this.createSendTransport();
+
+      // Create the chat DataProducer on the send transport (all peers)
+      await this.createChatDataProducer();
 
       if (this.isRoomDevice) {
         // Phase 4: advertise capabilities, then show pairing wizard
@@ -180,9 +190,10 @@ export class VideoRoomService {
       this.handleProducerClosed(remoteProducerId);
     });
 
-    this.socketService.on('receiveMessage', (msg: ChatMessage) => {
-      const currentMessages = this.messagesSubject.value;
-      this.messagesSubject.next([...currentMessages, msg]);
+    // ─── DataChannel: new remote DataProducer available ──────────────────
+    this.socketService.on(ACTIONS.NEW_DATA_PRODUCER, async ({ dataProducerId, socketId, userName }: any) => {
+      console.log('[VideoRoomService] NEW_DATA_PRODUCER — id:', dataProducerId, 'from:', userName);
+      await this.consumeDataProducer(dataProducerId, userName);
     });
   }
 
@@ -437,6 +448,42 @@ export class VideoRoomService {
         } catch (error) {
           console.error('[VideoRoomService] Error in PRODUCE handler:', error);
           callback(error);
+        }
+      });
+
+      // ─── DataChannel: producedata event ────────────────────────────────
+      // Fired by producerTransport.produceData(); we signal the server and
+      // return the server-assigned DataProducer ID via callback.
+      // The server also returns existingDataProducers so we can consume peers
+      // who joined before us (late-joiner fix).
+      this.producerTransport.on('producedata', async (parameters: any, callback: Function) => {
+        try {
+          console.log('[VideoRoomService] producedata event triggered');
+          const { id, error, existingDataProducers } = await this.socketService.emit(ACTIONS.PRODUCE_DATA, {
+            sctpStreamParameters: parameters.sctpStreamParameters,
+            label: parameters.label,
+            protocol: parameters.protocol,
+            appData: parameters.appData,
+          });
+          if (error) {
+            console.error('[VideoRoomService] PRODUCE_DATA server error:', error);
+            callback(new Error(error));
+            return;
+          }
+          console.log('[VideoRoomService] DataProducer created on server, id:', id,
+            '| existing DataProducers:', existingDataProducers?.length ?? 0);
+
+          // Consume all DataProducers that already existed before we joined
+          if (Array.isArray(existingDataProducers)) {
+            for (const { dataProducerId, userName } of existingDataProducers) {
+              await this.consumeDataProducer(dataProducerId, userName);
+            }
+          }
+
+          callback({ id });
+        } catch (err) {
+          console.error('[VideoRoomService] Error in producedata handler:', err);
+          callback(err);
         }
       });
     } catch {
@@ -725,6 +772,8 @@ export class VideoRoomService {
     this.participantService.cleanUp();
     this.producers.forEach((item) => item.producer.close());
     this.consumers.forEach((consumer) => consumer.close());
+    this.chatDataProducer?.close();
+    this.dataConsumers.forEach((dc) => dc.close());
     this.producerTransport && this.producerTransport.close();
     this.consumerTransport && this.consumerTransport.close();
 
@@ -734,20 +783,118 @@ export class VideoRoomService {
     this.topology$.next(null);
     this.producers = [];
     this.consumers = [];
+    this.chatDataProducer = null;
+    this.dataConsumers.clear();
   }
 
-  // ─── Chat ─────────────────────────────────────────────────────────────────
+  // ─── Chat (DataChannel) ───────────────────────────────────────────────────
 
-  sendMessage(message: string, sender: string, roomName: string) {
+  /**
+   * Creates a mediasoup DataProducer on the send transport.
+   * This is the local "write end" of the chat DataChannel.
+   */
+  private async createChatDataProducer(): Promise<void> {
+    try {
+      if (!this.producerTransport) {
+        console.warn('[VideoRoomService] createChatDataProducer: send transport not ready');
+        return;
+      }
+
+      // producerTransport.produceData() fires the 'producedata' event on the transport,
+      // which is handled in createSendTransport() above. That handler signals the server
+      // via PRODUCE_DATA and returns the server-assigned DataProducer ID via callback.
+      this.chatDataProducer = await this.producerTransport.produceData({
+        ordered: true,
+        label: 'chat',
+        protocol: 'json',
+        appData: { type: 'chat' },
+      });
+
+      console.log('[VideoRoomService] Chat DataProducer created:', this.chatDataProducer.id);
+    } catch (err) {
+      console.error('[VideoRoomService] Error creating chat DataProducer:', err);
+    }
+  }
+
+  /**
+   * Consumes a remote peer's chat DataProducer.
+   * Attaches a message listener that pushes received messages into messagesSubject.
+   */
+  private async consumeDataProducer(dataProducerId: string, senderName: string): Promise<void> {
+    try {
+      if (!this.consumerTransport || !this.recv_params?.id) {
+        console.warn('[VideoRoomService] consumeDataProducer: recv transport not ready');
+        return;
+      }
+
+      const params = await this.socketService.emit(ACTIONS.CONSUME_DATA, {
+        dataProducerId,
+        serverConsumerTransportId: this.recv_params.id,
+      });
+
+      if (params.error) {
+        console.error('[VideoRoomService] CONSUME_DATA error:', params.error);
+        return;
+      }
+
+      const dataConsumer: DataConsumer = await this.consumerTransport.consumeData({
+        id: params.id,
+        dataProducerId: params.dataProducerId,
+        sctpStreamParameters: params.sctpStreamParameters,
+        label: params.label,
+        protocol: params.protocol,
+      });
+
+      this.dataConsumers.set(dataConsumer.id, dataConsumer);
+
+      dataConsumer.on('message', (data: any) => {
+        try {
+          const raw = typeof data === 'string' ? data : new TextDecoder().decode(data);
+          const parsed: { message: string; timestamp: string } = JSON.parse(raw);
+          const chatMessage: ChatMessage = {
+            sender: senderName,
+            message: parsed.message,
+            timestamp: parsed.timestamp,
+          };
+          const current = this.messagesSubject.value;
+          this.messagesSubject.next([...current, chatMessage]);
+        } catch (e) {
+          console.warn('[VideoRoomService] Failed to parse DataChannel message:', e);
+        }
+      });
+
+      // Resume the DataConsumer
+      await this.socketService.emit(ACTIONS.DATA_CONSUMER_RESUME, {
+        serverDataConsumerId: dataConsumer.id,
+      });
+
+      console.log('[VideoRoomService] DataConsumer ready for', senderName, '— id:', dataConsumer.id);
+    } catch (err) {
+      console.error('[VideoRoomService] Error consuming DataProducer:', err);
+    }
+  }
+
+  /**
+   * Sends a chat message via the local DataProducer (SCTP DataChannel).
+   * Also appends the message locally so the sender sees it immediately.
+   */
+  sendMessage(message: string, sender: string, _roomName: string) {
     const chatMessage: ChatMessage = {
       sender,
       message,
       timestamp: new Date().toISOString(),
     };
-    // Note: uses socket directly via socketService
-    this.socketService.emit('sendMessage', { roomName, message });
-    const currentMessages = this.messagesSubject.value;
-    this.messagesSubject.next([...currentMessages, chatMessage]);
+
+    if (this.chatDataProducer && !this.chatDataProducer.closed) {
+      const payload = JSON.stringify({ message: chatMessage.message, timestamp: chatMessage.timestamp });
+      this.chatDataProducer.send(payload);
+    } else {
+      console.warn('[VideoRoomService] Chat DataProducer not ready — message not sent over DataChannel');
+    }
+
+    // Always show the message locally
+    const current = this.messagesSubject.value;
+    this.messagesSubject.next([...current, chatMessage]);
   }
 
   getMessages(): Observable<ChatMessage[]> {
