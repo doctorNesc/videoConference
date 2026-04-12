@@ -5,6 +5,8 @@ import {
   ViewChild,
   ElementRef,
   AfterViewInit,
+  Output,
+  EventEmitter,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -338,13 +340,15 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     }
   }
 
+  /** Emitted when the user has successfully chosen a display and the server confirmed it. */
+  @Output() displayChosen = new EventEmitter<void>();
+
   /**
-   * Called when display choice is confirmed. Parent component should hide this overlay.
+   * Called when display choice is confirmed. Emits displayChosen so the parent can hide this overlay.
    */
   onDisplayChosen() {
-    // Emit event or call parent method to hide picker
-    // For now, just log
     console.log('[DisplayPicker] Display choice confirmed, hiding picker');
+    this.displayChosen.emit();
   }
 
   // ─── Fallback list view ───────────────────────────────────────────────────

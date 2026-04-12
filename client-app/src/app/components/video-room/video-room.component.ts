@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -8,17 +8,16 @@ import { ResizableDirective } from '../../directives/app-resizable.directive';
 import { SideBarComponent } from '../side-bar/side-bar.component';
 import { RoomDeviceSetupComponent } from '../room-device-setup/room-device-setup.component';
 import { RoomDeviceDisplayLinkerComponent } from '../room-device-display-linker/room-device-display-linker.component';
+import { DisplayPickerComponent } from '../display-picker/display-picker.component';
 import {
   FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators,
 } from '@angular/forms';
 import { ChatMessage, VideoRoomService } from '../../services/video-room.service';
-import { ScreenCameraPairing, RoomConfig, DisplayConfig, RoomTopologyDTO, ScreenSlotDTO } from '../../utils/hybrid-types';
+import { ScreenCameraPairing, RoomConfig } from '../../utils/hybrid-types';
 import { Subscription } from 'rxjs';
 import { RoomDeviceService, SlotState } from '../../services/room-device.service';
 import { BroadcastChannelService } from '../../services/broadcast-channel.service';
 import { Participant } from '../../utils/types';
-import * as THREE from 'three';
-import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats-3d';
 
 @Component({
   selector: 'app-video-room',
@@ -31,6 +30,7 @@ import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats
     SideBarComponent,
     RoomDeviceSetupComponent,
     RoomDeviceDisplayLinkerComponent,
+    DisplayPickerComponent,
     ReactiveFormsModule,
     FormsModule,
   ],
@@ -38,9 +38,6 @@ import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats
   styleUrls: ['./video-room.component.scss'],
 })
 export class VideoRoomComponent implements OnInit, OnDestroy {
-  @ViewChild('splatContainer', { static: false })
-  splatContainerRef!: ElementRef<HTMLDivElement>;
-
   public participants: { id: string; stream: MediaStream; name: string; socketId?: string; isAssignedCamera?: boolean }[] = [];
   public mainParticipant!: { id: string; stream: MediaStream; name: string };
   public mainView: boolean = false;
@@ -73,22 +70,9 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   // ─── Assignment label (remote participants) ───────────────────────────────
   public assignedScreenLabel: string | null = null;
 
-  // ─── 3D Room visualization ────────────────────────────────────────────────
-  public roomConfig: RoomConfig | null = null;
-  public topology: RoomTopologyDTO | null = null;
-  public showSplatViewer: boolean = false;
-  public splatLoading: boolean = false;
-  public splatLoadError: string | null = null;
-  /** True while the user hasn't chosen a display yet (picker mode) */
-  public displayPickerMode: boolean = false;
-  /** The displayId the user clicked — shows "Connecting…" feedback */
-  public selectedDisplayId: string | null = null;
-
-  private viewer: Viewer | null = null;
-  private threeScene!: THREE.Scene;
-  private displayPlanes: Map<string, { mesh: THREE.Mesh; videoElement: HTMLVideoElement }> = new Map();
-  private raycaster = new THREE.Raycaster();
-  private mouse = new THREE.Vector2();
+  // ─── Display picker (remote participants in rooms with 3D layout) ─────────
+  /** True while the display picker overlay is shown */
+  public showDisplayPicker: boolean = false;
 
   /** Map of slotId → opened Window reference */
   private slotWindows = new Map<string, Window>();
@@ -115,9 +99,10 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
     this.videoService.initializeSocket(this.roomName, this.name, this.isRoomDevice);
 
-    // Load room config to check if 3D visualization is available
-    // But wait for socket to be ready before redirecting to DisplayPicker
-    this.loadRoomConfig();
+    // For remote participants: check if room has a 3D layout and show display picker
+    if (!this.isRoomDevice) {
+      this.loadRoomConfig();
+    }
 
     // ─── Participants subscription ──────────────────────────────────────────
     this.subs.push(
@@ -132,12 +117,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
           if (assignedCam) {
             this.setMainParticipant(assignedCam);
           }
-        }
-
-        // Update display planes with new participant streams when they arrive
-        if (this.showSplatViewer && this.displayPlanes.size > 0) {
-          // Re-attach streams to existing planes when participants change
-          this.reattachStreamsToPlanes();
         }
       })
     );
@@ -162,373 +141,38 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         this.messages = messages;
       })
     );
-
-    // ─── Topology subscription ─────────────────────────────────────────────
-    this.subs.push(
-      this.videoService.topology.subscribe((topology) => {
-        if (topology) {
-          this.topology = topology;
-          if (this.showSplatViewer) {
-            this.updateDisplayPlanes();
-          }
-        }
-      })
-    );
   }
 
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
 
-    // Clean up video elements first
-    this.displayPlanes.forEach(({ videoElement }) => {
-      try {
-        videoElement.pause();
-        videoElement.srcObject = null;
-      } catch { /* ignore */ }
-    });
-    this.displayPlanes.clear();
-
-    // Clear the splat container to prevent DOM errors during disposal
-    if (this.splatContainerRef?.nativeElement) {
-      try {
-        this.splatContainerRef.nativeElement.innerHTML = '';
-      } catch { /* ignore */ }
-    }
-
-    // Dispose viewer - suppress errors from library's internal cleanup
-    if (this.viewer) {
-      try {
-        // Wrap dispose in setTimeout to let Angular finish cleanup first
-        setTimeout(() => {
-          try {
-            this.viewer?.dispose();
-          } catch { /* ignore */ }
-        }, 0);
-      } catch { /* ignore */ }
-      this.viewer = null;
-    }
+    // Close all slot windows
+    this.slotWindows.forEach(w => { try { w.close(); } catch { /* ignore */ } });
+    this.slotWindows.clear();
 
     this.videoService.disconnectAndCleanUp();
   }
 
-  // ─── 3D Room visualization ───────────────────────────────────────────────
+  // ─── 3D Room visualization (display picker for remote participants) ────────
 
   private async loadRoomConfig() {
     try {
-      const configResponse = await this.http.get<RoomConfig>(`/api/rooms/${this.roomName}`).toPromise();
-      if (configResponse) {
-        this.roomConfig = configResponse;
-        // Show splat viewer only for remote participants (not room devices)
-        // Room devices use the pairing wizard instead
-        if (!this.isRoomDevice && configResponse.displays && configResponse.displays.length > 0) {
-          this.showSplatViewer = true;
-          // Start in picker mode — user must click a display to choose their slot.
-          // Switches to passive view once assignment is confirmed.
-          this.displayPickerMode = true;
-          // detectChanges() renders the @if (showSplatViewer) block and creates
-          // the #splatContainer element in the DOM before initViewer() accesses it.
-          this.cdr.detectChanges();
-          // ngAfterViewInit already ran before showSplatViewer was set, so we
-          // must call initViewer() explicitly here after the DOM is updated.
-          await this.initViewer();
-        }
+      const config = await this.http.get<RoomConfig>(`/api/rooms/${this.roomName}`).toPromise();
+      if (config?.displays && config.displays.length > 0) {
+        // Room has a 3D layout — show the display picker so the user can choose their slot
+        this.showDisplayPicker = true;
+        this.cdr.detectChanges();
       }
     } catch (err) {
       console.warn('[VideoRoomComponent] Failed to load room config:', err);
-      // Continue without 3D visualization
+      // Continue without display picker — user will be auto-assigned
     }
   }
 
-  private async initViewer() {
-    try {
-      if (!this.splatContainerRef || !this.roomConfig) return;
-
-      this.splatLoading = true;
-      this.cdr.detectChanges();
-
-      // Use saved camera position if available
-      const camPos = this.roomConfig.cameraPosition?.position;
-      const camLookAt = this.roomConfig.cameraPosition?.lookAt;
-
-      // Create Three.js scene for overlay
-      this.threeScene = new THREE.Scene();
-      this.threeScene.add(new THREE.AmbientLight(0xffffff, 0.6));
-      const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-      dir.position.set(5, 10, 5);
-      this.threeScene.add(dir);
-
-      // Initialize GaussianSplats3D viewer
-      this.viewer = new Viewer({
-        rootElement: this.splatContainerRef.nativeElement,
-        useBuiltInControls: true,
-        selfDrivenMode: true,
-        threeScene: this.threeScene,
-        cameraUp: [0, -1, 0],
-        ...(camPos ? { initialCameraPosition: [camPos.x, camPos.y, camPos.z] as [number, number, number] } : {}),
-        ...(camLookAt ? { initialCameraLookAt: [camLookAt.x, camLookAt.y, camLookAt.z] as [number, number, number] } : {}),
-        sceneRevealMode: SceneRevealMode.Gradual,
-        sharedMemoryForWorkers: false,
-      });
-
-      // Load splat file
-      const splatUrl = `/api/rooms/${this.roomName}/splat`;
-      await this.viewer.addSplatScene(splatUrl, {
-        splatAlphaRemovalThreshold: 5,
-        format: SceneFormat.Splat,
-        showLoadingUI: false,
-      });
-
-      this.viewer.start();
-
-      // Disable the library's built-in click-to-set-orbit-target behaviour
-      (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
-      (this.viewer as any).transitioningCameraTarget = false;
-
-      // Restrict to orbit-only: disable pan and zoom
-      const controls = (this.viewer as any).controls;
-      if (controls) {
-        controls.enablePan = false;
-        controls.enableZoom = false;
-        const cam = controls.object;
-        if (cam) {
-          // Set target just in front of camera for first-person look-around
-          const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-          controls.target.copy(cam.position).addScaledVector(lookDir, 0.01);
-          controls.minDistance = 0;
-          controls.maxDistance = Infinity;
-          controls.update();
-          // Keep target pinned just ahead of camera on every update
-          let lastDistance = controls.target.distanceTo(cam.position);
-          controls.addEventListener('change', () => {
-            const currentDistance = controls.target.distanceTo(cam.position);
-            if (Math.abs(currentDistance - lastDistance) < 0.001) {
-              const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-              controls.target.copy(cam.position).addScaledVector(dir, 0.01);
-            }
-            lastDistance = currentDistance;
-          });
-        }
-      }
-
-      // Create display planes
-      this.updateDisplayPlanes();
-
-      // Set up click handler for display selection (picker mode)
-      this.splatContainerRef.nativeElement.addEventListener('click', (event: MouseEvent) => this.onCanvasClick(event));
-
-      this.splatLoading = false;
-      this.cdr.detectChanges();
-    } catch (err) {
-      console.error('[VideoRoomComponent] Failed to initialize viewer:', err);
-      this.splatLoadError = String(err);
-      this.splatLoading = false;
-      this.cdr.detectChanges();
-    }
-  }
-
-  // ─── Display picker interaction ───────────────────────────────────────────
-
-  private onCanvasClick(event: MouseEvent) {
-    // Only handle clicks in picker mode and when not already selecting
-    if (!this.displayPickerMode || this.selectedDisplayId || !this.viewer || !this.threeScene) return;
-
-    const canvas = this.splatContainerRef?.nativeElement.querySelector('canvas');
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    const camera = (this.viewer as any).camera;
-    this.raycaster.setFromCamera(this.mouse, camera);
-
-    const planes = Array.from(this.displayPlanes.values()).map(p => p.mesh);
-    const intersects = this.raycaster.intersectObjects(planes);
-
-    if (intersects.length > 0) {
-      const clicked = intersects[0].object as THREE.Mesh;
-      const displayId = clicked.userData['displayId'];
-      if (displayId) this.selectDisplay(displayId);
-    }
-  }
-
-  async selectDisplay(displayId: string) {
-    this.selectedDisplayId = displayId;
+  /** Called by DisplayPickerComponent when the user has successfully chosen a display. */
+  onDisplayChosen() {
+    this.showDisplayPicker = false;
     this.cdr.detectChanges();
-    console.log('[VideoRoomComponent] Selecting display:', displayId);
-
-    try {
-      const result = await this.videoService.chooseDisplay(displayId);
-      if (result && result.success) {
-        console.log('[VideoRoomComponent] Display choice confirmed');
-        this.displayPickerMode = false;
-        this.selectedDisplayId = null;
-        this.cdr.detectChanges();
-      } else {
-        console.error('[VideoRoomComponent] Server rejected display choice:', result?.error);
-        this.selectedDisplayId = null;
-        this.cdr.detectChanges();
-      }
-    } catch (err) {
-      console.error('[VideoRoomComponent] Failed to choose display:', err);
-      this.selectedDisplayId = null;
-      this.cdr.detectChanges();
-    }
-  }
-
-  private updateDisplayPlanes() {
-    if (!this.roomConfig || !this.topology || !this.threeScene) return;
-
-    const displays = this.roomConfig.displays || [];
-
-    // Remove old planes
-    this.displayPlanes.forEach(({ mesh, videoElement }) => {
-      this.threeScene.remove(mesh);
-      videoElement.pause();
-      videoElement.srcObject = null;
-    });
-    this.displayPlanes.clear();
-
-    // Create new planes for each display
-    displays.forEach((display) => {
-      // Find the slot linked to this display
-      const slot = this.topology!.slots.find((s) => s.displayId === display.displayId);
-      if (!slot || slot.excluded) return;
-
-      // Create video element for this display's camera feed
-      const videoElement = document.createElement('video');
-      videoElement.autoplay = true;
-      videoElement.muted = true;
-      videoElement.playsInline = true;
-      videoElement.style.display = 'none';
-
-      // Create plane geometry
-      const geometry = new THREE.PlaneGeometry(display.widthM, display.heightM);
-
-      // Create video texture
-      const texture = new THREE.VideoTexture(videoElement);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.DoubleSide,
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(display.position3D.x, display.position3D.y, display.position3D.z);
-      mesh.rotation.y = display.rotationY;
-      mesh.userData = { displayId: display.displayId, slotId: slot.slotId };
-
-      this.threeScene.add(mesh);
-      this.displayPlanes.set(display.displayId, { mesh, videoElement });
-
-      // Try to attach the camera stream from the consumer
-      this.attachCameraStreamToPlane(display.displayId, slot);
-    });
-  }
-
-  private attachCameraStreamToPlane(displayId: string, slot: ScreenSlotDTO) {
-    const planeData = this.displayPlanes.get(displayId);
-    if (!planeData) return;
-
-    const { videoElement } = planeData;
-
-    // Try to get the stream from participants by producer ID
-    try {
-      const participant = this.participants.find(p => p.id === slot.cameraProducerId);
-      if (participant && participant.stream) {
-        videoElement.srcObject = participant.stream;
-        videoElement.play().catch((err) => console.warn('[VideoRoomComponent] video.play() failed:', err));
-        console.log('[VideoRoomComponent] Attached stream to display', displayId, 'from participant', slot.cameraProducerId);
-        return;
-      }
-    } catch (err) {
-      console.warn('[VideoRoomComponent] Failed to attach stream:', err);
-    }
-
-    console.log('[VideoRoomComponent] No stream available yet for display', displayId, 'waiting for producer', slot.cameraProducerId);
-  }
-
-  /**
-   * Re-attaches streams to existing display planes when participants change.
-   * This ensures that when a remote participant's stream arrives, it gets attached to the plane.
-   */
-  private reattachStreamsToPlanes() {
-    if (!this.topology) return;
-
-    this.displayPlanes.forEach(({ videoElement }, displayId) => {
-      const slot = this.topology!.slots.find((s) => s.displayId === displayId);
-      if (!slot) return;
-
-      // Only re-attach if the video element doesn't already have a stream
-      if (!videoElement.srcObject) {
-        this.attachCameraStreamToPlane(displayId, slot);
-      }
-    });
-  }
-
-  /**
-   * Handles the race condition where a participant's stream arrives before
-   * SLOT_REMOTE_JOINED has populated assignedRemotes.
-   * Iterates all open slot windows and tries to attach any participant whose
-   * socketId matches a remote that is now in the slot's assignedRemotes.
-   * Also handles the case where assignedRemotes is populated but the stream
-   * wasn't available yet when the slot subscription fired.
-   */
-  private tryAttachOrphanedParticipants(participants: { id: string; stream: MediaStream; name: string; socketId?: string }[]) {
-    for (const [slotId, win] of this.slotWindows) {
-      if (win.closed) continue;
-      const slot = this.roomDeviceService.slotsSnapshot.find(s => s.slotId === slotId);
-      if (!slot) continue;
-
-      const container = win.document.getElementById('video-container');
-      if (!container) continue;
-
-      // For each participant, check if they are assigned to this slot
-      for (const participant of participants) {
-        if (!participant.socketId) continue;
-
-        // Check if this participant is in the slot's assignedRemotes
-        const isAssigned = slot.assignedRemotes.some(r => r.socketId === participant.socketId);
-        if (!isAssigned) continue;
-
-        // Check if video element already exists and has stream
-        let videoEl = win.document.getElementById(`video-${participant.socketId}`) as HTMLVideoElement;
-        if (videoEl && videoEl.srcObject === participant.stream) continue; // already attached
-
-        if (!videoEl) {
-          // Create tile
-          const tile = win.document.createElement('div');
-          tile.className = 'remote-tile';
-          tile.id = `tile-${participant.socketId}`;
-
-          videoEl = win.document.createElement('video');
-          videoEl.id = `video-${participant.socketId}`;
-          videoEl.autoplay = true;
-          videoEl.playsInline = true;
-          videoEl.muted = false;
-          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;';
-
-          const nameEl = win.document.createElement('div');
-          nameEl.className = 'remote-name';
-          nameEl.textContent = participant.name;
-
-          tile.appendChild(videoEl);
-          tile.appendChild(nameEl);
-          container.appendChild(tile);
-
-          // Hide the "waiting" status overlay
-          const statusEl = win.document.getElementById('slot-status');
-          if (statusEl) statusEl.style.display = 'none';
-        }
-
-        // Attach stream
-        videoEl.srcObject = participant.stream;
-        videoEl.play().catch(err => console.warn('[VideoRoomComponent] orphan video.play() failed:', err));
-        console.log('[VideoRoomComponent] Attached orphaned participant', participant.socketId, 'to slot window', slotId);
-      }
-    }
   }
 
   // ─── Room device setup interception ──────────────────────────────────────
@@ -592,13 +236,14 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.pendingPairings = pairings;
 
     // Ensure roomConfig is loaded before checking for displays
-    if (!this.roomConfig) {
-      await this.loadRoomConfig();
-    }
+    let roomConfig: RoomConfig | null = null;
+    try {
+      roomConfig = await this.http.get<RoomConfig>(`/api/rooms/${this.roomName}`).toPromise() ?? null;
+    } catch { /* ignore */ }
 
     // If room has configured displays, show the display linker (step 2)
     // Otherwise, go straight to submitting pairings and opening slot windows
-    if (this.roomConfig?.displays && this.roomConfig.displays.length > 0) {
+    if (roomConfig?.displays && roomConfig.displays.length > 0) {
       this.showDisplayLinker = true;
       this.cdr.detectChanges();
     } else {
@@ -797,6 +442,59 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         tile.remove();
       }
     });
+  }
+
+  /**
+   * Handles the race condition where a participant's stream arrives before
+   * SLOT_REMOTE_JOINED has populated assignedRemotes.
+   */
+  private tryAttachOrphanedParticipants(participants: { id: string; stream: MediaStream; name: string; socketId?: string }[]) {
+    for (const [slotId, win] of this.slotWindows) {
+      if (win.closed) continue;
+      const slot = this.roomDeviceService.slotsSnapshot.find(s => s.slotId === slotId);
+      if (!slot) continue;
+
+      const container = win.document.getElementById('video-container');
+      if (!container) continue;
+
+      for (const participant of participants) {
+        if (!participant.socketId) continue;
+
+        const isAssigned = slot.assignedRemotes.some(r => r.socketId === participant.socketId);
+        if (!isAssigned) continue;
+
+        let videoEl = win.document.getElementById(`video-${participant.socketId}`) as HTMLVideoElement;
+        if (videoEl && videoEl.srcObject === participant.stream) continue;
+
+        if (!videoEl) {
+          const tile = win.document.createElement('div');
+          tile.className = 'remote-tile';
+          tile.id = `tile-${participant.socketId}`;
+
+          videoEl = win.document.createElement('video');
+          videoEl.id = `video-${participant.socketId}`;
+          videoEl.autoplay = true;
+          videoEl.playsInline = true;
+          videoEl.muted = false;
+          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;';
+
+          const nameEl = win.document.createElement('div');
+          nameEl.className = 'remote-name';
+          nameEl.textContent = participant.name;
+
+          tile.appendChild(videoEl);
+          tile.appendChild(nameEl);
+          container.appendChild(tile);
+
+          const statusEl = win.document.getElementById('slot-status');
+          if (statusEl) statusEl.style.display = 'none';
+        }
+
+        videoEl.srcObject = participant.stream;
+        videoEl.play().catch(err => console.warn('[VideoRoomComponent] orphan video.play() failed:', err));
+        console.log('[VideoRoomComponent] Attached orphaned participant', participant.socketId, 'to slot window', slotId);
+      }
+    }
   }
 
   /**
