@@ -424,7 +424,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         videoEl.autoplay = true;
         videoEl.playsInline = true;
         videoEl.muted = false;
-        videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;';
+        videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
 
         const nameEl = win.document.createElement('div');
         nameEl.className = 'remote-name';
@@ -489,7 +489,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
           videoEl.autoplay = true;
           videoEl.playsInline = true;
           videoEl.muted = false;
-          videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;';
+          videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
 
           const nameEl = win.document.createElement('div');
           nameEl.className = 'remote-name';
