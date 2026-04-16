@@ -129,6 +129,8 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
       .filter(p => p.slotId && p.selectedCameraDeviceId)
       .map(p => ({
         slotId: p.slotId,
+        screenIndex: p.screen.screenIndex,
+        screenLabel: p.screen.label,
         cameraDeviceId: p.selectedCameraDeviceId,
         cameraLabel: this.cameras.find(c => c.deviceId === p.selectedCameraDeviceId)?.label ?? 'Camera',
       }));

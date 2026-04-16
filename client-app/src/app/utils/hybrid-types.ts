@@ -91,6 +91,7 @@ export interface RemoteAssignment {
 export interface ScreenCameraPairing {
   slotId: string;
   screenIndex?: number;  // physical screen index — persisted in saved config for stable re-matching
+  screenLabel?: string;  // human-readable screen name (e.g. "Screen 1", "HDMI Monitor")
   cameraDeviceId: string;
   cameraLabel: string;
   displayId?: string;    // links to RoomConfig.displays[].displayId

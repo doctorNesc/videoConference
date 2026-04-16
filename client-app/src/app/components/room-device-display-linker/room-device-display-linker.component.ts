@@ -93,7 +93,7 @@ export class RoomDeviceDisplayLinkerComponent implements OnInit, OnDestroy, Afte
     // Initialize slot link states from input slots
     this.slotLinkStates = this.slots.map(s => ({
       slotId: s.slotId,
-      screenLabel: `Screen ${this.slots.indexOf(s) + 1}`,
+      screenLabel: s.screenLabel ?? `Screen ${this.slots.indexOf(s) + 1}`,
       selectedDisplayId: null,
       excluded: false,
     }));
