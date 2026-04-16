@@ -41,6 +41,16 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   public participants: { id: string; stream: MediaStream; name: string; socketId?: string; isAssignedCamera?: boolean }[] = [];
   public mainParticipant!: { id: string; stream: MediaStream; name: string };
   public mainView: boolean = false;
+
+  /** Optimal column count so all tiles fill the stage at maximum size. */
+  get gridCols(): number {
+    return Math.ceil(Math.sqrt(this.participants.length));
+  }
+
+  /** Row count derived from column count. */
+  get gridRows(): number {
+    return Math.ceil(this.participants.length / this.gridCols);
+  }
   public roomName!: string;
   public name!: string;
   public isRoomDevice: boolean = false;
@@ -364,11 +374,14 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     const labelEl = win.document.getElementById('slot-label');
     if (labelEl) labelEl.textContent = slot.screenLabel;
 
-    // Update grid columns based on remote count
+    // Update grid columns/rows based on remote count so tiles fill the window
     const container = win.document.getElementById('video-container');
     if (container) {
       const count = slot.assignedRemotes.length;
-      container.style.gridTemplateColumns = count <= 1 ? '1fr' : count <= 4 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)';
+      const cols = Math.ceil(Math.sqrt(count || 1));
+      const rows = Math.ceil((count || 1) / cols);
+      container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     }
 
     // Update status text
@@ -510,15 +523,75 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   <title>${slot.screenLabel}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0a0a; color: #fff; font-family: sans-serif; width: 100vw; height: 100vh; overflow: hidden; }
-    #video-container { display: grid; grid-template-columns: 1fr; width: 100%; height: 100%; }
-    .remote-tile { position: relative; background: #111; }
-    .remote-name { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 4px; font-size: 0.9rem; }
-    #slot-status { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; flex-direction: column; gap: 12px; color: #aaa; }
-    #slot-info { position: fixed; bottom: 12px; right: 12px; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; color: #ccc; }
-    #excluded-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; z-index: 1000; }
+    html, body { width: 100%; height: 100%; background: #0a0a0a; color: #fff; font-family: sans-serif; overflow: hidden; }
+    /* Full-screen grid container for remote video tiles */
+    #video-container {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+    /* Each tile fills its grid cell completely */
+    .remote-tile {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #111;
+      overflow: hidden;
+    }
+    .remote-tile video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #000;
+    }
+    .remote-name {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    /* Waiting overlay — shown until a remote is assigned */
+    #slot-status {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: #aaa;
+      z-index: 10;
+    }
+    #slot-info {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.5);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      color: #ccc;
+      z-index: 20;
+    }
+    #excluded-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 100;
+    }
     #excluded-overlay h2 { font-size: 32px; font-weight: 600; color: #fff; }
-    #excluded-overlay p { font-size: 18px; color: #aaa; }
+    #excluded-overlay p  { font-size: 18px; color: #aaa; }
   </style>
 </head>
 <body>

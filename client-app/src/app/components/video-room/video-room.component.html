@@ -1,4 +1,4 @@
-<div class="d-flex flex-row bg-dark text-white h-100">
+<div class="meet-root">
 
   <!-- ─── Pairing wizard overlay (room devices only) ──────────────────────── -->
   @if (showPairingWizard) {
@@ -23,92 +23,102 @@
     <app-display-picker (displayChosen)="onDisplayChosen()"></app-display-picker>
   }
 
-  <div class="main-content d-flex flex-column flex-grow-1">
+  <!-- ─── Top info bar ────────────────────────────────────────────────────── -->
+  <div class="meet-topbar">
+    <div class="topbar-left">
+      <span class="room-name">{{ roomName }}</span>
+    </div>
 
-    <!-- ─── Assignment label (remote participants) ──────────────────────────── -->
-    @if (!isRoomDevice && assignedScreenLabel) {
-      <div class="assignment-label">
-        <span class="material-symbols-outlined">monitor</span>
-        You are displayed on: <strong>{{ assignedScreenLabel }}</strong>
-      </div>
-    }
+    <div class="topbar-right">
+      <!-- Assignment label (remote participants) -->
+      @if (!isRoomDevice && assignedScreenLabel) {
+        <div class="assignment-label">
+          <span class="material-symbols-outlined">monitor</span>
+          Displayed on: <strong>{{ assignedScreenLabel }}</strong>
+        </div>
+      }
 
-    <!-- ─── Reconfigure banner (room devices with saved config) ─────────────── -->
-    @if (isRoomDevice && hasSavedConfig) {
-      <div class="reconfigure-banner">
-        <span class="material-symbols-outlined">settings</span>
-        <span>Using saved configuration</span>
-        <button (click)="reconfigure()" class="reconfigure-btn">
-          <span class="material-symbols-outlined">tune</span>
-          Reconfigure
+      <!-- Reconfigure banner (room devices with saved config) -->
+      @if (isRoomDevice && hasSavedConfig) {
+        <div class="reconfigure-banner">
+          <span class="material-symbols-outlined">settings</span>
+          <span>Saved config active</span>
+          <button (click)="reconfigure()" class="reconfigure-btn">
+            <span class="material-symbols-outlined">tune</span>
+            Reconfigure
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ─── Main stage ──────────────────────────────────────────────────────── -->
+  <div class="meet-stage">
+
+    <!-- Pinned / spotlight view -->
+    @if (mainView || participants.length > 12) {
+      <div class="spotlight-area">
+        <video id="mainVideo" class="spotlight-video" autoplay playsinline
+          [srcObject]="mainParticipant.stream"></video>
+        <div class="spotlight-name">{{ mainParticipant.name }}</div>
+        <button class="spotlight-unpin" (click)="removeMainParticipant()" title="Unpin">
+          <span class="material-symbols-outlined">push_pin</span>
+          Unpin
         </button>
       </div>
     }
 
-    <!-- ─── Big video (main view) ───────────────────────────────────────────── -->
-    <div *ngIf="mainView || participants.length > 12"
-      class="d-flex justify-content-center align-items-center flex-grow-2 main-video-container"
-      (click)="removeMainParticipant()">
-      <video id="mainVideo" class="main-video mb-3 mt-3" autoplay playsinline
-        [srcObject]="mainParticipant.stream"></video>
+    <!-- Tiled grid (shown when no spotlight, or as thumbnail strip) -->
+    <div class="tiles-area"
+         [class.tiles-strip]="mainView || participants.length > 12"
+         [class.tiles-grid]="!mainView && participants.length <= 12"
+         [style.--grid-cols]="gridCols"
+         [style.--grid-rows]="gridRows">
+
+      <app-participant
+        *ngFor="let participant of participants"
+        [stream]="participant.stream"
+        [userName]="participant.name"
+        [class.assigned-camera]="participant.isAssignedCamera"
+        (setMainParticipant)="setMainParticipant(participant)"
+        (detach)="detachParticipant(participant)"
+      ></app-participant>
     </div>
 
-    <!-- ─── Video grid ──────────────────────────────────────────────────────── -->
-    <div class="grid-content">
-      <div *ngIf="!mainView" class="d-flex flex-sm-wrap video-grid">
-        <app-participant
-          style="width: 400px;"
-          *ngFor="let participant of participants"
-          [stream]="participant.stream"
-          [userName]="participant.name"
-          class="video-item"
-          [class.assigned-camera]="participant.isAssignedCamera"
-          (setMainParticipant)="setMainParticipant(participant)"
-          (detach)="detachParticipant(participant)"
-          appResizable
-        ></app-participant>
-      </div>
-    </div>
-
-    <!-- ─── Scrollable thumbnail bar ────────────────────────────────────────── -->
-    <div *ngIf="mainView || participants.length > 12" class="video-bar">
-      <div class="video-thumbnail" *ngFor="let participant of participants">
-        <app-participant
-          [stream]="participant.stream"
-          (setMainParticipant)="setMainParticipant(participant)"
-          [userName]="participant.name"
-          (detach)="detachParticipant(participant)"
-        ></app-participant>
-      </div>
-    </div>
-
-    <!-- ─── Local video pinned at the bottom right ──────────────────────────── -->
-    <div class="local-video-container">
-      <video id="localVideo" class="local-video" autoplay playsinline muted></video>
-    </div>
-
-    <app-video-options
-      (startScreenShare)="startScreenShare()"
-      (stopScreenShare)="stopScreenShare()"
-      (videoToggle)="videoService.toggleLocalVideo()"
-      (audioToggle)="videoService.toggleLocalAudio()"
-      [roomName]="roomName"
-      (showUsersPanel)="onSidebarToggle()"
-      (leaveCall)="leaveCall()"
-    ></app-video-options>
   </div>
 
-  <app-side-bar class="sidebar" [isSidebarCollapsed]="isSidebarCollapsed" (sidebarToggle)="onSidebarToggle()">
+  <!-- ─── Local video PiP ─────────────────────────────────────────────────── -->
+  <div class="local-pip">
+    <video id="localVideo" autoplay playsinline muted></video>
+    <span class="pip-label">You</span>
+  </div>
+
+  <!-- ─── Bottom control bar ──────────────────────────────────────────────── -->
+  <app-video-options
+    (startScreenShare)="startScreenShare()"
+    (stopScreenShare)="stopScreenShare()"
+    (videoToggle)="videoService.toggleLocalVideo()"
+    (audioToggle)="videoService.toggleLocalAudio()"
+    [roomName]="roomName"
+    (showUsersPanel)="onSidebarToggle()"
+    (leaveCall)="leaveCall()"
+  ></app-video-options>
+
+  <!-- ─── Sidebar (chat) ──────────────────────────────────────────────────── -->
+  <app-side-bar class="meet-sidebar" [isSidebarCollapsed]="isSidebarCollapsed" (sidebarToggle)="onSidebarToggle()">
     <div class="chat-container">
       <div class="messages">
-        <div *ngFor="let msg of messages">
-          <p><strong>{{ msg.sender }}:</strong> {{ msg.message }}</p>
+        <div *ngFor="let msg of messages" class="chat-message">
+          <strong class="chat-sender">{{ msg.sender }}</strong>
+          <span class="chat-text">{{ msg.message }}</span>
         </div>
       </div>
 
       <form [formGroup]="messageForm" (ngSubmit)="onSubmit()" class="msg-input">
-        <input type="text" formControlName="message" placeholder="Type a message..." />
-        <button type="submit" [disabled]="!messageForm.valid">Send</button>
+        <input type="text" formControlName="message" placeholder="Send a message…" />
+        <button type="submit" [disabled]="!messageForm.valid">
+          <span class="material-symbols-outlined">send</span>
+        </button>
       </form>
     </div>
   </app-side-bar>
