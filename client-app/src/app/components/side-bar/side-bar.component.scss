@@ -1,36 +1,69 @@
+/* ── Google Meet-style slide-in sidebar ───────────────────────────────────── */
+
+$bg: #2d2e30;
+$border: #3c4043;
+$text: #e8eaed;
+$accent: #8ab4f8;
+
 .sidebar {
-    background-color: #2c3e50;
-    color: #ecf0f1;
-    height: 100vh;
-    width: 400px;
-    position: relative;
-    top: 0;
-    right: 0;
-    z-index: 1000;
-    transition: all 0.3s ease-in-out;
-    overflow-x: hidden;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 360px;
+  background: $bg;
+  color: $text;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.45);
+  border-left: 1px solid $border;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity  0.25s ease;
+  transform: translateX(0);
+  opacity: 1;
+  overflow: hidden;
+}
+
+.sidebar-collapsed {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid $border;
+  flex-shrink: 0;
+
+  h6 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: $text;
+    letter-spacing: 0.01em;
   }
 
-  .sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    position: relative;
-  }
-  .sidebar-menu-item {
-    position: relative;
-  }
-  
-  .sidebar-collapsed {
-    width: 0px;
-  }
-  
   .create-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
     cursor: pointer;
-    // background-color: blue;
-    color: #fff;
-    border: 0;
-    border-radius: 20px;
+    color: $text;
+    transition: background 0.15s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.2rem;
+    }
   }
+}
