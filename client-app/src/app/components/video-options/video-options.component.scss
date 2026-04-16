@@ -1,9 +1,124 @@
-.dark{
-    background-color: rgba(255,255,255,0.5);
+/* ── Google Meet-style bottom toolbar ─────────────────────────────────────── */
+
+$bg: #202124;
+$surface: #2d2e30;
+$border: #3c4043;
+$accent: #8ab4f8;
+$text: #e8eaed;
+$toolbar-h: 72px;
+
+.meet-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: $toolbar-h;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: $bg;
+  border-top: 1px solid $border;
+  z-index: 40;
 }
-.central-button{
-    background-color: gray;
-    margin: 0 10px;
-    padding: 10px;
-    border-radius: 50%;
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.toolbar-right {
+  justify-content: flex-end;
+}
+
+.toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-room {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: $text;
+  letter-spacing: 0.01em;
+}
+
+/* ── Control buttons ──────────────────────────────────────────────────────── */
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: $surface;
+  color: $text;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  outline: none;
+
+  .material-symbols-rounded {
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+
+  &:hover {
+    background: lighten($surface, 8%);
+  }
+
+  &:active {
+    transform: scale(0.93);
+  }
+}
+
+/* Muted / camera-off state — red pill */
+.ctrl-off {
+  background: #ea4335;
+  color: #fff;
+
+  &:hover {
+    background: darken(#ea4335, 8%);
+  }
+}
+
+/* Screen-share active state — blue tint */
+.ctrl-active {
+  background: rgba($accent, 0.18);
+  color: $accent;
+
+  &:hover {
+    background: rgba($accent, 0.28);
+  }
+}
+
+/* Leave call — red */
+.ctrl-leave {
+  background: #ea4335;
+  color: #fff;
+  width: 56px;
+  height: 48px;
+  border-radius: 24px;
+
+  &:hover {
+    background: darken(#ea4335, 8%);
+  }
+
+  .material-symbols-rounded {
+    font-size: 1.5rem;
+  }
+}
+
+/* Ghost (icon-only, no background fill) */
+.ctrl-ghost {
+  background: transparent;
+
+  &:hover {
+    background: $surface;
+  }
 }
