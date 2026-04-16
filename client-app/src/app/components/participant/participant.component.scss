@@ -1,51 +1,108 @@
-.video-container {
-  position: relative;
+/* ── Google Meet-style participant tile ───────────────────────────────────── */
+
+$bg-tile: #1a1a1a;
+$border: #3c4043;
+$text: #e8eaed;
+$accent: #8ab4f8;
+
+/* Host fills whatever cell the grid assigns — grid controls all sizing */
+:host {
+  display: block;
   width: 100%;
   height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tile {
+  position: relative;
+  /* Fill the host element completely — host is the sized/resizable container */
+  width: 100%;
+  height: 100%;
+  background: $bg-tile;
+  border-radius: 10px;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  /* Subtle border */
+  outline: 1px solid $border;
+  transition: outline-color 0.15s;
+
+  &:hover {
+    outline-color: rgba(138, 180, 248, 0.5);
+  }
+
+  /* Reveal actions on hover */
+  &:hover .tile-actions {
+    opacity: 1;
+  }
 
   video {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Fill container while maintaining aspect ratio */
-    border-radius: 5px;
+    /* contain keeps the native video aspect ratio visible without distortion */
+    object-fit: contain;
+    display: block;
+    background: #000;
   }
-
-  .button {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    z-index: 10;
-    padding: 5px 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-  .detach-btn{
-    bottom: 10px;
-    right: 60px;
-  }
-  .full-btn{
-    bottom: 10px;
-    right: 10px;
-  }
-
-  .name{
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    z-index: 10;
-    color: white;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 14px;
-  }
-
 }
 
+/* ── Name label ───────────────────────────────────────────────────────────── */
+.tile-name {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: $text;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 80px);
+}
+
+/* ── Hover action buttons ─────────────────────────────────────────────────── */
+.tile-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.tile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.65);
+  color: $text;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  outline: none;
+
+  .material-symbols-outlined {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  &:active {
+    transform: scale(0.9);
+  }
+}

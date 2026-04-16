@@ -1,6 +1,16 @@
-<div class="video-container">
-  <video [srcObject]="stream" autoplay></video>
-  <span class="name">{{ userName }}</span>
-  <span class="material-symbols-outlined button full-btn" (click)="setMainParticipant.emit($event)">{{'fullscreen'}}</span>
-  <span class="material-symbols-outlined button detach-btn" (click)="detach.emit($event)">{{'open_in_browser'}}</span>
-</div>  
+<div class="tile" (click)="setMainParticipant.emit()">
+  <video [srcObject]="stream" autoplay playsinline></video>
+
+  <!-- Name label (always visible) -->
+  <div class="tile-name">{{ userName }}</div>
+
+  <!-- Hover actions -->
+  <div class="tile-actions">
+    <button class="tile-btn" (click)="$event.stopPropagation(); setMainParticipant.emit()" title="Pin">
+      <span class="material-symbols-outlined">push_pin</span>
+    </button>
+    <button class="tile-btn" (click)="$event.stopPropagation(); detach.emit()" title="Open in new window">
+      <span class="material-symbols-outlined">open_in_new</span>
+    </button>
+  </div>
+</div>
