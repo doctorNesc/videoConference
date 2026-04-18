@@ -9,7 +9,6 @@ import {
   EventEmitter,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as THREE from 'three';
@@ -55,7 +54,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
   constructor(
     private videoService: VideoRoomService,
-    private http: HttpClient,
     private route: ActivatedRoute,
   ) {}
 
@@ -67,6 +65,17 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       this.loading = false;
       return;
     }
+
+    // Subscribe to room config updates (initial value from JOIN_ROOM + live ROOM_CONFIG_UPDATE).
+    // Re-render display planes whenever the admin saves a new layout.
+    this.subs.add(
+      this.videoService.roomConfig.subscribe((config) => {
+        if (config) {
+          this.roomConfig = config;
+          this.updateDisplayPlanes();
+        }
+      })
+    );
 
     // Subscribe to topology updates
     this.subs.add(
@@ -99,11 +108,8 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
   private async initViewer() {
     try {
-      // Load room config first so we can use the saved camera position
-      const configResponse = await this.http.get<RoomConfig>(`/api/rooms/${this.roomName}`).toPromise();
-      if (configResponse) {
-        this.roomConfig = configResponse;
-      }
+      // Room config is already available via videoService.roomConfig (seeded from JOIN_ROOM callback).
+      // No HTTP fetch needed here — the subscription in ngOnInit keeps this.roomConfig up to date.
 
       // Use saved camera position if available; otherwise let the library auto-fit
       const camPos = this.roomConfig?.cameraPosition?.position;

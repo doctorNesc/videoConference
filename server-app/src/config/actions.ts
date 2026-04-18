@@ -157,6 +157,14 @@ export const ACTIONS = {
      */
     UPDATE_DISPLAY_MAPPING: "updateDisplayMapping",
 
+    // ─── Admin: Room config live update ──────────────────────────────────────
+    /**
+     * Emitted by server → all peers in a room when an admin saves the room config.
+     * Payload: RoomConfig
+     * Clients update their local display layout without reconnecting.
+     */
+    ROOM_CONFIG_UPDATE: "roomConfigUpdate",
+
     // ─── Errors & system ─────────────────────────────────────────────────────
     ERROR: "error",
     DISCONNECT: "disconnect",

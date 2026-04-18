@@ -18,6 +18,7 @@ import { RoomDeviceService } from './room-device.service';
 import { BroadcastChannelService } from './broadcast-channel.service';
 import {
   RemoteAssignment,
+  RoomConfig,
   RoomTopologyDTO,
   ScreenCameraPairing,
   SlotRemoteJoinedEvent,
@@ -51,6 +52,11 @@ export class VideoRoomService {
   // ─── Topology (all peers) ─────────────────────────────────────────────────
   private topology$ = new BehaviorSubject<RoomTopologyDTO | null>(null);
   public topology = this.topology$.asObservable();
+
+  // ─── Room config (display layout, camera position) ────────────────────────
+  /** Populated from JOIN_ROOM callback and updated live via ROOM_CONFIG_UPDATE. */
+  private roomConfig$ = new BehaviorSubject<RoomConfig | null>(null);
+  public roomConfig = this.roomConfig$.asObservable();
 
   // ─── Mediasoup state ──────────────────────────────────────────────────────
   public mainView: boolean = false;
@@ -195,6 +201,12 @@ export class VideoRoomService {
       console.log('[VideoRoomService] NEW_DATA_PRODUCER — id:', dataProducerId, 'from:', userName);
       await this.consumeDataProducer(dataProducerId, userName);
     });
+
+    // ─── Room config live update (admin saved new display layout) ─────────
+    this.socketService.on(ACTIONS.ROOM_CONFIG_UPDATE, (config: RoomConfig) => {
+      this.roomConfig$.next(config);
+      console.log('[VideoRoomService] ROOM_CONFIG_UPDATE received for room:', config.roomName);
+    });
   }
 
   // ─── Room join ────────────────────────────────────────────────────────────
@@ -213,6 +225,12 @@ export class VideoRoomService {
       this.currentAssignment = data.assignment;
       this.assignment$.next(data.assignment);
       console.log('[VideoRoomService] Initial assignment from JOIN_ROOM:', data.assignment);
+    }
+
+    // Seed the room config observable so components have it immediately on join
+    if (data.roomConfig) {
+      this.roomConfig$.next(data.roomConfig);
+      console.log('[VideoRoomService] Initial roomConfig from JOIN_ROOM:', data.roomConfig.roomName);
     }
 
     return data;
@@ -781,6 +799,7 @@ export class VideoRoomService {
     this.currentAssignment = null;
     this.assignment$.next(null);
     this.topology$.next(null);
+    this.roomConfig$.next(null);
     this.producers = [];
     this.consumers = [];
     this.chatDataProducer = null;

@@ -423,7 +423,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         videoEl.id = `video-${remote.socketId}`;
         videoEl.autoplay = true;
         videoEl.playsInline = true;
-        videoEl.muted = false;
+        videoEl.muted = true; // Start muted to bypass autoplay policy
         videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
 
         const nameEl = win.document.createElement('div');
@@ -488,7 +488,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
           videoEl.id = `video-${participant.socketId}`;
           videoEl.autoplay = true;
           videoEl.playsInline = true;
-          videoEl.muted = false;
+          videoEl.muted = true; // Start muted to bypass autoplay policy
           videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
 
           const nameEl = win.document.createElement('div');

@@ -14,7 +14,6 @@ import multer from "multer";
 import * as roomConfigService from "./services/roomConfigService";
 import fs from "fs";
 
-
 dotenv.config();
 
 const app = express();
@@ -28,17 +27,24 @@ app.use((_req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/browser")));
-// app.use(cors({
-//   origin: ["http://192.168.1.241:3000"],
-//   methods: ["GET", "POST"]
-// }));
 
-// app.use("/api", roomRoutes);
+// ─── Core singletons ──────────────────────────────────────────────────────────
+// Declared before routes so REST handlers can close over them.
+
+const roomManager = new RoomManager();
+
+const httpServer = http.createServer(app);
+httpServer.listen(process.env.PORT || 3000, () => {
+  console.log("listening on port: " + process.env.PORT);
+});
+
+const io = new IOServer(httpServer, { cors: { origin: true } });
+
+// ─── REST routes ──────────────────────────────────────────────────────────────
 
 app.get("/api/roomUsers", (req: Request, res: Response): void => {
   const filterRoom = req.query.room as string | undefined;
 
-  // Build room list from RoomManager (new architecture)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allRooms: any[] = [];
 
@@ -128,7 +134,10 @@ app.post("/api/rooms", express.json(), (req: Request, res: Response): void => {
   }
 });
 
-/** PUT /api/rooms/:name — update room config (display positions) */
+/** PUT /api/rooms/:name — update room config (display positions).
+ *  Persists to disk, updates the in-memory cache, and pushes the new config
+ *  to all connected peers in that room via ROOM_CONFIG_UPDATE — so clients
+ *  see the new display layout immediately without reconnecting. */
 app.put("/api/rooms/:name", express.json(), (req: Request, res: Response): void => {
   try {
     const config = req.body as RoomConfig;
@@ -136,7 +145,17 @@ app.put("/api/rooms/:name", express.json(), (req: Request, res: Response): void 
       res.status(400).json({ error: 'Room name mismatch' });
       return;
     }
+
+    // 1. Persist to disk
     roomConfigService.saveRoomConfig(config);
+
+    // 2. Update in-memory cache so JOIN_ROOM returns fresh data for new joiners
+    roomManager.setRoomConfig(config.roomName, config);
+
+    // 3. Push live update to all peers currently in this room
+    io.to(config.roomName).emit(ACTIONS.ROOM_CONFIG_UPDATE, config);
+    console.log(`[API] Pushed ROOM_CONFIG_UPDATE to room "${config.roomName}"`);
+
     res.json(config);
   } catch (err) {
     console.error('[API] Error updating room config:', err);
@@ -148,6 +167,7 @@ app.put("/api/rooms/:name", express.json(), (req: Request, res: Response): void 
 app.delete("/api/rooms/:name", (req: Request, res: Response): void => {
   try {
     roomConfigService.deleteRoomConfig(req.params.name);
+    roomManager.roomConfigs.delete(req.params.name);
     res.json({ success: true });
   } catch (err) {
     console.error('[API] Error deleting room config:', err);
@@ -171,16 +191,17 @@ app.post("/api/rooms/:name/splat", upload.single('splat'), (req: Request, res: R
     const splatPath = roomConfigService.getSplatPath(req.params.name);
     console.log('[API] Writing splat file to:', splatPath);
     fs.writeFileSync(splatPath, req.file.buffer);
-    
+
     // Update room config with splat path
     const config = roomConfigService.loadRoomConfig(req.params.name);
     console.log('[API] Loaded config:', config);
     if (config) {
       config.splatPath = `splats/${req.params.name}.splat`;
       roomConfigService.saveRoomConfig(config);
+      roomManager.setRoomConfig(config.roomName, config);
       console.log('[API] Saved config with splat path');
     }
-    
+
     res.json({ success: true, splatPath: config?.splatPath });
   } catch (err) {
     console.error('[API] Error uploading splat file:', err);
@@ -253,16 +274,7 @@ app.get("*", (req: Request, res: Response): void => {
   );
 });
 
-const httpServer = http.createServer(app);
-httpServer.listen(process.env.PORT || 3000, () => {
-  console.log("listening on port: " + process.env.PORT);
-});
-
-const io = new IOServer(httpServer,
-  { cors: { origin: true } }
-);
-// const connections = io.of("/mediasoup");
-
+// ─── Shared state & mediasoup workers ────────────────────────────────────────
 
 export const sharedState: SharedState = {
   peers: {},
@@ -285,15 +297,6 @@ async function runMediasoupWorkers() {
 
   for (let i = 0; i < numWorkers; ++i) {
     const worker = await createWorker(
-      // {
-      // 	dtlsCertificateFile : config.mediasoup.workerSettings.dtlsCertificateFile,
-      // 	dtlsPrivateKeyFile  : config.mediasoup.workerSettings.dtlsPrivateKeyFile,
-      // 	logLevel            : config.mediasoup.workerSettings.logLevel,
-      // 	logTags             : config.mediasoup.workerSettings.logTags,
-      // 	rtcMinPort          : Number(config.mediasoup.workerSettings.rtcMinPort),
-      // 	rtcMaxPort          : Number(config.mediasoup.workerSettings.rtcMaxPort),
-      // 	disableLiburing     : Boolean(config.mediasoup.workerSettings.disableLiburing)
-      // }
       systemConfig.workerSettings
     );
     console.log(`Created worker #${i}, worker pid ${worker.pid}`);
@@ -304,7 +307,7 @@ async function runMediasoupWorkers() {
       setTimeout(() => process.exit(1), 2000);
     });
 
-    // Create a WebRtcServer in this Worker, assigning different portRanges to each 
+    // Create a WebRtcServer in this Worker, assigning different portRanges to each
     const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
     const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
     webRtcServer.on("workerclose", () => {
@@ -314,20 +317,7 @@ async function runMediasoupWorkers() {
     worker.appData.webRtcServer = webRtcServer;
 
     sharedState.mediasoupWorkers!.push(worker);
-
-    // Log worker resource usage every X seconds.
-    // setInterval(async () => {
-    //   const usage = await worker.getResourceUsage();
-
-    //   console.log('mediasoup Worker resource usage [pid:%d]: %o', worker.pid, usage);
-
-    //   const dump = await worker.dump();
-
-    //   console.log('mediasoup Worker dump [pid:%d]: %o', worker.pid, dump);
-    // }, 100000);
   }
 }
-const roomManager = new RoomManager(); //single instance for dependency injection
 
 registerSocketHandlers(io, sharedState, roomManager);
-

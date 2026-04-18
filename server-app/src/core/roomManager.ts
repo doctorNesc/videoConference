@@ -1,7 +1,7 @@
 import { Router, WebRtcServer, Worker } from "mediasoup/node/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { Peer } from "./peer";
-import { SharedState, RoomTopology, ScreenSlot, ScreenSlotDTO, RoomTopologyDTO, RoomDeviceCapabilities } from "../types";
+import { SharedState, RoomTopology, ScreenSlot, ScreenSlotDTO, RoomTopologyDTO, RoomDeviceCapabilities, RoomConfig } from "../types";
 import { mediaCodecs } from "../config/mediasoup.config";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,7 +303,20 @@ export class RoomManager {
     rooms: Map<string, Room> = new Map();
     socketToRoom: Map<string, string> = new Map();
 
+    /** In-memory cache of the latest saved RoomConfig per room name.
+     *  Updated by the PUT /api/rooms/:name REST handler so connected clients
+     *  receive live config pushes without a server restart. */
+    roomConfigs: Map<string, RoomConfig> = new Map();
+
     constructor() { }
+
+    setRoomConfig(roomName: string, config: RoomConfig): void {
+        this.roomConfigs.set(roomName, config);
+    }
+
+    getRoomConfig(roomName: string): RoomConfig | null {
+        return this.roomConfigs.get(roomName) ?? null;
+    }
 
     getOrAssignWorker = (state: SharedState): Worker => {
         const worker = state.mediasoupWorkers![this.workerIndex];
