@@ -31,24 +31,35 @@ export function registerRoomHandlers(
 
             console.log(`[JOIN_ROOM] ${userName} (${socket.id}) joined "${roomName}" [isRoomDevice=${isRoomDevice}]`);
 
-            // For remote participants: attempt immediate assignment if paired slots exist.
-            // The assignment is returned in the callback so the client has it before
-            // it starts consuming producers.
-            let assignment = null;
-            if (!isRoomDevice) {
-                assignment = assignRemoteOnJoin(socket.id, userName, namespace, roomManager);
-                if (assignment) {
-                    console.log(`[JOIN_ROOM] Remote ${userName} assigned to slot "${assignment.screenLabel}"`);
-                }
-            }
-
             // Load room config for 3D display picker (remotes need this)
             const roomConfig = roomConfigService.loadRoomConfig(roomName);
 
+            // For remote participants: only auto-assign if the room has NO 3D display config.
+            // Rooms with a 3D config use the DisplayPicker — the remote must call CHOOSE_DISPLAY
+            // explicitly after viewing the 3D room. Auto-assigning here would bypass the picker
+            // and cause the slot window to open before the remote has chosen a display.
+            let assignment = null;
+            if (!isRoomDevice) {
+                const hasDisplayConfig = roomConfig?.displays && roomConfig.displays.length > 0;
+                if (!hasDisplayConfig) {
+                    assignment = assignRemoteOnJoin(socket.id, userName, namespace, roomManager);
+                    if (assignment) {
+                        console.log(`[JOIN_ROOM] Remote ${userName} auto-assigned to slot "${assignment.screenLabel}" (no 3D config)`);
+                    }
+                } else {
+                    console.log(`[JOIN_ROOM] Remote ${userName} will choose display via DisplayPicker (3D config present)`);
+                }
+            }
+
+            // Include current topology so remote participants can immediately
+            // determine display availability without waiting for ROOM_TOPOLOGY_UPDATE.
+            const topologyDTO = room.getTopologyDTO();
+
             callback({
                 rtpCapabilities: room.router.rtpCapabilities,
-                assignment, // null for room devices or when no paired slots exist yet
+                assignment, // null when room has 3D config — remote must call CHOOSE_DISPLAY
                 roomConfig: roomConfig ?? null, // for 3D display picker
+                topology: topologyDTO,           // for display status indicators
             });
         } catch (err) {
             console.error("[JOIN_ROOM] error:", err);

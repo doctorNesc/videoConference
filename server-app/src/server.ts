@@ -191,7 +191,7 @@ app.post("/api/rooms/:name/splat", upload.single('splat'), (req: Request, res: R
     const splatPath = roomConfigService.getSplatPath(req.params.name);
     console.log('[API] Writing splat file to:', splatPath);
     fs.writeFileSync(splatPath, req.file.buffer);
-
+    
     // Update room config with splat path
     const config = roomConfigService.loadRoomConfig(req.params.name);
     console.log('[API] Loaded config:', config);
@@ -201,7 +201,7 @@ app.post("/api/rooms/:name/splat", upload.single('splat'), (req: Request, res: R
       roomManager.setRoomConfig(config.roomName, config);
       console.log('[API] Saved config with splat path');
     }
-
+    
     res.json({ success: true, splatPath: config?.splatPath });
   } catch (err) {
     console.error('[API] Error uploading splat file:', err);

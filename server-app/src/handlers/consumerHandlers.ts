@@ -99,16 +99,35 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
     socket.on(ACTIONS.CONSUMER_RESUME, async ({ serverConsumerId }, callback) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
-            const room = roomManager.getRoom(roomName!, 'CONSUMER_RESUME');
-            const consumer = room.getAllPeers().find(peer => peer.consumers.get(serverConsumerId))!.consumers.get(serverConsumerId);
-            // const consumer = roomManager
-            // const consumer = state.consumers.find(
-            //     (consumerData) => consumerData.consumer.id == serverConsumerId
-            // )?.consumer;
-            await consumer?.resume();
-            callback({ resumed: true });
+            if (!roomName) {
+                console.warn('[CONSUMER_RESUME] socket not in any room:', socket.id);
+                return callback?.({ error: 'not-in-room' });
+            }
+            const room = roomManager.getRoom(roomName, 'CONSUMER_RESUME');
+            if (!room) {
+                console.warn('[CONSUMER_RESUME] room not found:', roomName);
+                return callback?.({ error: 'room-not-found' });
+            }
+            
+            const peerWithConsumer = room.getAllPeers().find(peer => peer.consumers.get(serverConsumerId));
+            if (!peerWithConsumer) {
+                console.warn('[CONSUMER_RESUME] consumer not found:', serverConsumerId);
+                return callback?.({ error: 'consumer-not-found' });
+            }
+            
+            const consumer = peerWithConsumer.consumers.get(serverConsumerId);
+            if (!consumer) {
+                console.warn('[CONSUMER_RESUME] consumer is null:', serverConsumerId);
+                return callback?.({ error: 'consumer-null' });
+            }
+            
+            console.log('[CONSUMER_RESUME] Resuming consumer:', serverConsumerId, 'for socket:', socket.id);
+            await consumer.resume();
+            console.log('[CONSUMER_RESUME] Consumer resumed successfully:', serverConsumerId);
+            callback?.({ resumed: true });
         } catch (error) {
-            console.error("Error resuming consumer:", error);
+            console.error("[CONSUMER_RESUME] Error resuming consumer:", error);
+            callback?.({ error: String(error) });
         }
     });
 

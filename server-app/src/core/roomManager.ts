@@ -192,10 +192,15 @@ export class Room {
     /**
      * Assigns a remote participant to a specific display by displayId.
      * Returns the assigned slot, or null if the display is not available.
+     *
+     * Note: we do NOT require cameraDeviceId !== null here. The slot may be linked
+     * to a display (has displayId) before the camera producer is registered.
+     * The remote receives cameraProducerId: null initially, then gets an
+     * ASSIGNMENT_UPDATE when CAMERA_PRODUCER_REGISTERED fires.
      */
     assignRemoteToDisplay(remoteSocketId: string, displayId: string): ScreenSlot | null {
         const slot = Array.from(this.topology.slots.values()).find(
-            (s) => s.displayId === displayId && s.cameraDeviceId !== null && !s.excluded
+            (s) => s.displayId === displayId && !s.excluded
         );
         if (!slot) return null;
 
@@ -282,6 +287,7 @@ export class Room {
             cameraLabel: s.cameraLabel,
             cameraProducerId: s.cameraProducerId,
             assignedRemoteIds: [...s.assignedRemoteIds],
+            displayId: s.displayId,   // ← required for display-state lookup on the client
             excluded: s.excluded,
             position3D: s.position3D,
         }));
