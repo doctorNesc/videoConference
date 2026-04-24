@@ -31,27 +31,18 @@
 
       <div class="slot-list">
         @for (state of slotLinkStates; track state.slotId; let i = $index) {
-          <div
-            class="slot-row"
-            [class.active-slot]="i === activeSlotIndex && !state.excluded"
-            [class.assigned]="!!state.selectedDisplayId && !state.excluded"
-            [class.excluded-row]="state.excluded"
-            (click)="setActiveSlot(i)"
-          >
-            <div class="slot-header">
-              <span class="slot-index">{{ i + 1 }}</span>
-              <span class="slot-label">{{ state.screenLabel }}</span>
-              <label class="exclude-checkbox" (click)="$event.stopPropagation()">
-                <input
-                  type="checkbox"
-                  [checked]="state.excluded"
-                  (change)="toggleExcluded(state.slotId)"
-                />
-                <span>Exclude</span>
-              </label>
-            </div>
+          @if (!state.excluded) {
+            <div
+              class="slot-row"
+              [class.active-slot]="i === activeSlotIndex"
+              [class.assigned]="!!state.selectedDisplayId"
+              (click)="setActiveSlot(i)"
+            >
+              <div class="slot-header">
+                <span class="slot-index">{{ i + 1 }}</span>
+                <span class="slot-label">{{ state.screenLabel }}</span>
+              </div>
 
-            @if (!state.excluded) {
               <div class="slot-content">
                 <!-- Dropdown to select display manually -->
                 <select
@@ -80,15 +71,8 @@
                   </div>
                 }
               </div>
-            }
-
-            @if (state.excluded) {
-              <div class="excluded-label">
-                <span class="material-symbols-outlined">block</span>
-                Excluded from conference
-              </div>
-            }
-          </div>
+            </div>
+          }
         }
       </div>
 

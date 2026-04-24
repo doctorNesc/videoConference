@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { Viewer, SceneRevealMode } from '@mkkellogg/gaussian-splats-3d';
 
 import { RoomTopologyDTO, ScreenSlotDTO } from '../../utils/hybrid-types';
+import { VideoRoomService } from '../../services/video-room.service';
 
 /** Colour used for screen-slot markers in the 3D overlay */
 const SLOT_COLOUR_EMPTY = 0x4a90d9;
@@ -48,7 +49,10 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
 
   private subs = new Subscription();
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private videoRoomService: VideoRoomService,
+  ) {}
 
   async ngAfterViewInit() {
     await this.initViewer();
@@ -73,14 +77,19 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
       dir.position.set(5, 10, 5);
       this.threeScene.add(dir);
 
+      // Use saved camera position if available; otherwise let the library auto-fit
+      const roomConfig = this.videoRoomService['roomConfig$']?.value;
+      const camPos = roomConfig?.cameraPosition?.position;
+      const camLookAt = roomConfig?.cameraPosition?.lookAt;
+
       this.viewer = new Viewer({
         rootElement: this.containerRef.nativeElement,
         useBuiltInControls: true,          // orbit controls only
         selfDrivenMode: true,              // viewer manages its own RAF loop
         threeScene: this.threeScene,       // our overlay scene
         cameraUp: [0, 1, 0],
-        initialCameraPosition: [0, 0, 0],
-        initialCameraLookAt: [0, 0, 0],
+        ...(camPos ? { initialCameraPosition: [camPos.x, camPos.y, camPos.z] as [number, number, number] } : {}),
+        ...(camLookAt ? { initialCameraLookAt: [camLookAt.x, camLookAt.y, camLookAt.z] as [number, number, number] } : {}),
         sceneRevealMode: SceneRevealMode.Gradual,
       });
 

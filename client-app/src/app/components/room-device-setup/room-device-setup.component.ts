@@ -5,6 +5,7 @@ import {
   OnInit,
   Output,
   OnDestroy,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -16,6 +17,7 @@ interface SlotPairing {
   screen: ScreenInfo;
   selectedCameraDeviceId: string;
   previewStream: MediaStream | null;
+  excluded: boolean;
 }
 
 @Component({
@@ -39,13 +41,23 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
   /** Bounding box of all screens for proportional rendering */
   layoutBounds = { minLeft: 0, minTop: 0, totalWidth: 1, totalHeight: 1 };
 
-  constructor(private roomDeviceService: RoomDeviceService) {}
+  constructor(
+    private roomDeviceService: RoomDeviceService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit() {
     this.screens = this.roomDeviceService.screens;
     this.cameras = this.roomDeviceService.cameras;
     this.buildPairings();
     this.computeLayoutBounds();
+
+    // Start camera preview for pairings that already have a camera selected
+    this.pairings.forEach(pairing => {
+      if (pairing.selectedCameraDeviceId) {
+        this.onCameraChange(pairing);
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -61,6 +73,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
       screen,
       selectedCameraDeviceId: this.cameras[i]?.deviceId ?? (this.cameras[0]?.deviceId ?? ''),
       previewStream: null,
+      excluded: false,
     }));
   }
 
@@ -103,13 +116,34 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
     pairing.previewStream?.getTracks().forEach(t => t.stop());
     pairing.previewStream = null;
 
-    if (!pairing.selectedCameraDeviceId) return;
+    if (!pairing.selectedCameraDeviceId) {
+      // Clear video element
+      const videoEl = document.querySelector(`[data-slot="${pairing.slotId}"]`) as HTMLVideoElement;
+      if (videoEl) {
+        videoEl.srcObject = null;
+      }
+      return;
+    }
 
     try {
       pairing.previewStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: pairing.selectedCameraDeviceId } },
+        video: {
+          deviceId: { exact: pairing.selectedCameraDeviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
         audio: false,
       });
+
+      console.log('[RoomDeviceSetup] Camera preview started for slot:', pairing.slotId);
+
+      // Attach stream to video element immediately
+      const videoEl = document.querySelector(`[data-slot="${pairing.slotId}"]`) as HTMLVideoElement;
+      if (videoEl && pairing.previewStream) {
+        videoEl.srcObject = pairing.previewStream;
+        videoEl.play().catch(err => console.warn('[RoomDeviceSetup] play() failed:', err));
+        console.log('[RoomDeviceSetup] Stream attached to video element instantly');
+      }
     } catch (err) {
       console.error('[RoomDeviceSetup] Preview failed:', err);
     }
@@ -119,7 +153,14 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
   attachPreview(videoEl: HTMLVideoElement, pairing: SlotPairing) {
     if (pairing.previewStream && videoEl.srcObject !== pairing.previewStream) {
       videoEl.srcObject = pairing.previewStream;
+      videoEl.play().catch(err => console.warn('[RoomDeviceSetup] play() failed:', err));
     }
+  }
+
+  // ─── Screen exclusion ─────────────────────────────────────────────────────
+
+  toggleExcluded(pairing: SlotPairing) {
+    pairing.excluded = !pairing.excluded;
   }
 
   // ─── Confirm ──────────────────────────────────────────────────────────────
@@ -133,6 +174,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
         screenLabel: p.screen.label,
         cameraDeviceId: p.selectedCameraDeviceId,
         cameraLabel: this.cameras.find(c => c.deviceId === p.selectedCameraDeviceId)?.label ?? 'Camera',
+        excluded: p.excluded,
       }));
 
     // Stop previews before emitting (main streams will be opened by VideoRoomService)

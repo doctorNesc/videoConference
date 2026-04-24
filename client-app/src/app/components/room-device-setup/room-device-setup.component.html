@@ -12,12 +12,23 @@
     <div class="screen-layout-container">
       <div class="screen-layout" style="position: relative; width: 600px; height: 200px;">
         @for (pairing of pairings; track pairing.slotId) {
-          <div class="screen-tile" [ngStyle]="getScreenStyle(pairing.screen)">
+          <div class="screen-tile"
+               [ngStyle]="getScreenStyle(pairing.screen)"
+               [class.excluded]="pairing.excluded"
+               (click)="toggleExcluded(pairing)"
+               title="Click to exclude from conference">
+            @if (pairing.excluded) {
+              <span class="material-symbols-outlined exclude-icon">block</span>
+            }
             <div class="screen-label">{{ pairing.screen.label }}</div>
             <div class="screen-dims">{{ pairing.screen.width }}×{{ pairing.screen.height }}</div>
           </div>
         }
       </div>
+      <p class="layout-hint">
+        <span class="material-symbols-outlined">info</span>
+        Click a screen to exclude it from the conference
+      </p>
     </div>
 
     <!-- Per-screen pairing rows -->
@@ -47,19 +58,16 @@
           </div>
 
           <!-- Live preview -->
-          @if (pairing.previewStream) {
-            <div class="preview-container">
-              <video
-                autoplay
-                muted
-                playsinline
-                class="preview-video"
-                [attr.data-slot]="pairing.slotId"
-                #previewVideo
-                (loadedmetadata)="attachPreview(previewVideo, pairing)"
-              ></video>
-            </div>
-          }
+          <div class="preview-container">
+            <video
+              autoplay
+              muted
+              playsinline
+              class="preview-video"
+              [attr.data-slot]="pairing.slotId"
+              #previewVideo
+            ></video>
+          </div>
         </div>
       }
     </div>

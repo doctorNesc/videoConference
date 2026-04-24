@@ -43,22 +43,26 @@
           </h4>
 
           @for (slot of topology.slots; track slot.slotId) {
-            <div class="legend-slot" [class.occupied]="slot.assignedRemoteIds.length > 0">
-              <span class="dot" [class.occupied]="slot.assignedRemoteIds.length > 0"></span>
-              <div class="legend-info">
-                <strong>{{ slot.screenLabel }}</strong>
-                <span class="cam-label">
-                  {{ slot.cameraLabel || 'No camera' }}
-                </span>
-                @if (slot.assignedRemoteIds.length > 0) {
-                  <span class="remote-count">
-                    {{ slot.assignedRemoteIds.length }} remote(s)
+            @if (!slot.excluded) {
+              <div class="legend-slot"
+                   [class.occupied]="slot.assignedRemoteIds.length > 0">
+                <span class="dot"
+                      [class.occupied]="slot.assignedRemoteIds.length > 0"></span>
+                <div class="legend-info">
+                  <strong>{{ slot.screenLabel }}</strong>
+                  <span class="cam-label">
+                    {{ slot.cameraLabel || 'No camera' }}
                   </span>
-                } @else {
-                  <span class="remote-empty">Empty</span>
-                }
+                  @if (slot.assignedRemoteIds.length > 0) {
+                    <span class="remote-count">
+                      {{ slot.assignedRemoteIds.length }} remote(s)
+                    </span>
+                  } @else {
+                    <span class="remote-empty">Empty</span>
+                  }
+                </div>
               </div>
-            </div>
+            }
           }
 
           @if (topology.slots.length === 0) {

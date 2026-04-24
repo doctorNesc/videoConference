@@ -91,11 +91,12 @@ export class RoomDeviceDisplayLinkerComponent implements OnInit, OnDestroy, Afte
     }
 
     // Initialize slot link states from input slots
+    // Preserve the excluded flag from the setup wizard
     this.slotLinkStates = this.slots.map(s => ({
       slotId: s.slotId,
       screenLabel: s.screenLabel ?? `Screen ${this.slots.indexOf(s) + 1}`,
-      selectedDisplayId: null,
-      excluded: false,
+      selectedDisplayId: s.displayId ?? null,
+      excluded: s.excluded ?? false,
     }));
   }
 
@@ -415,17 +416,6 @@ export class RoomDeviceDisplayLinkerComponent implements OnInit, OnDestroy, Afte
       state.excluded = false;
       if (displayId) {
         this.highlightDisplayPlane(displayId);
-      }
-      this.cdr.detectChanges();
-    }
-  }
-
-  toggleExcluded(slotId: string) {
-    const state = this.slotLinkStates.find(s => s.slotId === slotId);
-    if (state) {
-      state.excluded = !state.excluded;
-      if (state.excluded) {
-        state.selectedDisplayId = null;
       }
       this.cdr.detectChanges();
     }
