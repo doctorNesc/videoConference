@@ -93,6 +93,52 @@
     border-radius: 8px;
     font-size: 16px;
     backdrop-filter: blur(10px);
+
+    p {
+      margin: 0 0 12px 0;
+    }
+
+    .display-legend {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 4px;
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #ccc;
+
+        .legend-swatch {
+          display: inline-block;
+          width: 16px;
+          height: 16px;
+          border-radius: 3px;
+          flex-shrink: 0;
+        }
+      }
+
+      .legend-available .legend-swatch {
+        background: #0055cc;
+        border: 2px solid #0099ff;
+        opacity: 0.85;
+      }
+
+      .legend-occupied .legend-swatch {
+        background: #00cc88;
+        border: 2px solid #00ffaa;
+        opacity: 0.85;
+      }
+
+      .legend-no-device .legend-swatch {
+        background: #111;
+        border: 2px solid #333;
+        opacity: 0.85;
+      }
+    }
   }
 
   .selection-feedback {

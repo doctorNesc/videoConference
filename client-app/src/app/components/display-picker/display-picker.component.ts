@@ -10,7 +10,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
+import { filter, distinctUntilChanged } from 'rxjs/operators';
 import * as THREE from 'three';
 import { Viewer, SceneRevealMode, SceneFormat } from '@mkkellogg/gaussian-splats-3d';
 
@@ -23,6 +24,12 @@ import { VideoRoomService } from '../../services/video-room.service';
  * Shown to remote participants after joining a room with a configured 3D layout.
  * Displays the 3D room with live camera feeds on display planes.
  * User clicks a display plane to choose where they want to appear.
+ *
+ * Design principles:
+ *  - Single combineLatest subscription drives all state updates.
+ *  - Display planes are created ONCE (createDisplayPlanes) and only their
+ *    materials/streams are updated on subsequent topology changes (updatePlaneStates).
+ *  - No retry timers — participant stream updates trigger updatePlaneStates reactively.
  */
 @Component({
   selector: 'app-display-picker',
@@ -46,11 +53,26 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   // Three.js and GaussianSplats3D
   private viewer: Viewer | null = null;
   private threeScene!: THREE.Scene;
-  private displayPlanes: Map<string, { mesh: THREE.Mesh; videoElement: HTMLVideoElement }> = new Map();
+
+  /**
+   * Per-display plane data. Created once in createDisplayPlanes(), updated in updatePlaneStates().
+   * Key: displayId
+   */
+  private displayPlanes: Map<string, {
+    mesh: THREE.Mesh;
+    videoElement: HTMLVideoElement;
+    borderMesh: THREE.Mesh | null;
+    currentState: 'unavailable' | 'no_slot' | 'available' | 'has_remote';
+  }> = new Map();
+
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
 
   private subs = new Subscription();
+  /** True once createDisplayPlanes() has run for the current roomConfig */
+  private planesCreated = false;
+  /** Latest snapshot of consumed participants — updated by the combineLatest subscription */
+  private latestParticipants: any[] = [];
 
   constructor(
     private videoService: VideoRoomService,
@@ -58,7 +80,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   ) {}
 
   ngOnInit() {
-    // Get room name from route parameter first, then fall back to VideoRoomService
     this.roomName = this.route.snapshot.paramMap.get('roomName') || this.videoService['roomName'] || '';
     if (!this.roomName) {
       this.loadError = 'No room name provided';
@@ -66,38 +87,56 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       return;
     }
 
-    // Subscribe to room config updates (initial value from JOIN_ROOM + live ROOM_CONFIG_UPDATE).
-    // Re-render display planes whenever the admin saves a new layout.
+    // ─── Single reactive subscription ────────────────────────────────────────
+    // Combines roomConfig + topology + participants into one stream.
+    // roomConfig drives plane creation (once); topology + participants drive state updates.
     this.subs.add(
-      this.videoService.roomConfig.subscribe((config) => {
-        if (config) {
-          this.roomConfig = config;
-          this.updateDisplayPlanes();
+      combineLatest([
+        this.videoService.roomConfig.pipe(filter(c => !!c)),
+        this.videoService.topology,          // may be null initially
+        this.videoService.getParticipants(), // fires whenever a stream is consumed
+      ]).subscribe(([config, topology, participants]) => {
+        this.roomConfig = config;
+        this.topology = topology;
+        this.latestParticipants = participants;
+
+        // Initialize viewer once we have room config (first time only)
+        if (!this.viewer) {
+          this.initViewer();
+          return; // initViewer will call createDisplayPlanes() when ready
         }
+
+        if (!this.planesCreated) {
+          // First time: create geometry for every display in the config
+          this.createDisplayPlanes();
+        }
+
+        // Every update: refresh materials and stream attachments
+        this.updatePlaneStates(participants);
       })
     );
 
-    // Subscribe to topology updates
+    // Track assignment so we can highlight the chosen display
     this.subs.add(
-      this.videoService.topology.subscribe((topology) => {
-        if (topology) {
-          this.topology = topology;
-          this.updateDisplayPlanes();
+      this.videoService.assignment.pipe(
+        filter(a => !!a),
+        distinctUntilChanged((a, b) => a?.slotId === b?.slotId),
+      ).subscribe(() => {
+        if (this.planesCreated) {
+          this.updatePlaneStates(this.latestParticipants);
         }
       })
     );
   }
 
   ngAfterViewInit() {
-    this.initViewer();
+    // Viewer is initialised inside the roomConfig subscription once config arrives.
+    // Nothing to do here — avoids a race between AfterViewInit and the first config emission.
   }
 
   ngOnDestroy() {
     this.subs.unsubscribe();
-    try {
-      this.viewer?.dispose();
-    } catch { /* ignore */ }
-    // Clean up video elements
+    try { this.viewer?.dispose(); } catch { /* ignore */ }
     this.displayPlanes.forEach(({ videoElement }) => {
       videoElement.pause();
       videoElement.srcObject = null;
@@ -108,21 +147,15 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
   private async initViewer() {
     try {
-      // Room config is already available via videoService.roomConfig (seeded from JOIN_ROOM callback).
-      // No HTTP fetch needed here — the subscription in ngOnInit keeps this.roomConfig up to date.
-
-      // Use saved camera position if available; otherwise let the library auto-fit
       const camPos = this.roomConfig?.cameraPosition?.position;
       const camLookAt = this.roomConfig?.cameraPosition?.lookAt;
 
-      // Create Three.js scene for overlay
       this.threeScene = new THREE.Scene();
       this.threeScene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const dir = new THREE.DirectionalLight(0xffffff, 0.8);
       dir.position.set(5, 10, 5);
       this.threeScene.add(dir);
 
-      // Initialize GaussianSplats3D viewer
       this.viewer = new Viewer({
         rootElement: this.containerRef.nativeElement,
         useBuiltInControls: true,
@@ -135,7 +168,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
         sharedMemoryForWorkers: false,
       });
 
-      // Load splat file
       const splatUrl = `/api/rooms/${this.roomName}/splat`;
       await this.viewer.addSplatScene(splatUrl, {
         splatAlphaRemovalThreshold: 5,
@@ -145,41 +177,25 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.viewer.start();
 
-      // Create display planes immediately if we have room config and topology
-      // Don't wait for topology subscription to fire
-      if (this.roomConfig && this.topology) {
-        this.updateDisplayPlanes();
-      } else if (this.roomConfig && !this.topology) {
-        // If we have room config but no topology yet, create placeholder planes
-        // They will be updated when topology arrives
-        this.updateDisplayPlanes();
-      }
-
-      // Disable the library's built-in click-to-set-orbit-target behaviour entirely.
+      // Disable the library's built-in click-to-set-orbit-target behaviour
       (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
-      // Cancel any in-progress camera target transition
       (this.viewer as any).transitioningCameraTarget = false;
 
-      // Restrict common users to orbit-only: disable pan and zoom on the built-in OrbitControls
-      // Set target just in front of camera (tiny distance) for first-person look-around
+      // Restrict to orbit-only (no pan/zoom) — first-person look-around
       const controls = (this.viewer as any).controls;
       if (controls) {
         controls.enablePan = false;
         controls.enableZoom = false;
         const cam = controls.object;
         if (cam) {
-          // Compute a point 0.01 units ahead of the camera along its look direction
           const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
           controls.target.copy(cam.position).addScaledVector(lookDir, 0.01);
           controls.minDistance = 0;
-          controls.maxDistance = Infinity; // don't let OrbitControls snap the camera
+          controls.maxDistance = Infinity;
           controls.update();
-          // Keep target pinned just ahead of camera on every update (first-person look-around),
-          // but only if distance is stable (rotation, not zoom).
           let lastDistance = controls.target.distanceTo(cam.position);
           controls.addEventListener('change', () => {
             const currentDistance = controls.target.distanceTo(cam.position);
-            // Only re-pin if distance is stable (rotation, not zoom)
             if (Math.abs(currentDistance - lastDistance) < 0.001) {
               const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
               controls.target.copy(cam.position).addScaledVector(dir, 0.01);
@@ -189,10 +205,17 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
         }
       }
 
-      // Set up click handler for display selection
       this.containerRef.nativeElement.addEventListener('click', (event) => this.onCanvasClick(event));
 
       this.loading = false;
+
+      // Now that the scene is ready, trigger plane creation if config + topology arrived already
+      if (this.roomConfig && !this.planesCreated) {
+        this.createDisplayPlanes();
+      }
+      if (this.planesCreated) {
+        this.updatePlaneStates(this.latestParticipants);
+      }
     } catch (err) {
       console.error('[DisplayPicker] Failed to initialize viewer:', err);
       this.loadError = String(err);
@@ -203,122 +226,305 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   // ─── Display plane management ─────────────────────────────────────────────
 
   /**
-   * Creates or updates display planes based on room config and topology.
-   * Each plane shows the live camera feed from that display's paired camera.
+   * Creates Three.js plane geometry for every display in the room config.
+   * Called ONCE per room config. Subsequent topology/participant changes call
+   * updatePlaneStates() instead — no geometry is destroyed or recreated.
    */
-  private updateDisplayPlanes() {
+  private createDisplayPlanes() {
     if (!this.roomConfig || !this.threeScene) return;
 
     const displays = this.roomConfig.displays || [];
 
-    // Remove old planes
-    this.displayPlanes.forEach(({ mesh, videoElement }) => {
-      this.threeScene.remove(mesh);
-      videoElement.pause();
-      videoElement.srcObject = null;
-    });
-    this.displayPlanes.clear();
-
-    // Create new planes for each display
     displays.forEach((display) => {
-      // Find the slot linked to this display (if topology is available)
-      const slot = this.topology?.slots.find((s) => s.displayId === display.displayId);
-      if (slot && slot.excluded) return; // Skip excluded slots
+      if (this.displayPlanes.has(display.displayId)) return; // already created
 
-      // Create video element for this display's camera feed
+      // Off-screen video element — needed for THREE.VideoTexture to work
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.muted = true;
       videoElement.playsInline = true;
-      videoElement.style.display = 'none';
+      videoElement.crossOrigin = 'anonymous';
+      videoElement.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:640px;height:480px;opacity:1;';
+      this.containerRef.nativeElement.appendChild(videoElement);
 
-      // Create plane geometry
+      // Geometry
       const geometry = new THREE.PlaneGeometry(display.widthM, display.heightM);
 
-      // Create video texture
-      const texture = new THREE.VideoTexture(videoElement);
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-
+      // Start with a placeholder blue material — updatePlaneStates() will switch to video texture
       const material = new THREE.MeshBasicMaterial({
-        map: texture,
+        color: 0x0055cc,
+        transparent: true,
+        opacity: 0.55,
         side: THREE.DoubleSide,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(display.position3D.x, display.position3D.y, display.position3D.z);
       mesh.rotation.y = display.rotationY;
-      mesh.userData = { displayId: display.displayId, slotId: slot?.slotId };
+      mesh.userData = { displayId: display.displayId, displayState: 'available' };
 
       this.threeScene.add(mesh);
-      this.displayPlanes.set(display.displayId, { mesh, videoElement });
 
-      // Try to attach the camera stream from the consumer (if slot is available)
-      if (slot) {
-        this.attachCameraStreamToPlane(display.displayId, slot);
-      }
+      // Border mesh (updated in updatePlaneStates)
+      const borderMesh = this.buildBorderMesh(display, 'available');
+      if (borderMesh) this.threeScene.add(borderMesh);
+
+      this.displayPlanes.set(display.displayId, {
+        mesh,
+        videoElement,
+        borderMesh,
+        currentState: 'available',
+      });
     });
+
+    this.planesCreated = true;
+    console.log('[DisplayPicker] Created', this.displayPlanes.size, 'display plane(s)');
   }
 
   /**
-   * Attaches the camera stream from a slot's producer to the display plane.
-   * The stream comes from the mediasoup consumer for that producer.
+   * Updates materials, borders, and stream attachments for all existing planes.
+   * Called on every topology or participant change — never destroys geometry.
    */
-  private attachCameraStreamToPlane(displayId: string, slot: ScreenSlotDTO) {
-    const planeData = this.displayPlanes.get(displayId);
-    if (!planeData) return;
+  private updatePlaneStates(participants: any[]) {
+    if (!this.roomConfig || !this.threeScene || !this.planesCreated) return;
 
-    const { videoElement } = planeData;
+    const mySocketId = (this.videoService as any).socketService?.socket?.id;
 
-    // Try to get the stream from the VideoRoomService's consumers
-    // The consumer's track is attached to a MediaStream
-    try {
-      const consumers = (this.videoService as any).consumers || [];
-      for (const consumer of consumers) {
-        // Check if this consumer's producer matches the slot's camera producer
-        if (consumer.producerId === slot.cameraProducerId) {
-          const stream = new MediaStream([consumer.track]);
-          videoElement.srcObject = stream;
-          videoElement.play().catch((err) => console.warn('[DisplayPicker] video.play() failed:', err));
-          console.log('[DisplayPicker] Attached stream to display', displayId);
-          return;
+    for (const display of (this.roomConfig.displays || [])) {
+      const planeData = this.displayPlanes.get(display.displayId);
+      if (!planeData) continue;
+
+      const slot = this.topology?.slots.find(s => s.displayId === display.displayId);
+      const newState = this.getDisplayState(slot);
+
+      // Update userData so raycasting reads the latest state
+      planeData.mesh.userData['displayState'] = newState;
+      if (planeData.borderMesh) planeData.borderMesh.userData['displayState'] = newState;
+
+      if (newState === 'unavailable') {
+        // Hide excluded planes entirely
+        planeData.mesh.visible = false;
+        if (planeData.borderMesh) planeData.borderMesh.visible = false;
+        continue;
+      }
+
+      planeData.mesh.visible = true;
+      if (planeData.borderMesh) planeData.borderMesh.visible = true;
+
+      // Update border colour when state changes
+      if (newState !== planeData.currentState) {
+        this.updateBorderColor(planeData.borderMesh, newState);
+        planeData.currentState = newState;
+      }
+
+      // Attach stream if slot has a remote assigned
+      if (newState === 'has_remote' && slot) {
+        this.tryAttachStream(display.displayId, slot, planeData, participants, mySocketId);
+      } else if (newState !== 'has_remote') {
+        // Revert to colour material if no remote is assigned (e.g. remote left)
+        this.revertToColorMaterial(planeData.mesh, newState);
+        if (planeData.videoElement.srcObject) {
+          planeData.videoElement.pause();
+          planeData.videoElement.srcObject = null;
         }
       }
-    } catch (err) {
-      console.warn('[DisplayPicker] Failed to attach stream:', err);
+    }
+  }
+
+  // ─── Display state helpers ────────────────────────────────────────────────
+
+  /**
+   * Determines the visual state of a display based on its linked slot.
+   *
+   *   'unavailable' – slot exists but is excluded from the conference
+   *   'no_slot'     – no physical device has been linked to this virtual display
+   *   'available'   – slot exists, not excluded, no remote assigned yet
+   *   'has_remote'  – slot has at least one remote participant assigned
+   */
+  private getDisplayState(slot: ScreenSlotDTO | undefined): 'unavailable' | 'no_slot' | 'available' | 'has_remote' {
+    if (!slot) return 'no_slot';
+    if (slot.excluded) return 'unavailable';
+    if (slot.assignedRemoteIds && slot.assignedRemoteIds.length > 0) return 'has_remote';
+    return 'available';
+  }
+
+  /**
+   * Reverts a plane's material to a solid colour (blue = available, dark = no_slot).
+   * Called when a remote leaves and the plane should no longer show video.
+   */
+  private revertToColorMaterial(mesh: THREE.Mesh, state: 'no_slot' | 'available' | 'has_remote') {
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    if (mat.map instanceof THREE.VideoTexture) {
+      mat.map.dispose();
+    }
+    if (state === 'no_slot') {
+      mesh.material = new THREE.MeshBasicMaterial({
+        color: 0x111111, transparent: true, opacity: 0.75, side: THREE.DoubleSide,
+      });
+    } else {
+      mesh.material = new THREE.MeshBasicMaterial({
+        color: 0x0055cc, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+      });
+    }
+    mat.dispose();
+  }
+
+  /**
+   * Updates the border mesh colour to match the new display state.
+   */
+  private updateBorderColor(
+    borderMesh: THREE.Mesh | null,
+    state: 'unavailable' | 'no_slot' | 'available' | 'has_remote',
+  ) {
+    if (!borderMesh) return;
+    const mat = borderMesh.material as THREE.MeshBasicMaterial;
+    if (state === 'available') mat.color.setHex(0x0099ff);
+    else if (state === 'has_remote') mat.color.setHex(0x00cc88);
+    else mat.color.setHex(0x333333);
+  }
+
+  /**
+   * Builds a slightly-larger border mesh placed just behind the display plane.
+   * Blue border for 'available', teal for 'has_remote', dark for 'no_slot'.
+   */
+  private buildBorderMesh(display: DisplayConfig, state: 'unavailable' | 'no_slot' | 'available' | 'has_remote'): THREE.Mesh | null {
+    const borderColor =
+      state === 'available' ? 0x0099ff :
+      state === 'has_remote' ? 0x00cc88 :
+      state === 'no_slot' ? 0x333333 : null;
+    if (!borderColor) return null;
+
+    const borderPad = 0.04;
+    const borderGeo = new THREE.PlaneGeometry(display.widthM + borderPad, display.heightM + borderPad);
+    const borderMat = new THREE.MeshBasicMaterial({ color: borderColor, side: THREE.DoubleSide });
+    const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+
+    const offset = new THREE.Vector3(0, 0, -0.005);
+    offset.applyEuler(new THREE.Euler(0, display.rotationY, 0));
+
+    borderMesh.position.set(
+      display.position3D.x + offset.x,
+      display.position3D.y + offset.y,
+      display.position3D.z + offset.z,
+    );
+    borderMesh.rotation.y = display.rotationY;
+    borderMesh.userData = { displayId: display.displayId, displayState: state, isBorder: true };
+
+    return borderMesh;
+  }
+
+  // ─── Stream attachment ────────────────────────────────────────────────────
+
+  /**
+   * Tries to attach a consumed remote stream to a display plane.
+   * If the stream is already attached and live, this is a no-op.
+   * If the stream is not yet available, the next participant update will retry.
+   */
+  private tryAttachStream(
+    displayId: string,
+    slot: ScreenSlotDTO,
+    planeData: { mesh: THREE.Mesh; videoElement: HTMLVideoElement; borderMesh: THREE.Mesh | null; currentState: string },
+    participants: any[],
+    mySocketId: string | undefined,
+  ) {
+    const { videoElement, mesh } = planeData;
+
+    // Skip if a live stream is already attached
+    if (videoElement.srcObject) {
+      const existing = videoElement.srcObject as MediaStream;
+      if (existing.getTracks().some(t => t.readyState === 'live')) return;
     }
 
-    // Fallback: show placeholder
-    console.log('[DisplayPicker] No stream available yet for display', displayId);
+    for (const remoteSocketId of slot.assignedRemoteIds) {
+      if (remoteSocketId === mySocketId) continue; // never show own stream
+
+      const participant = participants.find((p: any) => p.socketId === remoteSocketId);
+      if (!participant?.stream) continue;
+
+      this.attachStreamToVideoElement(videoElement, participant.stream);
+      this.switchMeshToVideoTexture(mesh, videoElement);
+      console.log('[DisplayPicker] Attached remote', remoteSocketId, 'to display', displayId);
+      return;
+    }
+
+    // Streams not yet consumed — next participant update will call updatePlaneStates again
+    console.log('[DisplayPicker] Slot', slot.slotId, 'has remote(s) but streams not yet available');
+  }
+
+  /**
+   * Switches a display plane's material to a live VideoTexture.
+   * Called once a real stream is available so the plane transitions from its
+   * status colour (blue / dark) to the actual video feed.
+   */
+  private switchMeshToVideoTexture(mesh: THREE.Mesh, videoElement: HTMLVideoElement) {
+    const oldMat = mesh.material as THREE.MeshBasicMaterial;
+    if (oldMat.map instanceof THREE.VideoTexture) return; // already showing video
+
+    const texture = new THREE.VideoTexture(videoElement);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+
+    const newMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+    mesh.material = newMat;
+    oldMat.dispose();
+  }
+
+  /**
+   * Safely attaches a MediaStream to a video element and starts playback.
+   * Idempotent: skips if the same stream is already attached.
+   */
+  private attachStreamToVideoElement(videoElement: HTMLVideoElement, stream: MediaStream) {
+    try {
+      if (videoElement.srcObject === stream) return;
+
+      videoElement.srcObject = stream;
+
+      const onLoadedMetadata = () => {
+        videoElement.removeEventListener('loadedmetadata', onLoadedMetadata);
+        videoElement.play().catch((err) => {
+          console.warn('[DisplayPicker] video.play() failed:', err.name);
+          setTimeout(() => videoElement.play().catch(() => {}), 200);
+        });
+      };
+      videoElement.addEventListener('loadedmetadata', onLoadedMetadata);
+      videoElement.play().catch(() => { /* expected before metadata loads */ });
+    } catch (err) {
+      console.error('[DisplayPicker] Failed to attach stream to video element:', err);
+    }
   }
 
   // ─── User interaction ─────────────────────────────────────────────────────
 
-  /**
-   * Handles canvas click to select a display.
-   */
   private onCanvasClick(event: MouseEvent) {
     if (!this.viewer || !this.threeScene) return;
 
     const canvas = this.containerRef.nativeElement.querySelector('canvas');
     if (!canvas) return;
 
-    // Get mouse position in normalized device coordinates
     const rect = canvas.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // Raycaster from camera
     const camera = (this.viewer as any).camera;
     this.raycaster.setFromCamera(this.mouse, camera);
 
-    // Find intersections with display planes
-    const planes = Array.from(this.displayPlanes.values()).map((p) => p.mesh);
+    const planes = Array.from(this.displayPlanes.values()).flatMap((p) =>
+      p.borderMesh ? [p.mesh, p.borderMesh] : [p.mesh]
+    );
     const intersects = this.raycaster.intersectObjects(planes);
 
     if (intersects.length > 0) {
       const clicked = intersects[0].object as THREE.Mesh;
       const displayId = clicked.userData['displayId'];
+      const displayState = clicked.userData['displayState'];
+
+      if (displayState === 'no_slot') {
+        console.log('[DisplayPicker] Clicked display has no physical device linked — ignoring');
+        return;
+      }
+
       this.selectDisplay(displayId);
     }
   }
@@ -334,7 +540,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       const result = await this.videoService.chooseDisplay(displayId);
       if (result && result.success) {
         console.log('[DisplayPicker] Display choice confirmed by server');
-        // Hide picker overlay (parent component will handle this)
         this.onDisplayChosen();
       } else {
         console.error('[DisplayPicker] Server rejected display choice:', result?.error);
@@ -349,9 +554,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   /** Emitted when the user has successfully chosen a display and the server confirmed it. */
   @Output() displayChosen = new EventEmitter<void>();
 
-  /**
-   * Called when display choice is confirmed. Emits displayChosen so the parent can hide this overlay.
-   */
   onDisplayChosen() {
     console.log('[DisplayPicker] Display choice confirmed, hiding picker');
     this.displayChosen.emit();
@@ -359,9 +561,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
   // ─── Fallback list view ───────────────────────────────────────────────────
 
-  /**
-   * Returns available displays for fallback list view (if 3D viewer fails).
-   */
   get availableDisplays(): DisplayConfig[] {
     if (!this.roomConfig) return [];
     return this.roomConfig.displays.filter((d) => {
@@ -370,9 +569,6 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     });
   }
 
-  /**
-   * Fallback: user clicks a display in the list.
-   */
   selectDisplayFromList(displayId: string) {
     this.selectDisplay(displayId);
   }

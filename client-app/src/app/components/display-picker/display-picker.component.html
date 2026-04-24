@@ -29,9 +29,20 @@
     </div>
   </div>
 
-  <!-- Instructions overlay -->
+  <!-- Instructions + legend overlay -->
   <div class="instructions" *ngIf="!loading && !loadError && !selectedDisplayId">
     <p>Click on a display to choose where you want to appear</p>
+    <div class="display-legend">
+      <span class="legend-item legend-available">
+        <span class="legend-swatch"></span> Available
+      </span>
+      <span class="legend-item legend-occupied">
+        <span class="legend-swatch"></span> Occupied
+      </span>
+      <span class="legend-item legend-no-device">
+        <span class="legend-swatch"></span> No device linked
+      </span>
+    </div>
   </div>
 
   <!-- Selection feedback -->
