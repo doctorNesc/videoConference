@@ -43,6 +43,18 @@ export class VideoRoomService {
   // ─── Mode ─────────────────────────────────────────────────────────────────
   public isRoomDevice: boolean = false;
 
+  // ─── Producer fetching state ──────────────────────────────────────────────
+  private getProducersInProgress: boolean = false;
+  private getProducersTimeout: any = null;
+
+  // ─── Setup completion signal ──────────────────────────────────────────────
+  /** Fires true once the full mediasoup setup sequence completes for this peer.
+   *  Remote participants: after produceVideo() + getProducers() both finish.
+   *  Room devices: after registerAsRoomDevice() finishes.
+   *  Components (DisplayPicker, VideoRoom) wait for this before rendering. */
+  private setupComplete$ = new BehaviorSubject<boolean>(false);
+  public setupReady = this.setupComplete$.asObservable();
+
   // ─── Assignment (remote participants only) ────────────────────────────────
   /** The slot this remote participant is currently assigned to */
   public currentAssignment: RemoteAssignment | null = null;
@@ -71,6 +83,10 @@ export class VideoRoomService {
    */
   protected producers: { id: string; producer: Producer; isScreen?: boolean; slotId?: string }[] = [];
   protected consumers: Consumer[] = [];
+
+  // ─── Local producer tracking (for remote participants) ──────────────────────
+  /** The producer ID of the local video stream (for remote participants) */
+  private localProducerId: string | null = null;
 
   private roomName!: string;
   private username!: string;
@@ -126,11 +142,18 @@ export class VideoRoomService {
       await this.createChatDataProducer();
 
       if (this.isRoomDevice) {
-        // Phase 4: advertise capabilities, then show pairing wizard
+        // Room device: advertise capabilities, then show pairing wizard
         await this.registerAsRoomDevice();
+        this.setupComplete$.next(true);
       } else {
-        // Remote participant: produce video immediately
+        // Remote participant: produce own video, then consume all existing producers.
+        // getProducers() is called unconditionally here — do NOT rely on the
+        // producersExist flag from TRANSPORT_PRODUCE, which may be false if the
+        // room device hasn't produced yet at the time we join.
         await this.produceVideo();
+        await this.getProducers();
+        // Signal that setup is complete — DisplayPicker can now render with streams
+        this.setupComplete$.next(true);
       }
     });
 
@@ -231,6 +254,13 @@ export class VideoRoomService {
     if (data.roomConfig) {
       this.roomConfig$.next(data.roomConfig);
       console.log('[VideoRoomService] Initial roomConfig from JOIN_ROOM:', data.roomConfig.roomName);
+    }
+
+    // Seed topology immediately so DisplayPicker can show correct display states
+    // without waiting for the ROOM_TOPOLOGY_UPDATE socket event.
+    if (data.topology) {
+      this.topology$.next(data.topology);
+      console.log('[VideoRoomService] Initial topology from JOIN_ROOM:', data.topology.slots?.length, 'slot(s)');
     }
 
     return data;
@@ -546,6 +576,10 @@ export class VideoRoomService {
       producer.on('trackended', () => console.log('Track ended'));
       producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
       this.producers.push({ id: producer.id, producer, isScreen: false });
+
+      // Track the local producer ID for display picker
+      this.localProducerId = producer.id;
+      console.log('[VideoRoomService] Local video producer created:', producer.id);
     } catch (error) {
       console.error('Error producing video:', error);
     }
@@ -571,6 +605,24 @@ export class VideoRoomService {
     }
   }
 
+  // ─── Local stream accessors (for display picker) ────────────────────────────
+
+  /**
+   * Returns the local video stream (for remote participants).
+   * Used by DisplayPickerComponent to show the user's own video on the chosen display.
+   */
+  getLocalVideoStream(): MediaStream | null {
+    return this.videoStream || null;
+  }
+
+  /**
+   * Returns the local producer ID (for remote participants).
+   * Used by DisplayPickerComponent to identify which stream to show on the chosen display.
+   */
+  getLocalProducerId(): string | null {
+    return this.localProducerId;
+  }
+
   // ─── Consumer ─────────────────────────────────────────────────────────────
 
   async connectRecvTransport(
@@ -587,6 +639,18 @@ export class VideoRoomService {
         serverConsumerTransportId,
       });
 
+      if (params.error) {
+        console.error('[VideoRoomService] CONSUME error:', params.error);
+        return;
+      }
+
+      console.log('[VideoRoomService] CONSUME response received:', {
+        consumerId: params.id,
+        producerId: params.producerId,
+        kind: params.kind,
+        userName: params.userName,
+      });
+
       let consumer;
       try {
         consumer = await consumerTransport.consume({
@@ -595,55 +659,95 @@ export class VideoRoomService {
           kind: params.kind,
           rtpParameters: params.rtpParameters,
         });
+        console.log('[VideoRoomService] Consumer created successfully:', params.id);
       } catch (e) {
-        console.error('[Client] consume() failed:', e);
+        console.error('[VideoRoomService] consume() failed:', e);
         return;
       }
 
+      // Store consumer so DisplayPicker (and other components) can look up streams by producerId
+      this.consumers.push(consumer!);
+
       const { track } = consumer!;
+
+      if (!track) {
+        console.error('[VideoRoomService] Consumer track is null or undefined');
+        return;
+      }
+
+      console.log('[VideoRoomService] Track obtained:', {
+        kind: track.kind,
+        enabled: track.enabled,
+        readyState: track.readyState,
+      });
 
       // Determine if this producer is the assigned camera for this remote participant
       const isAssignedCamera = !this.isRoomDevice &&
         this.currentAssignment?.cameraProducerId === remoteProducerId;
 
+      const stream = new MediaStream([track]);
+      console.log('[VideoRoomService] MediaStream created with track, adding participant:', remoteProducerId);
+
       this.addParticipant(
         remoteProducerId,
-        new MediaStream([track]),
+        stream,
         params.userName || '',
         socketId,
         isAssignedCamera,
       );
 
+      console.log('[VideoRoomService] Emitting CONSUMER_RESUME for:', params.serverConsumerId);
       this.socketService.emit(ACTIONS.CONSUMER_RESUME, {
         serverConsumerId: params.serverConsumerId,
+      }).then(() => {
+        console.log('[VideoRoomService] CONSUMER_RESUME acknowledged for:', params.serverConsumerId);
+      }).catch((err) => {
+        console.error('[VideoRoomService] CONSUMER_RESUME failed:', err);
       });
-    } catch {
-      console.error('Error connecting recv transport');
+    } catch (error) {
+      console.error('[VideoRoomService] Error connecting recv transport:', error);
     }
   }
 
   // ─── Producers list ───────────────────────────────────────────────────────
 
-  async getProducers(retryCount: number = 0, maxRetries: number = 5) {
-    const response: { producerId: string; socketId: string }[] =
-      await this.socketService.emit(ACTIONS.GET_PRODUCERS);
-
-    console.log('[VideoRoomService] getProducers() response:', JSON.stringify(response), 'attempt:', retryCount + 1);
-
-    // If no producers found and we haven't exceeded max retries, retry with exponential backoff
-    if (response.length === 0 && retryCount < maxRetries) {
-      const delayMs = Math.min(1000 * Math.pow(2, retryCount), 10000); // exponential backoff, max 10s
-      console.log(`[VideoRoomService] No producers found, retrying in ${delayMs}ms (attempt ${retryCount + 1}/${maxRetries})`);
-      setTimeout(() => this.getProducers(retryCount + 1, maxRetries), delayMs);
+  /**
+   * Fetches available producers from the server and consumes them.
+   * Uses debouncing to prevent multiple simultaneous requests.
+   * Removed retry logic since producers are announced via NEW_PRODUCER events.
+   */
+  async getProducers() {
+    // Prevent multiple simultaneous requests
+    if (this.getProducersInProgress) {
+      console.log('[VideoRoomService] getProducers() already in progress, skipping duplicate request');
       return;
     }
 
-    response.forEach(async ({ producerId, socketId }) => {
-      console.log('[VideoRoomService] getProducers() — consuming producerId:', producerId, '| socketId:', socketId);
-      if (!this.producers.find((p) => p.id === producerId)) {
-        await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId);
-      }
-    });
+    // Clear any pending timeout
+    if (this.getProducersTimeout) {
+      clearTimeout(this.getProducersTimeout);
+      this.getProducersTimeout = null;
+    }
+
+    this.getProducersInProgress = true;
+
+    try {
+      const response: { producerId: string; socketId: string }[] =
+        await this.socketService.emit(ACTIONS.GET_PRODUCERS);
+
+      console.log('[VideoRoomService] getProducers() response:', JSON.stringify(response));
+
+      response.forEach(async ({ producerId, socketId }) => {
+        console.log('[VideoRoomService] getProducers() — consuming producerId:', producerId, '| socketId:', socketId);
+        if (!this.producers.find((p) => p.id === producerId)) {
+          await this.connectRecvTransport(producerId, this.consumerTransport, this.recv_params.id, socketId);
+        }
+      });
+    } catch (error) {
+      console.error('[VideoRoomService] Error fetching producers:', error);
+    } finally {
+      this.getProducersInProgress = false;
+    }
   }
 
   // ─── Participant management ───────────────────────────────────────────────
@@ -655,6 +759,29 @@ export class VideoRoomService {
     socketId?: string,
     isAssignedCamera?: boolean,
   ) {
+    console.log('[VideoRoomService] addParticipant() called:', {
+      remoteProducerId,
+      name,
+      socketId,
+      isAssignedCamera,
+      streamTracks: stream.getTracks().length,
+      streamId: stream.id,
+    });
+
+    // Validate stream before adding
+    if (!stream || stream.getTracks().length === 0) {
+      console.error('[VideoRoomService] addParticipant() — stream has no tracks!', {
+        remoteProducerId,
+        streamExists: !!stream,
+        trackCount: stream?.getTracks().length ?? 0,
+      });
+      return;
+    }
+
+    // Expose streams on window BEFORE adding to participant service
+    // This ensures slot-view windows can access them immediately
+    this.exposeStreamsOnWindow(remoteProducerId, stream, socketId);
+
     this.participantService.add({
       id: remoteProducerId,
       stream,
@@ -663,15 +790,16 @@ export class VideoRoomService {
       isAssignedCamera,
     });
 
-    // Expose streams on window so slot-view windows can access via window.opener
-    // (MediaStream cannot be transferred via BroadcastChannel)
-    this.exposeStreamsOnWindow(remoteProducerId, stream, socketId);
-
     this.participantService.participants.pipe(take(1)).subscribe(
       val => {
-        console.log('Added participant:', val);
+        console.log('[VideoRoomService] Participant added successfully:', {
+          totalParticipants: val.length,
+          newParticipant: remoteProducerId,
+          participants: val.map(p => ({ id: p.id, name: p.name })),
+        });
         // Broadcast serialisable refs (no MediaStream) to slot-view windows
         if (this.broadcastChannel) {
+          console.log('[VideoRoomService] Broadcasting participants to slot windows');
           this.broadcastChannel.broadcastParticipants(val);
         }
       }
@@ -684,18 +812,49 @@ export class VideoRoomService {
    * window.opener.__participantStreamsBySocketId__ (by socketId).
    */
   private exposeStreamsOnWindow(producerId: string, stream: MediaStream, socketId?: string) {
-    const win = window as any;
-    if (!win.__participantStreams__) {
-      win.__participantStreams__ = new Map<string, MediaStream>();
+    try {
+      const win = window as any;
+
+      if (!win.__participantStreams__) {
+        win.__participantStreams__ = new Map<string, MediaStream>();
+        console.log('[VideoRoomService] Created __participantStreams__ map');
+      }
+      if (!win.__participantStreamsBySocketId__) {
+        win.__participantStreamsBySocketId__ = new Map<string, MediaStream>();
+        console.log('[VideoRoomService] Created __participantStreamsBySocketId__ map');
+      }
+
+      // Validate stream before exposing
+      if (!stream || stream.getTracks().length === 0) {
+        console.error('[VideoRoomService] Cannot expose stream — no tracks:', {
+          producerId,
+          socketId,
+          streamExists: !!stream,
+          trackCount: stream?.getTracks().length ?? 0,
+        });
+        return;
+      }
+
+      win.__participantStreams__.set(producerId, stream);
+      console.log('[VideoRoomService] Exposed stream by producerId:', {
+        producerId,
+        streamId: stream.id,
+        trackCount: stream.getTracks().length,
+        totalExposedByProducerId: win.__participantStreams__.size,
+      });
+
+      if (socketId) {
+        win.__participantStreamsBySocketId__.set(socketId, stream);
+        console.log('[VideoRoomService] Exposed stream by socketId:', {
+          socketId,
+          producerId,
+          streamId: stream.id,
+          totalExposedBySocketId: win.__participantStreamsBySocketId__.size,
+        });
+      }
+    } catch (err) {
+      console.error('[VideoRoomService] Error exposing stream on window:', err);
     }
-    if (!win.__participantStreamsBySocketId__) {
-      win.__participantStreamsBySocketId__ = new Map<string, MediaStream>();
-    }
-    win.__participantStreams__.set(producerId, stream);
-    if (socketId) {
-      win.__participantStreamsBySocketId__.set(socketId, stream);
-    }
-    console.log('[VideoRoomService] Exposed stream for producerId', producerId, 'socketId', socketId);
   }
 
   handleProducerClosed(remoteProducerId: string) {
@@ -787,6 +946,12 @@ export class VideoRoomService {
       stream.getTracks().forEach((track) => track.stop());
     }
 
+    // Clear any pending getProducers timeout
+    if (this.getProducersTimeout) {
+      clearTimeout(this.getProducersTimeout);
+      this.getProducersTimeout = null;
+    }
+
     this.participantService.cleanUp();
     this.producers.forEach((item) => item.producer.close());
     this.consumers.forEach((consumer) => consumer.close());
@@ -800,6 +965,7 @@ export class VideoRoomService {
     this.assignment$.next(null);
     this.topology$.next(null);
     this.roomConfig$.next(null);
+    this.setupComplete$.next(false);
     this.producers = [];
     this.consumers = [];
     this.chatDataProducer = null;

@@ -20,6 +20,8 @@ export interface SlotState {
   cameraProducerId: string | null;
   /** Remote participants currently assigned to this slot */
   assignedRemotes: { socketId: string; name: string }[];
+  /** Whether this slot is excluded from the conference */
+  excluded: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -312,6 +314,7 @@ export class RoomDeviceService {
       cameraLabel: dto.cameraLabel,
       cameraProducerId: dto.cameraProducerId,
       assignedRemotes: dto.assignedRemoteIds.map(id => ({ socketId: id, name: 'Unknown' })),
+      excluded: dto.excluded,
     };
   }
 
