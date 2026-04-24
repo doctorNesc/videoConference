@@ -464,6 +464,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = false; // Fix upside-down video
     texture.needsUpdate = true;
 
     const newMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
