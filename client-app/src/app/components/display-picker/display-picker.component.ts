@@ -353,9 +353,17 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Called when a remote leaves and the plane should no longer show video.
    */
   private revertToColorMaterial(mesh: THREE.Mesh, state: 'no_slot' | 'available' | 'has_remote') {
-    const mat = mesh.material as THREE.MeshBasicMaterial;
-    if (mat.map instanceof THREE.VideoTexture) {
-      mat.map.dispose();
+    const mat = mesh.material as THREE.MeshBasicMaterial | THREE.ShaderMaterial;
+    // Handle both MeshBasicMaterial (with VideoTexture) and ShaderMaterial
+    if (mat instanceof THREE.ShaderMaterial) {
+      const texture = mat.uniforms?.['map']?.value;
+      if (texture instanceof THREE.VideoTexture) {
+        texture.dispose();
+      }
+    } else if (mat instanceof THREE.MeshBasicMaterial) {
+      if (mat.map instanceof THREE.VideoTexture) {
+        mat.map.dispose();
+      }
     }
     if (state === 'no_slot') {
       mesh.material = new THREE.MeshBasicMaterial({
@@ -366,7 +374,9 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
         color: 0x0055cc, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
       });
     }
-    mat.dispose();
+    if (mat instanceof THREE.MeshBasicMaterial) {
+      mat.dispose();
+    }
   }
 
   /**
@@ -467,7 +477,47 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     texture.flipY = false; // Fix upside-down video
     texture.needsUpdate = true;
 
-    const newMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+    // Use a shader material to add margins around the video
+    const margin = 0.03; // 3% margin on each side
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+    const fragmentShader = `
+      uniform sampler2D map;
+      uniform float margin;
+      varying vec2 vUv;
+      void main() {
+        // Apply margin by clamping UV coordinates
+        vec2 uv = vec2(
+          clamp(vUv.x, margin, 1.0 - margin),
+          clamp(vUv.y, margin, 1.0 - margin)
+        );
+        // Scale to account for margin (remove black bars)
+        vec2 scaledUv = (uv - margin) / (1.0 - 2.0 * margin);
+        vec4 color = texture2D(map, scaledUv);
+        // Add black background for margin area
+        if (vUv.x < margin || vUv.x > 1.0 - margin || vUv.y < margin || vUv.y > 1.0 - margin) {
+          gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        } else {
+          gl_FragColor = color;
+        }
+      }
+    `;
+
+    const newMat = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: texture },
+        margin: { value: margin },
+      },
+      vertexShader,
+      fragmentShader,
+      side: THREE.DoubleSide,
+    });
+
     mesh.material = newMat;
     oldMat.dispose();
   }
