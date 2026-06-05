@@ -29,7 +29,7 @@ export class BroadcastChannelService {
 
   /** @deprecated Use participantRefs — streams cannot be cloned across windows */
   get participants(): Observable<Participant[]> {
-    // Return empty — slot-view must use window.opener to get streams
+    
     return new BehaviorSubject<Participant[]>([]).asObservable();
   }
 

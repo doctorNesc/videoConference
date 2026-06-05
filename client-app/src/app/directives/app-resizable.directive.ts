@@ -37,7 +37,7 @@ export class ResizableDirective {
     this.renderer.setStyle(this.el.nativeElement, 'width', `${newWidth}px`);
     this.renderer.setStyle(this.el.nativeElement, 'height', `${newHeight}px`);
 
-    // Force other videos in the grid to adjust proportionally
+    
     this.updateGrid();
   };
 
@@ -49,8 +49,8 @@ export class ResizableDirective {
 
   private updateGrid() {
     const parent = this.el.nativeElement.parentElement;
-    parent.style.display = 'none'; // Trigger reflow
-    parent.offsetHeight; // Force a reflow
+    parent.style.display = 'none'; 
+    parent.offsetHeight; 
     parent.style.display = 'grid';
   }
 }

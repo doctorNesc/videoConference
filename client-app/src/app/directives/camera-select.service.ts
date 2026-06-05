@@ -12,7 +12,7 @@ export class CameraSelectService {
   }
 
   async getCameraStream(deviceId: string): Promise<MediaStream> {
-    // Stop the previous stream if exists
+    
     this.stopStream();
 
     this.stream = await navigator.mediaDevices.getUserMedia({

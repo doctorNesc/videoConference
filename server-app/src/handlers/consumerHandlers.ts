@@ -9,7 +9,7 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
         rtpCapabilities, remoteProducerId, serverConsumerTransportId
     }, callback) => {
         try {
-            // const roomName = state.peers[socket.id].roomName;
+            
             const roomName = roomManager.socketToRoom.get(socket.id);
             if (!roomName) {
                 console.warn('[CONSUME] request from socket not in room:', socket.id);
@@ -30,17 +30,17 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
             if (!room.router.canConsume({ producerId: remoteProducerId, rtpCapabilities })) {
                 return callback({ params: { error: 'cannot-consume-with-rtp-capabilities' } });
             }
-            // const room = roomManager.getRoom(roomName!);
-            // const producerPeer = room?.getAllPeers().find(peer => peer.producers.has(remoteProducerId));
+            
+            
             const userName = producerPeer?.userName;
             const router = room.router;
-            // const consumerTransport = room?.getAllPeers().find(peer => peer.recvTransport.id == serverConsumerTransportId)?.recvTransport;
-            // check if the router can consume the specified producer
+            
+            
             if (router.canConsume({
                 producerId: remoteProducerId,
                 rtpCapabilities,
             })) {
-                // transport can now consume and return a consumer
+                
                 const consumer = await consumerTransport!.consume({
                     producerId: remoteProducerId,
                     rtpCapabilities,
@@ -49,13 +49,8 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
 
                 consumer.on(ACTIONS.TRANSPORT_CLOSE, () => {
                     console.log("transport close from consumer", consumer.id);
-                    // remove consumer from peer map when transport is closed
-                    // try {
-                    //     const peerConsumer = room.getPeer(socket.id);
-                    //     peerConsumer.removeConsumer(consumer.id);
-                    // } catch {
-                    //     // ignore
-                    // }
+                    
+                    
                 });
 
                 consumer.on(ACTIONS.PRODUCER_CLOSE, () => {
@@ -70,14 +65,12 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                 const peerConsumer = room.getPeer(socket.id);
                 peerConsumer.addConsumer(consumer);
 
-                // When this consumer is closed (for any reason) remove it from the peer
-                // mediasoup emits an internal '@close' event when a consumer is closed
+                
                 consumer.on('@close', () => {
                     peerConsumer.removeConsumer(consumer.id);
                 });
 
-                // from the consumer extract the following params
-                // to send back to the Client
+                
                 const params = {
                     id: consumer.id,
                     producerId: remoteProducerId,
@@ -86,10 +79,10 @@ export function registerConsumerHandlers(socket: Socket, state: SharedState, roo
                     serverConsumerId: consumer.id,
                     userName
                 };
-                // send the parameters to the client
+                
                 callback({ params });
             }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            
         } catch (error: any) {
             console.error('[CONSUME] failed to create consumer:', error);
             callback({ params: { error: error.message || String(error) } });

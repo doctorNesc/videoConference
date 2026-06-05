@@ -1,13 +1,12 @@
-// ─── Mirror of server-side hybrid types (safe for browser) ───────────────────
 
-// ─── Room Configuration: Static admin-defined display positions ───────────────
+
 export interface DisplayConfig {
-  displayId: string;               // stable uuid, set once by admin
-  label: string;                   // e.g. "Front Left Screen"
+  displayId: string;               
+  label: string;                   
   position3D: { x: number; y: number; z: number };
-  rotationY: number;               // facing direction in radians
-  widthM: number;                  // physical width in meters
-  heightM: number;                 // physical height in meters
+  rotationY: number;               
+  widthM: number;                  
+  heightM: number;                 
 }
 
 export interface CameraPosition {
@@ -17,21 +16,21 @@ export interface CameraPosition {
 
 export interface RoomConfig {
   roomName: string;
-  splatPath: string;               // relative path to .splat file
-  displays: DisplayConfig[];       // pre-configured displays
-  cameraPosition?: CameraPosition; // default camera position set by admin
+  splatPath: string;               
+  displays: DisplayConfig[];       
+  cameraPosition?: CameraPosition; 
   createdAt: string;
   updatedAt: string;
 }
 
-// ─── Device Pairing Config: Saved per device per room ────────────────────────
+
 export interface DevicePairingConfig {
-  deviceFingerprint: string;       // stable ID for the physical machine
+  deviceFingerprint: string;       
   roomName: string;
   pairings: {
-    displayId: string;             // which configured display
-    screenIndex: number;           // which of the device's physical screens
-    cameraDeviceId: string;        // which camera
+    displayId: string;             
+    screenIndex: number;           
+    cameraDeviceId: string;        
     cameraLabel: string;
   }[];
   createdAt: string;
@@ -67,8 +66,8 @@ export interface ScreenSlotDTO {
   cameraLabel: string | null;
   cameraProducerId: string | null;
   assignedRemoteIds: string[];
-  displayId?: string;              // links to RoomConfig.displays[].displayId
-  excluded: boolean;               // screen reserved for local work
+  displayId?: string;              
+  excluded: boolean;               
   position3D?: { x: number; y: number; z: number };
 }
 
@@ -90,12 +89,12 @@ export interface RemoteAssignment {
 /** Pairing submitted by a room device after the wizard */
 export interface ScreenCameraPairing {
   slotId: string;
-  screenIndex?: number;  // physical screen index — persisted in saved config for stable re-matching
-  screenLabel?: string;  // human-readable screen name (e.g. "Screen 1", "HDMI Monitor")
+  screenIndex?: number;  
+  screenLabel?: string;  
   cameraDeviceId: string;
   cameraLabel: string;
-  displayId?: string;    // links to RoomConfig.displays[].displayId
-  excluded?: boolean;    // marks slot as excluded from conference
+  displayId?: string;    
+  excluded?: boolean;    
 }
 
 /** Notification sent to a room device when a remote joins its slot */
@@ -111,7 +110,6 @@ export interface SlotRemoteLeftEvent {
   remoteSocketId: string;
 }
 
-// ─── Window Management API types (not yet in standard TS lib) ─────────────────
 
 export interface ScreenDetailed extends Screen {
   readonly label: string;

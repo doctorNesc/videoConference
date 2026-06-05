@@ -61,26 +61,26 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     message: new FormControl('', Validators.min(1)),
   });
 
-  // ─── Pairing wizard state ─────────────────────────────────────────────────
+
   /** True while the room device setup wizard is shown */
   public showPairingWizard: boolean = false;
   /** Slot IDs returned by server after REGISTER_ROOM_DEVICE */
   public pendingSlotIds: string[] = [];
 
-  // ─── Display linker state (step 2 of wizard) ──────────────────────────────
+
   /** True while the display linker is shown (after pairing wizard) */
   public showDisplayLinker: boolean = false;
   /** Pairings from the wizard, held until display linker confirms */
   public pendingPairings: ScreenCameraPairing[] = [];
 
-  // ─── Saved config state ───────────────────────────────────────────────────
+
   /** True when device joined with a saved config (shows reconfigure button) */
   public hasSavedConfig: boolean = false;
 
-  // ─── Assignment label (remote participants) ───────────────────────────────
+
   public assignedScreenLabel: string | null = null;
 
-  // ─── Display picker (remote participants in rooms with 3D layout) ─────────
+
   /** True while the display picker overlay is shown */
   public showDisplayPicker: boolean = false;
 
@@ -103,15 +103,11 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.name = this.route.snapshot.queryParamMap.get('userName') || 'Guest';
     this.isRoomDevice = this.route.snapshot.queryParamMap.get('inTheRoom')?.toLowerCase() === 'true' || false;
 
-    // Override initializeSocket to intercept room device registration
+
     this.setupRoomDeviceRegistration();
 
     this.videoService.initializeSocket(this.roomName, this.name, this.isRoomDevice);
 
-    // ─── DisplayPicker: show only after setup is complete AND room has 3D config ──
-    // setupReady fires true after produceVideo() + getProducers() both finish.
-    // roomConfig arrives in the JOIN_ROOM callback — no separate HTTP call needed.
-    // This replaces the old loadRoomConfig() HTTP call which raced with socket setup.
     if (!this.isRoomDevice) {
       this.subs.push(
         combineLatest([
@@ -126,12 +122,10 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       );
     }
 
-    // ─── Participants subscription ──────────────────────────────────────────
     this.subs.push(
       this.videoService.getParticipants().subscribe((participants) => {
         this.participants = participants;
 
-        // For remote participants, auto-set main view to assigned camera
         if (!this.isRoomDevice && this.videoService.currentAssignment?.cameraProducerId) {
           const assignedCam = participants.find(
             p => p.id === this.videoService.currentAssignment!.cameraProducerId
@@ -141,8 +135,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Update slot windows reactively when participants change.
-        // Gate on slotWindows being open (room device only).
         if (this.slotWindows.size > 0) {
           const latestSlots = this.roomDeviceService.slotsSnapshot;
           for (const slot of latestSlots) {
@@ -152,12 +144,12 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       })
     );
 
-    // ─── Assignment subscription ────────────────────────────────────────────
+
     this.subs.push(
       this.videoService.assignment.subscribe((assignment) => {
         if (assignment) {
           this.assignedScreenLabel = assignment.screenLabel;
-          // Update main view when assignment changes
+
           if (assignment.cameraProducerId) {
             const cam = this.participants.find(p => p.id === assignment.cameraProducerId);
             if (cam) this.setMainParticipant(cam);
@@ -166,8 +158,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       })
     );
 
-    // ─── Slot state subscription (room device) ──────────────────────────────
-    // Always active — gates on slotWindows.size > 0 so it's a no-op for remotes.
+
     this.subs.push(
       this.roomDeviceService.slots.subscribe(slots => {
         if (this.slotWindows.size === 0) return;
@@ -177,7 +168,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       })
     );
 
-    // ─── Messages subscription ──────────────────────────────────────────────
+
     this.subs.push(
       this.videoService.getMessages().subscribe((messages) => {
         this.messages = messages;
@@ -188,7 +179,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.subs.forEach(s => s.unsubscribe());
 
-    // Close all slot windows
+
     this.slotWindows.forEach(w => { try { w.close(); } catch { /* ignore */ } });
     this.slotWindows.clear();
 
@@ -201,7 +192,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  // ─── Room device setup interception ──────────────────────────────────────
 
   /**
    * Monkey-patches registerAsRoomDevice to show the wizard after registration.
@@ -219,7 +209,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       console.log('[VideoRoomComponent] Device registered:', { slotIds, hasSavedConfig: savedConfig });
 
       if (slotIds.length > 0 && !savedConfig) {
-        // Only show wizard if no saved config was applied
+
         console.log('[VideoRoomComponent] Showing pairing wizard');
         this.pendingSlotIds = slotIds;
         this.showPairingWizard = true;
@@ -227,8 +217,8 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         console.log('[VideoRoomComponent] Saved config applied, opening slot windows');
         this.hasSavedConfig = true;
         this.cdr.detectChanges();
-        // Saved config was applied on the server side
-        // The pairings are already active, just open the slot windows
+
+
         this.openSlotWindows();
       }
       return result;
@@ -244,36 +234,33 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     await this.roomDeviceService.deleteSavedConfig(this.roomName, fingerprint);
     this.hasSavedConfig = false;
 
-    // Close any open slot windows
+
     this.slotWindows.forEach(w => { try { w.close(); } catch { /* ignore */ } });
     this.slotWindows.clear();
 
-    // Show the pairing wizard again with the current slot IDs
+
     const slots = this.roomDeviceService.slotsSnapshot;
     this.pendingSlotIds = slots.map(s => s.slotId);
     this.showPairingWizard = true;
     this.cdr.detectChanges();
   }
 
-  // ─── Pairing wizard events ────────────────────────────────────────────────
 
   async onPairingConfirmed(pairings: ScreenCameraPairing[]) {
     this.showPairingWizard = false;
     this.pendingPairings = pairings;
 
-    // Use the cached roomConfig from the service (seeded from JOIN_ROOM callback).
-    // No HTTP call needed — the config is already available.
+
     const roomConfig = await new Promise<RoomConfig | null>(resolve => {
       this.videoService.roomConfig.pipe(take(1)).subscribe(c => resolve(c));
     });
 
-    // If room has configured displays, show the display linker (step 2)
-    // Otherwise, go straight to submitting pairings and opening slot windows
+
     if (roomConfig?.displays && roomConfig.displays.length > 0) {
       this.showDisplayLinker = true;
       this.cdr.detectChanges();
     } else {
-      // No displays configured, skip linker and go straight to submission
+
       await this.submitPairingsAndOpenSlots(pairings);
     }
   }
@@ -281,7 +268,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
   async onDisplayLinkingConfirmed(links: any[]) {
     this.showDisplayLinker = false;
 
-    // Merge display links into pending pairings
+
     const merged = this.pendingPairings.map(p => {
       const link = links.find(l => l.slotId === p.slotId);
       return {
@@ -303,7 +290,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
   private async submitPairingsAndOpenSlots(pairings: ScreenCameraPairing[]) {
     await this.videoService.submitScreenCameraPairing(pairings);
-    // Open a dedicated browser window per slot, positioned on the correct physical screen
+
     this.openSlotWindows();
   }
 
@@ -314,7 +301,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
    */
   private openSlotWindows() {
     for (const slot of this.roomDeviceService.slotsSnapshot) {
-      // Skip excluded slots — they are reserved for local work
+
       if (slot.excluded) {
         console.log('[VideoRoomComponent] Skipping excluded slot window for', slot.slotId, slot.screenLabel);
         continue;
@@ -322,8 +309,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       this.openSlotWindow(slot);
     }
 
-    // Trigger an immediate update with current participants now that windows are open.
-    // The ngOnInit subscriptions will handle all future updates reactively.
+
     for (const slot of this.roomDeviceService.slotsSnapshot) {
       this.updateSlotWindow(slot, this.participants);
     }
@@ -349,7 +335,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Write initial HTML
+
     win.document.write(this.buildSlotWindowHtml(slot));
     win.document.close();
     this.slotWindows.set(slot.slotId, win);
@@ -365,11 +351,11 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
     const currentParticipants = participants ?? this.participants;
 
-    // Update slot label
+
     const labelEl = win.document.getElementById('slot-label');
     if (labelEl) labelEl.textContent = slot.screenLabel;
 
-    // Update grid columns/rows based on remote count so tiles fill the window
+
     const container = win.document.getElementById('video-container');
     if (container) {
       const count = slot.assignedRemotes.length;
@@ -379,7 +365,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
       container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     }
 
-    // Update status text
+
     const statusEl = win.document.getElementById('slot-status');
 
     if (slot.assignedRemotes.length === 0) {
@@ -387,7 +373,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         statusEl.style.display = 'flex';
         statusEl.innerHTML = `<p>No remote participant assigned to <strong>${slot.screenLabel}</strong></p>`;
       }
-      // Hide all videos
+
       const container = win.document.getElementById('video-container');
       if (container) container.innerHTML = '';
       return;
@@ -397,9 +383,9 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
     if (!container) return;
 
-    // For each assigned remote, find their stream and attach it
+
     for (const remote of slot.assignedRemotes) {
-      // Find participant by socketId — the remote's video stream consumed by this room device
+
       const participant = currentParticipants.find(p => p.socketId === remote.socketId);
       if (!participant) {
         console.log('[VideoRoomComponent] Participant not yet available for remote', remote.socketId,
@@ -409,7 +395,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 
       let videoEl = win.document.getElementById(`video-${remote.socketId}`) as HTMLVideoElement;
       if (!videoEl) {
-        // Create new video element
+
         const tile = win.document.createElement('div');
         tile.className = 'remote-tile';
         tile.id = `tile-${remote.socketId}`;
@@ -418,7 +404,7 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         videoEl.id = `video-${remote.socketId}`;
         videoEl.autoplay = true;
         videoEl.playsInline = true;
-        videoEl.muted = true; // Start muted to bypass autoplay policy
+        videoEl.muted = true;
         videoEl.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;';
 
         const nameEl = win.document.createElement('div');
@@ -430,18 +416,18 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
         container.appendChild(tile);
       }
 
-      // Attach stream if not already attached
+
       if (videoEl.srcObject !== participant.stream) {
         videoEl.srcObject = participant.stream;
         const tracks = participant.stream.getTracks();
         console.log('[VideoRoomComponent] Attached stream for', remote.socketId,
           'tracks:', tracks.map(t => `${t.kind}:${t.readyState}:enabled=${t.enabled}`));
-        // Explicitly call play() since autoplay may not fire on dynamically created elements
+
         videoEl.play().catch(err => console.warn('[VideoRoomComponent] video.play() failed:', err));
       }
     }
 
-    // Remove tiles for remotes that are no longer assigned
+
     const assignedIds = new Set(slot.assignedRemotes.map(r => r.socketId));
     const tiles = container.querySelectorAll('[id^="tile-"]');
     tiles.forEach(tile => {
@@ -554,7 +540,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
 </html>`;
   }
 
-  // ─── Participant view ─────────────────────────────────────────────────────
 
   setMainParticipant(participant: { id: string; stream: MediaStream; name: string }) {
     this.mainParticipant = participant;
@@ -592,7 +577,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── Chat ─────────────────────────────────────────────────────────────────
 
   onSubmit() {
     this.messageForm.value &&
@@ -608,7 +592,6 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.isSidebarCollapsed = !this.isSidebarCollapsed;
   }
 
-  // ─── Media controls ───────────────────────────────────────────────────────
 
   startScreenShare() {
     this.videoService.startScreenShare();

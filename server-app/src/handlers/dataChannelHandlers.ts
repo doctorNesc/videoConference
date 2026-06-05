@@ -17,8 +17,8 @@ export function registerDataChannelHandlers(
   nsp: Namespace,
   roomManager: RoomManager,
 ) {
-  // ─── PRODUCE_DATA ──────────────────────────────────────────────────────────
-  // Triggered by the mediasoup-client 'producedata' transport event.
+  
+  
   socket.on(ACTIONS.PRODUCE_DATA, async ({ sctpStreamParameters, label, protocol, appData }, callback) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
@@ -44,20 +44,19 @@ export function registerDataChannelHandlers(
         `[PRODUCE_DATA] peer ${peer.userName} created DataProducer ${dataProducer.id} (label: ${dataProducer.label})`
       );
 
-      // Collect existing DataProducers from all other peers so the new peer
-      // can consume them (handles the "late joiner" case).
+      
       const existingDataProducers: { dataProducerId: string; socketId: string; userName: string }[] = [];
       room.getAllPeers().forEach((otherPeer) => {
         if (otherPeer.id === socket.id) return;
 
-        // Notify existing peers about the new DataProducer
+        
         otherPeer.socket.emit(ACTIONS.NEW_DATA_PRODUCER, {
           dataProducerId: dataProducer.id,
           socketId: socket.id,
           userName: peer.userName,
         });
 
-        // Collect this peer's DataProducers for the new peer
+        
         otherPeer.dataProducers.forEach((dp) => {
           existingDataProducers.push({
             dataProducerId: dp.id,
@@ -74,9 +73,7 @@ export function registerDataChannelHandlers(
     }
   });
 
-  // ─── CONSUME_DATA ──────────────────────────────────────────────────────────
-  // The requesting socket is the consumer; serverConsumerTransportId identifies
-  // which of its recv transports to use.
+  
   socket.on(ACTIONS.CONSUME_DATA, async ({ dataProducerId, serverConsumerTransportId }, callback) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);
@@ -84,7 +81,7 @@ export function registerDataChannelHandlers(
 
       const room = roomManager.getRoom(roomName, "CONSUME_DATA");
 
-      // The consuming peer is the one making this request
+      
       const consumerPeer = room.getPeer(socket.id);
 
       if (!consumerPeer.recvTransport || consumerPeer.recvTransport.id !== serverConsumerTransportId) {
@@ -114,7 +111,7 @@ export function registerDataChannelHandlers(
     }
   });
 
-  // ─── DATA_CONSUMER_RESUME ──────────────────────────────────────────────────
+  
   socket.on(ACTIONS.DATA_CONSUMER_RESUME, async ({ serverDataConsumerId }, callback) => {
     try {
       const roomName = roomManager.socketToRoom.get(socket.id);

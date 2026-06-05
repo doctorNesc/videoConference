@@ -33,13 +33,13 @@ export class HomeComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
-    // Restore previously saved preferences
+    
     const snap = this.joinPrefs.snapshot;
     this.inTheRoom = snap.isRoomDevice;
     this.userName = snap.userName;
     this.selectedCameraId = snap.selectedCameraId ?? '';
 
-    // Enumerate cameras if the API is available
+    
     if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
       this.cameraEnumSupported = true;
       await this.loadCameras();
@@ -50,14 +50,14 @@ export class HomeComponent implements OnInit {
   async loadCameras() {
     this.loadingCameras = true;
     try {
-      // Request a brief stream so the browser populates device labels
+      
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       stream.getTracks().forEach(t => t.stop());
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       this.cameras = devices.filter(d => d.kind === 'videoinput');
     } catch {
-      // Permission denied or no camera — silently degrade
+      
       this.cameras = [];
     } finally {
       this.loadingCameras = false;
@@ -83,7 +83,7 @@ export class HomeComponent implements OnInit {
     this.joinPrefs.setUserName(this.userName);
   }
 
-  // Redirect to the entered room
+  
   joinConference() {
     if (this.roomName.trim()) {
       this.joinPrefs.setUserName(this.userName);
@@ -96,7 +96,7 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  // Generate a random 8-character room name and navigate to it
+  
   createNewConference() {
     const generatedRoomName = this.generateRoomName();
     this.joinPrefs.setUserName(this.userName);
@@ -106,7 +106,7 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  // Helper function to generate an 8-character random room name
+  
   private generateRoomName(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let roomName = '';

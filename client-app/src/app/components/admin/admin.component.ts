@@ -24,7 +24,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Poll room users every 5 s
+    
     this.subs.add(
       interval(5000).pipe(startWith(0), switchMap(() => this.roomService.getAllUsers())).subscribe({
         next: (data) => { this.allRooms = data; },
@@ -32,7 +32,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       })
     );
 
-    // Poll topology every 5 s
+    
     this.subs.add(
       interval(5000).pipe(
         startWith(0),

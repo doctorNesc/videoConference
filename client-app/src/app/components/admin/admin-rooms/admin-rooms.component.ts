@@ -30,8 +30,7 @@ export class AdminRoomsComponent implements OnInit {
     this.loadRooms();
   }
 
-  // ─── Load rooms ───────────────────────────────────────────────────────────
-
+  
   private async loadRooms() {
     try {
       const response = await this.http
@@ -46,8 +45,7 @@ export class AdminRoomsComponent implements OnInit {
     }
   }
 
-  // ─── Create new room ──────────────────────────────────────────────────────
-
+  
   toggleNewRoomForm() {
     this.showNewRoomForm = !this.showNewRoomForm;
     this.newRoomName = '';
@@ -74,7 +72,7 @@ export class AdminRoomsComponent implements OnInit {
 
       await this.http.post('/api/rooms', newRoom).toPromise();
 
-      // Reload rooms
+      
       await this.loadRooms();
       this.showNewRoomForm = false;
       this.newRoomName = '';
@@ -86,14 +84,12 @@ export class AdminRoomsComponent implements OnInit {
     }
   }
 
-  // ─── Edit room ────────────────────────────────────────────────────────────
-
+  
   editRoom(roomName: string) {
     this.router.navigate(['/admin/room', roomName]);
   }
 
-  // ─── Delete room ──────────────────────────────────────────────────────────
-
+  
   async deleteRoom(roomName: string) {
     if (!confirm(`Are you sure you want to delete room "${roomName}"?`)) {
       return;
@@ -108,8 +104,7 @@ export class AdminRoomsComponent implements OnInit {
     }
   }
 
-  // ─── Upload splat file ────────────────────────────────────────────────────
-
+  
   async uploadSplat(roomName: string, event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -130,8 +125,7 @@ export class AdminRoomsComponent implements OnInit {
     }
   }
 
-  // ─── Format date ──────────────────────────────────────────────────────────
-
+  
   formatDate(dateStr: string): string {
     try {
       return new Date(dateStr).toLocaleDateString('en-US', {

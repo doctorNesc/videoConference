@@ -18,7 +18,7 @@ dotenv.config();
 
 const app = express();
 
-// Required for SharedArrayBuffer (used by gaussian-splats-3d worker sorting)
+
 app.use((_req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
@@ -28,8 +28,6 @@ app.use((_req, res, next) => {
 
 app.use(express.static(path.join(__dirname, "../../client-app/dist/client-app/browser")));
 
-// ─── Core singletons ──────────────────────────────────────────────────────────
-// Declared before routes so REST handlers can close over them.
 
 const roomManager = new RoomManager();
 
@@ -40,12 +38,11 @@ httpServer.listen(process.env.PORT || 3000, () => {
 
 const io = new IOServer(httpServer, { cors: { origin: true } });
 
-// ─── REST routes ──────────────────────────────────────────────────────────────
 
 app.get("/api/roomUsers", (req: Request, res: Response): void => {
   const filterRoom = req.query.room as string | undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  
   const allRooms: any[] = [];
 
   roomManager.rooms.forEach((room, roomName) => {
@@ -88,7 +85,6 @@ app.get("/api/topology", (_req: Request, res: Response): void => {
   res.json(roomManager.getAllTopologies());
 });
 
-// ─── Room Configuration REST API ──────────────────────────────────────────────
 
 /** GET /api/rooms — list all room configs */
 app.get("/api/rooms", (_req: Request, res: Response): void => {
@@ -146,13 +142,13 @@ app.put("/api/rooms/:name", express.json(), (req: Request, res: Response): void 
       return;
     }
 
-    // 1. Persist to disk
+    
     roomConfigService.saveRoomConfig(config);
 
-    // 2. Update in-memory cache so JOIN_ROOM returns fresh data for new joiners
+    
     roomManager.setRoomConfig(config.roomName, config);
 
-    // 3. Push live update to all peers currently in this room
+    
     io.to(config.roomName).emit(ACTIONS.ROOM_CONFIG_UPDATE, config);
     console.log(`[API] Pushed ROOM_CONFIG_UPDATE to room "${config.roomName}"`);
 
@@ -175,7 +171,6 @@ app.delete("/api/rooms/:name", (req: Request, res: Response): void => {
   }
 });
 
-// ─── Splat file upload & serving ──────────────────────────────────────────────
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -192,7 +187,7 @@ app.post("/api/rooms/:name/splat", upload.single('splat'), (req: Request, res: R
     console.log('[API] Writing splat file to:', splatPath);
     fs.writeFileSync(splatPath, req.file.buffer);
     
-    // Update room config with splat path
+    
     const config = roomConfigService.loadRoomConfig(req.params.name);
     console.log('[API] Loaded config:', config);
     if (config) {
@@ -226,7 +221,6 @@ app.get("/api/rooms/:name/splat", (req: Request, res: Response): void => {
   }
 });
 
-// ─── Device pairing config ───────────────────────────────────────────────────
 
 /** GET /api/rooms/:name/device-config/:fingerprint — get device pairing config */
 app.get("/api/rooms/:name/device-config/:fingerprint", (req: Request, res: Response): void => {
@@ -274,7 +268,6 @@ app.get("*", (req: Request, res: Response): void => {
   );
 });
 
-// ─── Shared state & mediasoup workers ────────────────────────────────────────
 
 export const sharedState: SharedState = {
   peers: {},
@@ -307,7 +300,7 @@ async function runMediasoupWorkers() {
       setTimeout(() => process.exit(1), 2000);
     });
 
-    // Create a WebRtcServer in this Worker, assigning different portRanges to each
+    
     const webRtcServerOptions = getWebRtcTransportOptionsForWorker(i);
     const webRtcServer = await worker.createWebRtcServer(webRtcServerOptions);
     webRtcServer.on("workerclose", () => {

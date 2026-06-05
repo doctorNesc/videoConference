@@ -1,5 +1,5 @@
 
-// import { createWorker } from "mediasoup";
+
 import { Router, WebRtcServer, WebRtcServerOptions, WebRtcTransport, } from "mediasoup/node/lib/types";
 import { RoomManager } from "../core/roomManager";
 
@@ -21,9 +21,8 @@ export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcS
         announcedIp: process.env.ANNOUNCED_IP || "127.0.0.1"
       }
     ],
-    // enableUdp: true,
-    // enableTcp: true,
-    // preferUdp: true,
+    
+    
   };
 }
 
@@ -46,14 +45,7 @@ export const createWebRtcTransport = async (
     }
   });
 
-  // transport.on("icestatechange", (iceState) => {//debug purposes
-  //   console.log(`transport ${transport.id} icestatechange:`, iceState);
-  // });
-
-  // transport.on("@close", () => {
-  //   console.log("transport closed");
-  // });
-
+  
   return transport;
 };
 
@@ -71,9 +63,9 @@ export function leaveRoom(roomManager: RoomManager, roomName: string, socketId: 
       }
     }
   } catch (err) {
-    // Room or peer may already be gone (e.g., on socket disconnect after room cleanup)
+    
     console.warn(`[leaveRoom] Error cleaning up ${socketId} from ${roomName}:`, err);
-    // Still try to clean up the socket-to-room mapping
+    
     roomManager.socketToRoom.delete(socketId);
   }
 }

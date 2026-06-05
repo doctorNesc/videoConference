@@ -1,13 +1,13 @@
-// src/config/actions.ts
+
 
 export const ACTIONS = {
-    // ─── Room & peer lifecycle ────────────────────────────────────────────────
+    
     JOIN_ROOM: "joinRoom",
     LEAVE_ROOM: "leaveRoom",
     ROOM_CLOSED: "roomClosed",
     CONNECTION_SUCCESS: "connection-success",
 
-    // ─── Transport ────────────────────────────────────────────────────────────
+    
     CREATE_TRANSPORT: "createTransport",
     CREATE_WEBRTC_TRANSPORT: "createWebRtcTransport",
     TRANSPORT_CREATED: "transportCreated",
@@ -17,7 +17,7 @@ export const ACTIONS = {
     TRANSPORT_CONNECTED: "transportConnected",
     TRANSPORT_CLOSE: "transportclose",
 
-    // ─── Producer ─────────────────────────────────────────────────────────────
+    
     PRODUCE: "produce",
     PRODUCER_CREATED: "producerCreated",
     NEW_PRODUCER: "new-producer",
@@ -25,20 +25,20 @@ export const ACTIONS = {
     PRODUCER_CLOSE: "producerclose",
     PRODUCER_CLOSED: "producer-closed",
 
-    // ─── Consumer ─────────────────────────────────────────────────────────────
+    
     CONSUME: "consume",
     CONSUMER_CREATED: "consumerCreated",
     CONSUMER_RESUME: "consumer-resume",
     CONSUMER_PAUSE: "consumerPause",
     CONSUMER_CLOSED: "consumerClosed",
 
-    // ─── Screen share ─────────────────────────────────────────────────────────
+    
     START_SCREEN_SHARE: "startScreenShare",
     STOP_SCREEN_SHARE: "stopScreenShare",
     SCREEN_PRODUCER_CREATED: "screenProducerCreated",
     SCREEN_CONSUMER_CREATED: "screenConsumerCreated",
 
-    // ─── DataChannel (chat via mediasoup SCTP DataChannels) ──────────────────
+    
     /**
      * Emitted by client → server to create a DataProducer on the send transport.
      * Callback: { id: string } — the server-side DataProducer ID.
@@ -64,7 +64,7 @@ export const ACTIONS = {
      */
     DATA_CONSUMER_RESUME: "dataConsumerResume",
 
-    // ─── Hybrid: Room device lifecycle ───────────────────────────────────────
+    
     /**
      * Emitted by a physical room device after joining.
      * Payload: { capabilities: RoomDeviceCapabilities }
@@ -98,7 +98,7 @@ export const ACTIONS = {
      */
     UNREGISTER_ROOM_DEVICE: "unregisterRoomDevice",
 
-    // ─── Hybrid: Assignment ───────────────────────────────────────────────────
+    
     /**
      * Emitted by server → a specific remote participant when their slot assignment changes.
      * Payload: RemoteAssignment
@@ -111,7 +111,7 @@ export const ACTIONS = {
      */
     GET_ROOM_TOPOLOGY: "getRoomTopology",
 
-    // ─── Hybrid: Slot notifications to room devices ───────────────────────────
+    
     /**
      * Emitted by server → the room device that owns the slot when a remote is assigned.
      * Payload: { slotId: string; remoteSocketId: string; remoteName: string }
@@ -124,7 +124,7 @@ export const ACTIONS = {
      */
     SLOT_REMOTE_LEFT: "slotRemoteLeft",
 
-    // ─── Hybrid: Room configuration & assignment ──────────────────────────────
+    
     /**
      * Emitted by a remote participant to choose a specific display.
      * Payload: { displayId: string }
@@ -157,7 +157,7 @@ export const ACTIONS = {
      */
     UPDATE_DISPLAY_MAPPING: "updateDisplayMapping",
 
-    // ─── Admin: Room config live update ──────────────────────────────────────
+    
     /**
      * Emitted by server → all peers in a room when an admin saves the room config.
      * Payload: RoomConfig
@@ -165,7 +165,7 @@ export const ACTIONS = {
      */
     ROOM_CONFIG_UPDATE: "roomConfigUpdate",
 
-    // ─── Errors & system ─────────────────────────────────────────────────────
+    
     ERROR: "error",
     DISCONNECT: "disconnect",
     DIED: "died",

@@ -1,0 +1,79 @@
+PREREQUISITES:
+- Node.js (v18 or higher) - Download from https://nodejs.org/
+- npm (comes with Node.js)
+- Git (for cloning the repository)
+- Docker & Docker Compose (optional, for containerized deployment)
+
+MEDIASOUP REQUIREMENTS:
+Mediasoup is a WebRTC SFU (Selective Forwarding Unit) that requires specific
+system dependencies. See full installation guide:
+  https://mediasoup.org/documentation/v2/mediasoup/installation/
+
+Required system packages:
+
+On Ubuntu/Debian:
+  sudo apt-get update
+  sudo apt-get install -y build-essential python3 pkg-config libssl-dev
+
+On macOS (with Homebrew):
+  brew install python3 openssl pkg-config
+
+On Windows:
+  - Install Visual Studio Build Tools or Visual Studio Community
+  - Install Python 3
+  - Install OpenSSL
+
+
+Install server dependencies:
+  cd server-app
+  npm install
+
+Install client dependencies:
+  cd ../client-app
+  npm install
+
+Return to root directory:
+  cd ..
+
+CONFIGURE ENVIRONMENT VARIABLES
+
+
+Create .env file in server-app directory:
+  cd server-app
+  cp .env-example .env
+
+Edit .env with your settings:
+  PORT=3000
+  ANNOUNCED_IP=127.0.0.1 //server ip
+
+Return to root:
+  cd ..
+
+BUILD THE CLIENT APPLICATION
+
+Build Angular client for development:
+  cd client-app
+  npm run build
+
+Or for development with live reload:
+  npm start
+
+This will start the Angular dev server on http://localhost:4200
+
+Return to root:
+  cd ..
+
+START THE SERVER
+
+In a new terminal, start the Node.js server:
+  cd server-app
+  npm start
+
+The server will start on http://localhost:3000
+
+
+Open your browser and navigate to:
+  http://localhost:3000
+
+Or if running Angular dev server:
+  http://localhost:4200

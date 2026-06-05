@@ -39,12 +39,12 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
   loading = true;
   loadError: string | null = null;
 
-  // ─── Three.js overlay objects ─────────────────────────────────────────────
+  
   private threeScene!: THREE.Scene;
   private slotMarkers: Map<string, THREE.Mesh> = new Map();
   private slotLabels: Map<string, THREE.Sprite> = new Map();
 
-  // ─── GaussianSplats3D viewer ──────────────────────────────────────────────
+  
   private viewer: Viewer | null = null;
 
   private subs = new Subscription();
@@ -64,29 +64,28 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
     try { this.viewer?.dispose(); } catch { /* ignore */ }
   }
 
-  // ─── Viewer initialisation ────────────────────────────────────────────────
-
+  
   private async initViewer() {
     try {
-      // Three.js scene for overlay markers
+      
       this.threeScene = new THREE.Scene();
 
-      // Ambient + directional light for the overlay meshes
+      
       this.threeScene.add(new THREE.AmbientLight(0xffffff, 0.6));
       const dir = new THREE.DirectionalLight(0xffffff, 0.8);
       dir.position.set(5, 10, 5);
       this.threeScene.add(dir);
 
-      // Use saved camera position if available; otherwise let the library auto-fit
+      
       const roomConfig = this.videoRoomService['roomConfig$']?.value;
       const camPos = roomConfig?.cameraPosition?.position;
       const camLookAt = roomConfig?.cameraPosition?.lookAt;
 
       this.viewer = new Viewer({
         rootElement: this.containerRef.nativeElement,
-        useBuiltInControls: true,          // orbit controls only
-        selfDrivenMode: true,              // viewer manages its own RAF loop
-        threeScene: this.threeScene,       // our overlay scene
+        useBuiltInControls: true,          
+        selfDrivenMode: true,              
+        threeScene: this.threeScene,       
         cameraUp: [0, 1, 0],
         ...(camPos ? { initialCameraPosition: [camPos.x, camPos.y, camPos.z] as [number, number, number] } : {}),
         ...(camLookAt ? { initialCameraLookAt: [camLookAt.x, camLookAt.y, camLookAt.z] as [number, number, number] } : {}),
@@ -107,8 +106,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // ─── Topology polling ─────────────────────────────────────────────────────
-
+  
   private startTopologyPolling() {
     this.subs.add(
       interval(5000).pipe(
@@ -134,8 +132,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
     this.updateOverlay();
   }
 
-  // ─── 3D overlay ───────────────────────────────────────────────────────────
-
+  
   /**
    * Rebuilds the Three.js overlay markers for each screen slot.
    * Slots are positioned using their screenIndex as a simple X offset
@@ -146,7 +143,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
 
     const slots = this.topology?.slots ?? [];
 
-    // Remove markers for slots that no longer exist
+    
     const currentIds = new Set(slots.map(s => s.slotId));
     this.slotMarkers.forEach((mesh, id) => {
       if (!currentIds.has(id)) {
@@ -161,7 +158,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    // Add / update markers
+    
     slots.forEach((slot, i) => {
       const position = slot.position3D
         ? new THREE.Vector3(slot.position3D.x, slot.position3D.y, slot.position3D.z)
@@ -170,7 +167,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
       const occupied = slot.assignedRemoteIds.length > 0;
       const colour = occupied ? SLOT_COLOUR_OCCUPIED : SLOT_COLOUR_EMPTY;
 
-      // Marker sphere
+      
       let mesh = this.slotMarkers.get(slot.slotId);
       if (!mesh) {
         const geo = new THREE.SphereGeometry(0.12, 16, 16);
@@ -184,7 +181,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
       }
       mesh.position.copy(position);
 
-      // Label sprite
+      
       let sprite = this.slotLabels.get(slot.slotId);
       if (!sprite) {
         sprite = this.makeTextSprite(this.slotLabel(slot));
@@ -204,8 +201,7 @@ export class RealSpaceComponent implements AfterViewInit, OnDestroy {
     return `${slot.screenLabel}\n${cam}\n${who}`;
   }
 
-  // ─── Sprite helpers ───────────────────────────────────────────────────────
-
+  
   private makeTextSprite(text: string): THREE.Sprite {
     const canvas = this.renderTextCanvas(text);
     const texture = new THREE.CanvasTexture(canvas);

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { CameraSelectService } from '../../directives/camera-select.service';
 
 const screenWidth = window.screen.width;
-// const screenHeight = window.screen.height;
+
 let k = screenWidth / 1920;
 
 @Component({

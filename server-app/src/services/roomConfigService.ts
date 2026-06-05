@@ -5,7 +5,7 @@ import { RoomConfig, DevicePairingConfig } from '../types';
 const ROOMS_DIR = path.join(__dirname, '../../rooms');
 const SPLATS_DIR = path.join(ROOMS_DIR, 'splats');
 
-// Ensure directories exist
+
 function ensureDirectories() {
   if (!fs.existsSync(ROOMS_DIR)) {
     fs.mkdirSync(ROOMS_DIR, { recursive: true });
@@ -25,7 +25,7 @@ export function loadAllRoomConfigs(): RoomConfig[] {
   try {
     const allFiles = fs.readdirSync(ROOMS_DIR);
     const files = allFiles.filter(f => {
-      // Only load room config files (not device pairing configs which contain a dash)
+      
       return f.endsWith('.json') && !f.includes('-');
     });
     
@@ -37,7 +37,7 @@ export function loadAllRoomConfigs(): RoomConfig[] {
         configs.push(config);
       } catch (fileErr) {
         console.error(`[RoomConfigService] Error loading individual room config ${file}:`, fileErr);
-        // Continue loading other files instead of failing completely
+        
       }
     }
   } catch (err) {

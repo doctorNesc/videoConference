@@ -10,19 +10,19 @@ import { AdminRoomsComponent } from './components/admin/admin-rooms/admin-rooms.
 import { RoomEditorComponent } from './components/admin/room-editor/room-editor.component';
 
 export const routes: Routes = [
-  // Admin routes
+  
   { path: 'admin', component: AdminRoomsComponent },
   { path: 'admin/room/:name', component: RoomEditorComponent },
 
-  // Video conference routes
+  
   { path: 'hello', component: HomeComponent },
   { path: 'classRoom', component: ClassroomComponent },
   { path: 'sfu/:roomName', component: VideoRoomComponent },
   { path: 'display-picker/:roomName', component: DisplayPickerComponent },
 
-  // Legacy/special routes
+  
   { path: 'B405', component: RealSpaceComponent },
 
-  // Default redirect
+  
   { path: '**', redirectTo: '/hello', pathMatch: 'full' },
 ];

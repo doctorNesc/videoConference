@@ -20,7 +20,7 @@ export class ParticipantService {
     if (!existing) {
       this.participants$.next([...this.participants$.value, participant]);
     } else {
-      // Update existing participant with new properties (e.g., assignedMainRoomDevice)
+      
       const updated = this.participants$.value.map(p =>
         p.id === participant.id ? { ...p, ...participant } : p
       );

@@ -40,14 +40,14 @@ export class VideoRoomService {
 
   private router = inject(Router);
 
-  // ─── Mode ─────────────────────────────────────────────────────────────────
+  
   public isRoomDevice: boolean = false;
 
-  // ─── Producer fetching state ──────────────────────────────────────────────
+  
   private getProducersInProgress: boolean = false;
   private getProducersTimeout: any = null;
 
-  // ─── Setup completion signal ──────────────────────────────────────────────
+  
   /** Fires true once the full mediasoup setup sequence completes for this peer.
    *  Remote participants: after produceVideo() + getProducers() both finish.
    *  Room devices: after registerAsRoomDevice() finishes.
@@ -55,22 +55,22 @@ export class VideoRoomService {
   private setupComplete$ = new BehaviorSubject<boolean>(false);
   public setupReady = this.setupComplete$.asObservable();
 
-  // ─── Assignment (remote participants only) ────────────────────────────────
+  
   /** The slot this remote participant is currently assigned to */
   public currentAssignment: RemoteAssignment | null = null;
   private assignment$ = new BehaviorSubject<RemoteAssignment | null>(null);
   public assignment = this.assignment$.asObservable();
 
-  // ─── Topology (all peers) ─────────────────────────────────────────────────
+  
   private topology$ = new BehaviorSubject<RoomTopologyDTO | null>(null);
   public topology = this.topology$.asObservable();
 
-  // ─── Room config (display layout, camera position) ────────────────────────
+  
   /** Populated from JOIN_ROOM callback and updated live via ROOM_CONFIG_UPDATE. */
   private roomConfig$ = new BehaviorSubject<RoomConfig | null>(null);
   public roomConfig = this.roomConfig$.asObservable();
 
-  // ─── Mediasoup state ──────────────────────────────────────────────────────
+  
   public mainView: boolean = false;
   private device!: Device;
   private producerTransport!: Transport;
@@ -84,7 +84,7 @@ export class VideoRoomService {
   protected producers: { id: string; producer: Producer; isScreen?: boolean; slotId?: string }[] = [];
   protected consumers: Consumer[] = [];
 
-  // ─── Local producer tracking (for remote participants) ──────────────────────
+  
   /** The producer ID of the local video stream (for remote participants) */
   private localProducerId: string | null = null;
 
@@ -95,7 +95,7 @@ export class VideoRoomService {
   public localVideo!: any;
   public videoStream!: MediaStream;
 
-  // ─── Chat (DataChannel) ───────────────────────────────────────────────────
+  
   private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
   public messages$: Observable<ChatMessage[]> = this.messagesSubject.asObservable();
 
@@ -104,7 +104,7 @@ export class VideoRoomService {
   /** All active DataConsumers keyed by their server-side DataConsumer ID */
   private dataConsumers: Map<string, DataConsumer> = new Map();
 
-  // ─── Encoding params ──────────────────────────────────────────────────────
+  
   public params: any = {
     encodings: [
       { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
@@ -122,15 +122,14 @@ export class VideoRoomService {
     @Optional() private broadcastChannel: BroadcastChannelService,
   ) { }
 
-  // ─── Initialisation ───────────────────────────────────────────────────────
-
+  
   initializeSocket(roomName: string, userName: string, isRoomDevice: boolean) {
     this.roomName = roomName;
     this.username = userName;
     this.isRoomDevice = isRoomDevice;
 
     this.socketService.on(ACTIONS.CONNECTION_SUCCESS, async ({ socketId }: any) => {
-      // All users need local stream for display
+      
       await this.getLocalStream();
 
       await this.joinRoom();
@@ -138,21 +137,19 @@ export class VideoRoomService {
       await this.createRecvTransport();
       await this.createSendTransport();
 
-      // Create the chat DataProducer on the send transport (all peers)
+      
       await this.createChatDataProducer();
 
       if (this.isRoomDevice) {
-        // Room device: advertise capabilities, then show pairing wizard
+        
         await this.registerAsRoomDevice();
         this.setupComplete$.next(true);
       } else {
-        // Remote participant: produce own video, then consume all existing producers.
-        // getProducers() is called unconditionally here — do NOT rely on the
-        // producersExist flag from TRANSPORT_PRODUCE, which may be false if the
-        // room device hasn't produced yet at the time we join.
+        
+        
         await this.produceVideo();
         await this.getProducers();
-        // Signal that setup is complete — DisplayPicker can now render with streams
+        
         this.setupComplete$.next(true);
       }
     });
@@ -164,21 +161,21 @@ export class VideoRoomService {
       }
     });
 
-    // ─── Hybrid: assignment update (remote participants) ──────────────────
+    
     this.socketService.on(ACTIONS.ASSIGNMENT_UPDATE, (assignment: RemoteAssignment) => {
       this.currentAssignment = assignment;
       this.assignment$.next(assignment);
       console.log('[VideoRoomService] Assignment updated:', assignment);
     });
 
-    // ─── Hybrid: topology update (all peers) ─────────────────────────────
+    
     this.socketService.on(ACTIONS.ROOM_TOPOLOGY_UPDATE, (topology: RoomTopologyDTO) => {
       this.topology$.next(topology);
       if (this.isRoomDevice) {
-        // Update room device slot state
+        
         const mySocketId = this.getMySocketId();
         if (mySocketId) {
-          // On first topology update (after REGISTER_ROOM_DEVICE), initialize slots from topology
+          
           if (this.roomDeviceService.slotsSnapshot.length === 0) {
             this.roomDeviceService.initSlotsFromTopology(topology, mySocketId);
             if (this.broadcastChannel) {
@@ -186,7 +183,7 @@ export class VideoRoomService {
               this.broadcastChannel.broadcastSlots(this.roomDeviceService.slotsSnapshot);
             }
           } else {
-            // Subsequent updates: just update existing slots
+            
             this.roomDeviceService.onTopologyUpdate(topology, mySocketId);
             if (this.broadcastChannel) {
               console.log('[VideoRoomService] Broadcasting updated slots to slot windows');
@@ -197,7 +194,7 @@ export class VideoRoomService {
       }
     });
 
-    // ─── Hybrid: slot notifications (room devices) ────────────────────────
+    
     this.socketService.on(ACTIONS.SLOT_REMOTE_JOINED, (event: SlotRemoteJoinedEvent) => {
       this.roomDeviceService.onRemoteJoined(event);
       if (this.broadcastChannel) {
@@ -214,26 +211,25 @@ export class VideoRoomService {
       }
     });
 
-    // ─── Producer closed ──────────────────────────────────────────────────
+    
     this.socketService.on(ACTIONS.PRODUCER_CLOSED, ({ remoteProducerId }: any) => {
       this.handleProducerClosed(remoteProducerId);
     });
 
-    // ─── DataChannel: new remote DataProducer available ──────────────────
+    
     this.socketService.on(ACTIONS.NEW_DATA_PRODUCER, async ({ dataProducerId, socketId, userName }: any) => {
       console.log('[VideoRoomService] NEW_DATA_PRODUCER — id:', dataProducerId, 'from:', userName);
       await this.consumeDataProducer(dataProducerId, userName);
     });
 
-    // ─── Room config live update (admin saved new display layout) ─────────
+    
     this.socketService.on(ACTIONS.ROOM_CONFIG_UPDATE, (config: RoomConfig) => {
       this.roomConfig$.next(config);
       console.log('[VideoRoomService] ROOM_CONFIG_UPDATE received for room:', config.roomName);
     });
   }
 
-  // ─── Room join ────────────────────────────────────────────────────────────
-
+  
   async joinRoom() {
     const data = await this.socketService.emit(ACTIONS.JOIN_ROOM, {
       roomName: this.roomName,
@@ -243,21 +239,20 @@ export class VideoRoomService {
 
     this.rtpCapabilities = data.rtpCapabilities;
 
-    // If server already assigned us a slot (room had paired devices before we joined)
+    
     if (data.assignment && !this.isRoomDevice) {
       this.currentAssignment = data.assignment;
       this.assignment$.next(data.assignment);
       console.log('[VideoRoomService] Initial assignment from JOIN_ROOM:', data.assignment);
     }
 
-    // Seed the room config observable so components have it immediately on join
+    
     if (data.roomConfig) {
       this.roomConfig$.next(data.roomConfig);
       console.log('[VideoRoomService] Initial roomConfig from JOIN_ROOM:', data.roomConfig.roomName);
     }
 
-    // Seed topology immediately so DisplayPicker can show correct display states
-    // without waiting for the ROOM_TOPOLOGY_UPDATE socket event.
+    
     if (data.topology) {
       this.topology$.next(data.topology);
       console.log('[VideoRoomService] Initial topology from JOIN_ROOM:', data.topology.slots?.length, 'slot(s)');
@@ -266,8 +261,7 @@ export class VideoRoomService {
     return data;
   }
 
-  // ─── Local stream ─────────────────────────────────────────────────────────
-
+  
   async getLocalStream() {
     try {
       const prefs = this.joinPrefs.snapshot;
@@ -276,13 +270,13 @@ export class VideoRoomService {
         height: { min: 400, max: 1080 },
       };
 
-      // Use pre-selected camera if available
+      
       if (prefs.selectedCameraId) {
         videoConstraint.deviceId = { exact: prefs.selectedCameraId };
       }
 
       this.videoStream = await navigator.mediaDevices.getUserMedia({
-        audio: false, // TODO: enable audio
+        audio: false, 
         video: videoConstraint,
       });
 
@@ -295,8 +289,7 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Hybrid: room device registration ────────────────────────────────────
-
+  
   /**
    * Phase 4: Enumerates screens and cameras, sends capabilities to server.
    * Attempts to load saved pairing config. If found, sends it with registration.
@@ -310,7 +303,7 @@ export class VideoRoomService {
     const capabilities = this.roomDeviceService.getCapabilities();
     const fingerprint = this.roomDeviceService.generateFingerprint();
 
-    // Try to load saved pairing config
+    
     let savedPairings: { slotId?: string; screenIndex: number; cameraDeviceId: string; cameraLabel: string; displayId?: string; excluded?: boolean }[] | null = null;
     let hasSavedConfig = false;
     try {
@@ -333,20 +326,17 @@ export class VideoRoomService {
 
     console.log('[VideoRoomService] Registered as room device, slot IDs:', result?.slots, 'hasSavedConfig:', hasSavedConfig);
 
-    // When saved config is applied, the server already paired the slots.
-    // We must produce camera streams now (same as submitScreenCameraPairing does),
-    // because the component skips the wizard and never calls submitScreenCameraPairing.
+    
     if (hasSavedConfig && savedPairings && result?.slots) {
-      // The server creates slots in the same order as capabilities.screens (screenIndex 0, 1, 2...).
-      // result.slots is newSlots.map(s => s.slotId) — index i corresponds to screen i.
-      // Saved pairings may not have screenIndex (older saves), so match by array position.
+      
+      
       const slotIds: string[] = result.slots;
 
       for (let i = 0; i < savedPairings.length; i++) {
         const pairing = savedPairings[i];
         if (!pairing.cameraDeviceId || pairing.excluded) continue;
 
-        // Match by screenIndex if present, otherwise fall back to positional index
+        
         let slotId: string | undefined;
         if (pairing.screenIndex !== undefined) {
           slotId = slotIds[pairing.screenIndex];
@@ -362,7 +352,7 @@ export class VideoRoomService {
         console.log(`[VideoRoomService] Producing camera for saved slot ${slotId} (index ${i}, camera: ${pairing.cameraLabel})`);
         await this.produceCameraForSlot(slotId, pairing.cameraDeviceId);
       }
-      // Now consume any existing producers from other peers
+      
       await this.getProducers();
     }
 
@@ -374,17 +364,15 @@ export class VideoRoomService {
    * Sends pairings to server, saves config locally, then starts producing camera streams.
    */
   async submitScreenCameraPairing(pairings: ScreenCameraPairing[]): Promise<void> {
-    // Apply locally for immediate UI feedback
+    
     pairings.forEach(p => {
       this.roomDeviceService.applyPairing(p.slotId, p.cameraDeviceId, p.cameraLabel);
     });
 
-    // Send to server
+    
     await this.socketService.emit(ACTIONS.SCREEN_CAMERA_PAIRING, { pairings });
 
-    // Save pairing config to server for future joins.
-    // Enrich each pairing with screenIndex (looked up from local slot state) so the
-    // saved config can be matched back to the correct slot on the next session.
+    
     const fingerprint = this.roomDeviceService.generateFingerprint();
     const enrichedPairings = pairings.map(p => {
       const slot = this.roomDeviceService.slotsSnapshot.find(s => s.slotId === p.slotId);
@@ -395,12 +383,12 @@ export class VideoRoomService {
       console.log('[VideoRoomService] Saved pairing config for device', fingerprint);
     }
 
-    // Start producing a camera stream for each paired slot
+    
     for (const pairing of pairings) {
       await this.produceCameraForSlot(pairing.slotId, pairing.cameraDeviceId);
     }
 
-    // Now consume existing producers from other peers
+    
     await this.getProducers();
   }
 
@@ -438,7 +426,7 @@ export class VideoRoomService {
 
       this.producers.push({ id: producer.id, producer, isScreen: false, slotId });
 
-      // Tell server which producer belongs to which slot
+      
       await this.socketService.emit(ACTIONS.CAMERA_PRODUCER_REGISTERED, {
         slotId,
         producerId: producer.id,
@@ -451,8 +439,7 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Mediasoup transport & producer setup ─────────────────────────────────
-
+  
   async createDevice() {
     try {
       this.device = new Device();
@@ -499,11 +486,7 @@ export class VideoRoomService {
         }
       });
 
-      // ─── DataChannel: producedata event ────────────────────────────────
-      // Fired by producerTransport.produceData(); we signal the server and
-      // return the server-assigned DataProducer ID via callback.
-      // The server also returns existingDataProducers so we can consume peers
-      // who joined before us (late-joiner fix).
+      
       this.producerTransport.on('producedata', async (parameters: any, callback: Function) => {
         try {
           console.log('[VideoRoomService] producedata event triggered');
@@ -521,7 +504,7 @@ export class VideoRoomService {
           console.log('[VideoRoomService] DataProducer created on server, id:', id,
             '| existing DataProducers:', existingDataProducers?.length ?? 0);
 
-          // Consume all DataProducers that already existed before we joined
+          
           if (Array.isArray(existingDataProducers)) {
             for (const { dataProducerId, userName } of existingDataProducers) {
               await this.consumeDataProducer(dataProducerId, userName);
@@ -577,7 +560,7 @@ export class VideoRoomService {
       producer.on(ACTIONS.TRANSPORT_CLOSE, () => console.log('Transport closed'));
       this.producers.push({ id: producer.id, producer, isScreen: false });
 
-      // Track the local producer ID for display picker
+      
       this.localProducerId = producer.id;
       console.log('[VideoRoomService] Local video producer created:', producer.id);
     } catch (error) {
@@ -605,8 +588,7 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Local stream accessors (for display picker) ────────────────────────────
-
+  
   /**
    * Returns the local video stream (for remote participants).
    * Used by DisplayPickerComponent to show the user's own video on the chosen display.
@@ -623,8 +605,7 @@ export class VideoRoomService {
     return this.localProducerId;
   }
 
-  // ─── Consumer ─────────────────────────────────────────────────────────────
-
+  
   async connectRecvTransport(
     remoteProducerId: string,
     consumerTransport: Transport,
@@ -665,7 +646,7 @@ export class VideoRoomService {
         return;
       }
 
-      // Store consumer so DisplayPicker (and other components) can look up streams by producerId
+      
       this.consumers.push(consumer!);
 
       const { track } = consumer!;
@@ -681,7 +662,7 @@ export class VideoRoomService {
         readyState: track.readyState,
       });
 
-      // Determine if this producer is the assigned camera for this remote participant
+      
       const isAssignedCamera = !this.isRoomDevice &&
         this.currentAssignment?.cameraProducerId === remoteProducerId;
 
@@ -709,21 +690,20 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Producers list ───────────────────────────────────────────────────────
-
+  
   /**
    * Fetches available producers from the server and consumes them.
    * Uses debouncing to prevent multiple simultaneous requests.
    * Removed retry logic since producers are announced via NEW_PRODUCER events.
    */
   async getProducers() {
-    // Prevent multiple simultaneous requests
+    
     if (this.getProducersInProgress) {
       console.log('[VideoRoomService] getProducers() already in progress, skipping duplicate request');
       return;
     }
 
-    // Clear any pending timeout
+    
     if (this.getProducersTimeout) {
       clearTimeout(this.getProducersTimeout);
       this.getProducersTimeout = null;
@@ -750,8 +730,7 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Participant management ───────────────────────────────────────────────
-
+  
   addParticipant(
     remoteProducerId: string,
     stream: MediaStream,
@@ -768,7 +747,7 @@ export class VideoRoomService {
       streamId: stream.id,
     });
 
-    // Validate stream before adding
+    
     if (!stream || stream.getTracks().length === 0) {
       console.error('[VideoRoomService] addParticipant() — stream has no tracks!', {
         remoteProducerId,
@@ -778,8 +757,7 @@ export class VideoRoomService {
       return;
     }
 
-    // Expose streams on window BEFORE adding to participant service
-    // This ensures slot-view windows can access them immediately
+    
     this.exposeStreamsOnWindow(remoteProducerId, stream, socketId);
 
     this.participantService.add({
@@ -797,7 +775,7 @@ export class VideoRoomService {
           newParticipant: remoteProducerId,
           participants: val.map(p => ({ id: p.id, name: p.name })),
         });
-        // Broadcast serialisable refs (no MediaStream) to slot-view windows
+        
         if (this.broadcastChannel) {
           console.log('[VideoRoomService] Broadcasting participants to slot windows');
           this.broadcastChannel.broadcastParticipants(val);
@@ -824,7 +802,7 @@ export class VideoRoomService {
         console.log('[VideoRoomService] Created __participantStreamsBySocketId__ map');
       }
 
-      // Validate stream before exposing
+      
       if (!stream || stream.getTracks().length === 0) {
         console.error('[VideoRoomService] Cannot expose stream — no tracks:', {
           producerId,
@@ -862,7 +840,7 @@ export class VideoRoomService {
     consumerToClose?.close();
     this.consumers = this.consumers.filter((item) => item.producerId !== remoteProducerId);
 
-    // Remove from window stream maps
+    
     const win = window as any;
     if (win.__participantStreams__) {
       win.__participantStreams__.delete(remoteProducerId);
@@ -871,7 +849,7 @@ export class VideoRoomService {
     this.participantService.remove(remoteProducerId);
     this.participantService.removeDetached(remoteProducerId);
 
-    // Broadcast updated refs after removal
+    
     this.participantService.participants.pipe(take(1)).subscribe(val => {
       if (this.broadcastChannel) {
         this.broadcastChannel.broadcastParticipants(val);
@@ -895,8 +873,7 @@ export class VideoRoomService {
     return this.participantService.detachedParticipants;
   }
 
-  // ─── Media controls ───────────────────────────────────────────────────────
-
+  
   toggleLocalVideo() {
     const videoProducer = this.producers.find(p => !p.isScreen && !p.slotId);
     if (videoProducer?.producer) {
@@ -909,7 +886,7 @@ export class VideoRoomService {
   }
 
   toggleLocalAudio() {
-    // Audio producer toggle — extend when audio is enabled
+    
   }
 
   async startScreenShare() {
@@ -933,8 +910,7 @@ export class VideoRoomService {
     }
   }
 
-  // ─── Cleanup ──────────────────────────────────────────────────────────────
-
+  
   public leaveRoom() {
     this.socketService.emit(ACTIONS.LEAVE_ROOM, { roomName: this.roomName });
     this.router.navigate(['/']);
@@ -946,7 +922,7 @@ export class VideoRoomService {
       stream.getTracks().forEach((track) => track.stop());
     }
 
-    // Clear any pending getProducers timeout
+    
     if (this.getProducersTimeout) {
       clearTimeout(this.getProducersTimeout);
       this.getProducersTimeout = null;
@@ -972,8 +948,7 @@ export class VideoRoomService {
     this.dataConsumers.clear();
   }
 
-  // ─── Chat (DataChannel) ───────────────────────────────────────────────────
-
+  
   /**
    * Creates a mediasoup DataProducer on the send transport.
    * This is the local "write end" of the chat DataChannel.
@@ -985,9 +960,7 @@ export class VideoRoomService {
         return;
       }
 
-      // producerTransport.produceData() fires the 'producedata' event on the transport,
-      // which is handled in createSendTransport() above. That handler signals the server
-      // via PRODUCE_DATA and returns the server-assigned DataProducer ID via callback.
+      
       this.chatDataProducer = await this.producerTransport.produceData({
         ordered: true,
         label: 'chat',
@@ -1048,7 +1021,7 @@ export class VideoRoomService {
         }
       });
 
-      // Resume the DataConsumer
+      
       await this.socketService.emit(ACTIONS.DATA_CONSUMER_RESUME, {
         serverDataConsumerId: dataConsumer.id,
       });
@@ -1077,7 +1050,7 @@ export class VideoRoomService {
       console.warn('[VideoRoomService] Chat DataProducer not ready — message not sent over DataChannel');
     }
 
-    // Always show the message locally
+    
     const current = this.messagesSubject.value;
     this.messagesSubject.next([...current, chatMessage]);
   }
@@ -1086,8 +1059,7 @@ export class VideoRoomService {
     return this.messages$;
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
+  
   private getMySocketId(): string | null {
     return this.socketService.socketId ?? null;
   }

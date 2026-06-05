@@ -10,7 +10,7 @@ export class Peer {
     conferenceRoomName: string = "default";
     socket: Socket;
 
-    // ─── Hybrid: room device fields ──────────────────────────────────────────
+    
     /** True when this peer is a physical room device (not a remote participant) */
     isRoomDevice: boolean = false;
     /** Capabilities advertised by the room device on registration */
@@ -18,7 +18,7 @@ export class Peer {
     /** Stable device fingerprint for persisting pairing config */
     deviceFingerprint?: string;
 
-    // ─── Mediasoup resources ─────────────────────────────────────────────────
+    
     sendTransport!: WebRtcTransport;
     recvTransport!: WebRtcTransport;
     producers: Map<string, Producer> = new Map();
@@ -95,7 +95,7 @@ export class Peer {
     }
 
     close() {
-        // Clean up everything when peer disconnects
+        
         this.producers.forEach((p) => p.close());
         this.consumers.forEach((c) => c.close());
         this.dataProducers.forEach((dp) => dp.close());

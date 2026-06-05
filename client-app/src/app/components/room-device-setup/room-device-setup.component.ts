@@ -52,7 +52,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
     this.buildPairings();
     this.computeLayoutBounds();
 
-    // Start camera preview for pairings that already have a camera selected
+    
     this.pairings.forEach(pairing => {
       if (pairing.selectedCameraDeviceId) {
         this.onCameraChange(pairing);
@@ -61,12 +61,11 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    // Stop all preview streams
+    
     this.pairings.forEach(p => p.previewStream?.getTracks().forEach(t => t.stop()));
   }
 
-  // ─── Build pairing entries ────────────────────────────────────────────────
-
+  
   private buildPairings() {
     this.pairings = this.screens.map((screen, i) => ({
       slotId: this.slotIds[i] ?? '',
@@ -77,8 +76,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
     }));
   }
 
-  // ─── Layout computation for proportional screen rendering ────────────────
-
+  
   private computeLayoutBounds() {
     if (this.screens.length === 0) return;
     const minLeft = Math.min(...this.screens.map(s => s.left));
@@ -95,8 +93,8 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
 
   /** Returns CSS style for a screen tile in the spatial layout */
   getScreenStyle(screen: ScreenInfo): Record<string, string> {
-    const containerWidth = 600; // px — the layout container width
-    const containerHeight = 200; // px — the layout container height
+    const containerWidth = 600; 
+    const containerHeight = 200; 
     const scaleX = containerWidth / this.layoutBounds.totalWidth;
     const scaleY = containerHeight / this.layoutBounds.totalHeight;
 
@@ -109,15 +107,14 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
     };
   }
 
-  // ─── Camera preview ───────────────────────────────────────────────────────
-
+  
   async onCameraChange(pairing: SlotPairing) {
-    // Stop previous preview
+    
     pairing.previewStream?.getTracks().forEach(t => t.stop());
     pairing.previewStream = null;
 
     if (!pairing.selectedCameraDeviceId) {
-      // Clear video element
+      
       const videoEl = document.querySelector(`[data-slot="${pairing.slotId}"]`) as HTMLVideoElement;
       if (videoEl) {
         videoEl.srcObject = null;
@@ -137,7 +134,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
 
       console.log('[RoomDeviceSetup] Camera preview started for slot:', pairing.slotId);
 
-      // Attach stream to video element immediately
+      
       const videoEl = document.querySelector(`[data-slot="${pairing.slotId}"]`) as HTMLVideoElement;
       if (videoEl && pairing.previewStream) {
         videoEl.srcObject = pairing.previewStream;
@@ -157,14 +154,12 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── Screen exclusion ─────────────────────────────────────────────────────
-
+  
   toggleExcluded(pairing: SlotPairing) {
     pairing.excluded = !pairing.excluded;
   }
 
-  // ─── Confirm ──────────────────────────────────────────────────────────────
-
+  
   confirm() {
     const result: ScreenCameraPairing[] = this.pairings
       .filter(p => p.slotId && p.selectedCameraDeviceId)
@@ -177,7 +172,7 @@ export class RoomDeviceSetupComponent implements OnInit, OnDestroy {
         excluded: p.excluded,
       }));
 
-    // Stop previews before emitting (main streams will be opened by VideoRoomService)
+    
     this.pairings.forEach(p => p.previewStream?.getTracks().forEach(t => t.stop()));
 
     this.pairingConfirmed.emit(result);

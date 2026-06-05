@@ -4,9 +4,6 @@ import { Peer } from "./peer";
 import { SharedState, RoomTopology, ScreenSlot, ScreenSlotDTO, RoomTopologyDTO, RoomDeviceCapabilities, RoomConfig } from "../types";
 import { mediaCodecs } from "../config/mediasoup.config";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Room
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class Room {
     roomName: string;
@@ -28,8 +25,7 @@ export class Room {
         };
     }
 
-    // ─── Peer management ─────────────────────────────────────────────────────
-
+    
     addPeer(peer: Peer) {
         this.peers.set(peer.id, peer);
     }
@@ -60,8 +56,7 @@ export class Room {
         return this.peers.size;
     }
 
-    // ─── Topology: room device registration ──────────────────────────────────
-
+    
     /**
      * Called when a room device emits REGISTER_ROOM_DEVICE.
      * Creates unpaired ScreenSlots (no camera assigned yet) for each screen.
@@ -132,8 +127,7 @@ export class Room {
         return displacedRemotes;
     }
 
-    // ─── Topology: assignment engine ─────────────────────────────────────────
-
+    
     /**
      * Returns all slots that have a paired camera (ready to accept remotes).
      * Excludes slots marked as excluded.
@@ -152,7 +146,7 @@ export class Room {
         const pairedSlots = this.getPairedSlots();
         if (pairedSlots.length === 0) return null;
 
-        // Round-robin: pick slot with fewest assigned remotes
+        
         const target = pairedSlots.reduce((min, slot) =>
             slot.assignedRemoteIds.length < min.assignedRemoteIds.length ? slot : min
         );
@@ -204,10 +198,10 @@ export class Room {
         );
         if (!slot) return null;
 
-        // Remove from any previous assignment
+        
         this.unassignRemote(remoteSocketId);
 
-        // Assign to the new slot
+        
         if (!slot.assignedRemoteIds.includes(remoteSocketId)) {
             slot.assignedRemoteIds.push(remoteSocketId);
         }
@@ -223,23 +217,21 @@ export class Room {
     rebalanceAssignments(): Map<string, ScreenSlot> {
         const pairedSlots = this.getPairedSlots();
 
-        // Collect all currently assigned remotes
+        
         const allRemotes: string[] = [];
         for (const slot of this.topology.slots.values()) {
             allRemotes.push(...slot.assignedRemoteIds);
             slot.assignedRemoteIds = [];
         }
 
-        // Also collect remotes from slots that no longer exist (displaced)
-        // (already cleared above since we cleared all slots)
-
+        
         if (pairedSlots.length === 0) {
             console.log(`[Room ${this.roomName}] No paired slots available for rebalancing`);
             return new Map();
         }
 
-        // Reassign round-robin
-        const newAssignments = new Map<string, ScreenSlot>(); // remoteSocketId → slot
+        
+        const newAssignments = new Map<string, ScreenSlot>(); 
         allRemotes.forEach((remoteId, i) => {
             const slot = pairedSlots[i % pairedSlots.length];
             slot.assignedRemoteIds.push(remoteId);
@@ -250,8 +242,7 @@ export class Room {
         return newAssignments;
     }
 
-    // ─── Screen exclusion ─────────────────────────────────────────────────────
-
+    
     /**
      * Marks a screen slot as excluded (reserved for local work).
      */
@@ -274,8 +265,7 @@ export class Room {
         return slot;
     }
 
-    // ─── Topology serialisation ───────────────────────────────────────────────
-
+    
     /** Serialise topology to a plain object safe for socket.io transmission */
     getTopologyDTO(): RoomTopologyDTO {
         const slots: ScreenSlotDTO[] = Array.from(this.topology.slots.values()).map((s) => ({
@@ -287,7 +277,7 @@ export class Room {
             cameraLabel: s.cameraLabel,
             cameraProducerId: s.cameraProducerId,
             assignedRemoteIds: [...s.assignedRemoteIds],
-            displayId: s.displayId,   // ← required for display-state lookup on the client
+            displayId: s.displayId,   
             excluded: s.excluded,
             position3D: s.position3D,
         }));
@@ -300,9 +290,6 @@ export class Room {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RoomManager
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class RoomManager {
     workerIndex: number = 0;

@@ -26,24 +26,23 @@ export interface SlotState {
 
 @Injectable({ providedIn: 'root' })
 export class RoomDeviceService {
-  // ─── Capability state ─────────────────────────────────────────────────────
+  
   private _screens: ScreenInfo[] = [];
   private _cameras: CameraInfo[] = [];
 
-  // ─── Slot state (populated after server responds to REGISTER_ROOM_DEVICE) ──
+  
   private slots$ = new BehaviorSubject<SlotState[]>([]);
   public slots = this.slots$.asObservable();
   get slotsSnapshot(): SlotState[] { return this.slots$.value; }
 
-  // ─── Topology (full picture from server) ─────────────────────────────────
+  
   private topology$ = new BehaviorSubject<RoomTopologyDTO | null>(null);
   public topology = this.topology$.asObservable();
 
   get screens(): ScreenInfo[] { return this._screens; }
   get cameras(): CameraInfo[] { return this._cameras; }
 
-  // ─── Capability enumeration ───────────────────────────────────────────────
-
+  
   /**
    * Enumerates physical screens using the Window Management API.
    * Falls back to a single screen entry if the API is unavailable or denied.
@@ -61,7 +60,7 @@ export class RoomDeviceService {
           top: s.top,
         }));
       } else {
-        // Fallback: single screen
+        
         this._screens = [{
           screenIndex: 0,
           label: 'Screen 1',
@@ -91,7 +90,7 @@ export class RoomDeviceService {
    */
   async enumerateCameras(): Promise<CameraInfo[]> {
     try {
-      // Request permission first so labels are populated
+      
       await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then(s => s.getTracks().forEach(t => t.stop()))
         .catch(() => { /* permission denied — labels will be empty */ });
@@ -120,8 +119,7 @@ export class RoomDeviceService {
     };
   }
 
-  // ─── Device fingerprinting ────────────────────────────────────────────────
-
+  
   /**
    * Generates or retrieves a stable device fingerprint from localStorage.
    * Used to persist pairing config across sessions.
@@ -130,7 +128,7 @@ export class RoomDeviceService {
     const key = 'hybrid-device-id';
     let id = localStorage.getItem(key);
     if (!id) {
-      // Generate a new UUID-like ID
+      
       id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -195,8 +193,7 @@ export class RoomDeviceService {
     }
   }
 
-  // ─── Slot management (driven by server events) ────────────────────────────
-
+  
   /**
    * Called when server responds to REGISTER_ROOM_DEVICE with slot IDs.
    * Initialises local slot state from the topology DTO.
@@ -217,11 +214,11 @@ export class RoomDeviceService {
     const mySlots = topology.slots
       .filter(s => s.deviceSocketId === mySocketId)
       .map(s => {
-        // Preserve existing remote name info if available
+        
         const existing = this.slots$.value.find(e => e.slotId === s.slotId);
         const slotState = this.dtoToSlotState(s);
         if (existing) {
-          // Keep names for remotes that are still assigned
+          
           slotState.assignedRemotes = s.assignedRemoteIds.map(id => {
             const known = existing.assignedRemotes.find(r => r.socketId === id);
             return known ?? { socketId: id, name: 'Unknown' };
@@ -282,8 +279,7 @@ export class RoomDeviceService {
     this.slots$.next(updated);
   }
 
-  // ─── Multi-window helpers ─────────────────────────────────────────────────
-
+  
   /**
    * Opens a new browser window positioned on the physical screen for a given slot.
    * Uses Window Management API coordinates if available.
@@ -303,8 +299,7 @@ export class RoomDeviceService {
     );
   }
 
-  // ─── Private helpers ──────────────────────────────────────────────────────
-
+  
   private dtoToSlotState(dto: ScreenSlotDTO): SlotState {
     return {
       slotId: dto.slotId,

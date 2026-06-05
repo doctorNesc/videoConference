@@ -18,10 +18,8 @@ export function registerHybridHandlers(
     namespace: Namespace,
     roomManager: RoomManager,
 ) {
-    // ─── REGISTER_ROOM_DEVICE ─────────────────────────────────────────────────
-    // Emitted by a physical room device after joining the room.
-    // Creates unpaired ScreenSlots for each advertised screen.
-    // If savedPairings are provided, applies them immediately (skip wizard).
+    
+    
     socket.on(
         ACTIONS.REGISTER_ROOM_DEVICE,
         (
@@ -47,36 +45,34 @@ export function registerHybridHandlers(
                 const room = roomManager.getRoom(roomName, "REGISTER_ROOM_DEVICE");
                 const peer = room.getPeer(socket.id);
 
-                // Store capabilities and fingerprint on the peer
+                
                 peer.setCapabilities(capabilities);
                 if (fingerprint) {
                     peer.deviceFingerprint = fingerprint;
                 }
 
-                // Create unpaired slots
+                
                 const newSlots = room.registerDevice(socket.id, capabilities);
 
-                // If saved pairings provided, apply them immediately
+                
                 let hasSavedConfig = false;
                 if (savedPairings && savedPairings.length > 0) {
-                    // Apply pairings.
-                    // Saved pairings may not have screenIndex (older saves use slotId from a previous session).
-                    // Match by screenIndex if present, otherwise fall back to positional index.
+                    
+                    
                     room.applyScreenCameraPairing(
                         savedPairings.map((p, i) => {
                             let slotId: string;
                             if (p.screenIndex !== undefined) {
                                 slotId = newSlots.find((s) => s.screenIndex === p.screenIndex)?.slotId ?? "";
                             } else {
-                                // Positional fallback: pairing[i] → newSlots[i]
+                                
                                 slotId = newSlots[i]?.slotId ?? "";
                             }
                             return { slotId, cameraDeviceId: p.cameraDeviceId, cameraLabel: p.cameraLabel };
                         })
                     );
 
-                    // Set displayId and excluded flag on slots.
-                    // Use same screenIndex-or-positional matching as above.
+                    
                     savedPairings.forEach((p, i) => {
                         const slot = p.screenIndex !== undefined
                             ? newSlots.find((s) => s.screenIndex === p.screenIndex)
@@ -87,7 +83,7 @@ export function registerHybridHandlers(
                         }
                     });
 
-                    // Rebalance remotes to include newly paired slots
+                    
                     const newAssignments = room.rebalanceAssignments();
                     newAssignments.forEach((slot, remoteSocketId) => {
                         const assignment: RemoteAssignment = {
@@ -103,7 +99,7 @@ export function registerHybridHandlers(
                     console.log(`[HYBRID] Device ${socket.id} applied saved pairing config`);
                 }
 
-                // Broadcast updated topology to everyone in the socket.io room
+                
                 const topologyDTO = room.getTopologyDTO();
                 namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -121,9 +117,7 @@ export function registerHybridHandlers(
         }
     );
 
-    // ─── SCREEN_CAMERA_PAIRING ────────────────────────────────────────────────
-    // Emitted by a room device after the pairing wizard is completed.
-    // Links each slot to a specific camera device, and optionally to a display position.
+    
     socket.on(
         ACTIONS.SCREEN_CAMERA_PAIRING,
         (
@@ -139,10 +133,10 @@ export function registerHybridHandlers(
 
                 const room = roomManager.getRoom(roomName, "SCREEN_CAMERA_PAIRING");
 
-                // Apply pairings
+                
                 room.applyScreenCameraPairing(pairings);
 
-                // Set displayId and excluded flag on slots
+                
                 pairings.forEach((p) => {
                     const slot = room.topology.slots.get(p.slotId);
                     if (slot) {
@@ -151,10 +145,10 @@ export function registerHybridHandlers(
                     }
                 });
 
-                // Rebalance: now that slots are paired, assign any waiting remotes
+                
                 const newAssignments = room.rebalanceAssignments();
 
-                // Notify each reassigned remote of their new assignment
+                
                 newAssignments.forEach((slot, remoteSocketId) => {
                     const assignment: RemoteAssignment = {
                         slotId: slot.slotId,
@@ -165,10 +159,10 @@ export function registerHybridHandlers(
                     namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
                 });
 
-                // Notify room device of its assigned remotes per slot
+                
                 notifyDeviceOfSlotAssignments(socket.id, room, namespace);
 
-                // Broadcast updated topology to all peers in the room
+                
                 const topologyDTO = room.getTopologyDTO();
                 namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -180,9 +174,7 @@ export function registerHybridHandlers(
         }
     );
 
-    // ─── CAMERA_PRODUCER_REGISTERED ───────────────────────────────────────────
-    // Emitted by a room device when it starts streaming a camera.
-    // Links the mediasoup producer ID to the slot so remotes can consume it.
+    
     socket.on(
         ACTIONS.CAMERA_PRODUCER_REGISTERED,
         ({ slotId, producerId }: { slotId: string; producerId: string }, callback?: Function) => {
@@ -201,7 +193,7 @@ export function registerHybridHandlers(
                     return;
                 }
 
-                // Notify all remotes assigned to this slot of the updated producer
+                
                 slot.assignedRemoteIds.forEach((remoteSocketId) => {
                     const assignment: RemoteAssignment = {
                         slotId: slot.slotId,
@@ -212,7 +204,7 @@ export function registerHybridHandlers(
                     namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
                 });
 
-                // Broadcast updated topology to all peers
+                
                 const topologyDTO = room.getTopologyDTO();
                 namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -224,8 +216,7 @@ export function registerHybridHandlers(
         }
     );
 
-    // ─── GET_ROOM_TOPOLOGY ────────────────────────────────────────────────────
-    // Client requests the current topology (e.g. for 3D visualization).
+    
     socket.on(ACTIONS.GET_ROOM_TOPOLOGY, (_: any, callback?: Function) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
@@ -241,15 +232,13 @@ export function registerHybridHandlers(
         }
     });
 
-    // ─── UNREGISTER_ROOM_DEVICE ───────────────────────────────────────────────
-    // Explicit unregister (also called internally on disconnect).
+    
     socket.on(ACTIONS.UNREGISTER_ROOM_DEVICE, (_: any, callback?: Function) => {
         handleDeviceLeave(socket.id, namespace, roomManager);
         callback?.({ success: true });
     });
 
-    // ─── CHOOSE_DISPLAY ───────────────────────────────────────────────────────
-    // Emitted by a remote participant to choose a specific display.
+    
     socket.on(ACTIONS.CHOOSE_DISPLAY, ({ displayId }: { displayId: string }, callback?: Function) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
@@ -273,17 +262,17 @@ export function registerHybridHandlers(
                 deviceSocketId: slot.deviceSocketId,
             };
 
-            // Notify the remote of their assignment
+            
             namespace.to(socket.id).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
 
-            // Notify the room device that owns this slot
+            
             namespace.to(slot.deviceSocketId).emit(ACTIONS.SLOT_REMOTE_JOINED, {
                 slotId: slot.slotId,
                 remoteSocketId: socket.id,
                 remoteName: room.getPeer(socket.id)?.userName ?? "Unknown",
             });
 
-            // Broadcast updated topology to all peers
+            
             const topologyDTO = room.getTopologyDTO();
             namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -294,8 +283,7 @@ export function registerHybridHandlers(
         }
     });
 
-    // ─── EXCLUDE_SCREEN ───────────────────────────────────────────────────────
-    // Emitted by a room device to exclude a screen from conference.
+    
     socket.on(ACTIONS.EXCLUDE_SCREEN, ({ slotId }: { slotId: string }, callback?: Function) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
@@ -312,7 +300,7 @@ export function registerHybridHandlers(
                 return;
             }
 
-            // Rebalance remotes away from this slot
+            
             const newAssignments = room.rebalanceAssignments();
             newAssignments.forEach((s, remoteSocketId) => {
                 const assignment: RemoteAssignment = {
@@ -324,7 +312,7 @@ export function registerHybridHandlers(
                 namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
             });
 
-            // Broadcast updated topology
+            
             const topologyDTO = room.getTopologyDTO();
             namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -335,8 +323,7 @@ export function registerHybridHandlers(
         }
     });
 
-    // ─── INCLUDE_SCREEN ───────────────────────────────────────────────────────
-    // Emitted by a room device to include a previously excluded screen.
+    
     socket.on(ACTIONS.INCLUDE_SCREEN, ({ slotId }: { slotId: string }, callback?: Function) => {
         try {
             const roomName = roomManager.socketToRoom.get(socket.id);
@@ -353,7 +340,7 @@ export function registerHybridHandlers(
                 return;
             }
 
-            // Rebalance remotes to include this slot
+            
             const newAssignments = room.rebalanceAssignments();
             newAssignments.forEach((s, remoteSocketId) => {
                 const assignment: RemoteAssignment = {
@@ -365,7 +352,7 @@ export function registerHybridHandlers(
                 namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
             });
 
-            // Broadcast updated topology
+            
             const topologyDTO = room.getTopologyDTO();
             namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -377,9 +364,6 @@ export function registerHybridHandlers(
     });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Exported helpers (used by roomHandlers and transportHandlers)
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Handles cleanup when a room device disconnects or explicitly unregisters.
@@ -397,19 +381,19 @@ export function handleDeviceLeave(
     try {
         room = roomManager.getRoom(roomName, "handleDeviceLeave");
     } catch {
-        return; // room already gone
+        return; 
     }
 
-    // Check if this socket was actually a room device
+    
     if (!room.topology.deviceSockets.has(deviceSocketId)) return;
 
-    // Remove device slots and get displaced remotes
+    
     room.unregisterDevice(deviceSocketId);
 
-    // Rebalance remaining remotes across remaining slots
+    
     const newAssignments = room.rebalanceAssignments();
 
-    // Notify each reassigned remote of their new slot
+    
     newAssignments.forEach((slot, remoteSocketId) => {
         const assignment: RemoteAssignment = {
             slotId: slot.slotId,
@@ -420,7 +404,7 @@ export function handleDeviceLeave(
         namespace.to(remoteSocketId).emit(ACTIONS.ASSIGNMENT_UPDATE, assignment);
     });
 
-    // Broadcast updated topology to all peers
+    
     const topologyDTO = room.getTopologyDTO();
     namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 
@@ -458,7 +442,7 @@ export function assignRemoteOnJoin(
         deviceSocketId: slot.deviceSocketId,
     };
 
-    // Notify the room device that owns this slot
+    
     namespace.to(slot.deviceSocketId).emit(ACTIONS.SLOT_REMOTE_JOINED, {
         slotId: slot.slotId,
         remoteSocketId,
@@ -490,20 +474,17 @@ export function unassignRemoteOnLeave(
     const slot = room.unassignRemote(remoteSocketId);
     if (!slot) return;
 
-    // Notify the room device that owns this slot
+    
     namespace.to(slot.deviceSocketId).emit(ACTIONS.SLOT_REMOTE_LEFT, {
         slotId: slot.slotId,
         remoteSocketId,
     });
 
-    // Broadcast updated topology
+    
     const topologyDTO = room.getTopologyDTO();
     namespace.to(roomName).emit(ACTIONS.ROOM_TOPOLOGY_UPDATE, topologyDTO);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Sends SLOT_REMOTE_JOINED notifications to a room device for all its current

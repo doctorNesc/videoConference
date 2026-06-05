@@ -10,7 +10,7 @@ import { RoomManager } from "../core/roomManager";
 import { ACTIONS } from "../config/actions";
 
 export function registerSocketHandlers(io: Server, state: SharedState, roomManager: RoomManager) {
-  // Capture the namespace once — all handlers that need to broadcast use this
+  
   const nsp: Namespace = io.of("/mediasoup");
 
   nsp.on("connection", (socket) => {
@@ -19,17 +19,16 @@ export function registerSocketHandlers(io: Server, state: SharedState, roomManag
       socketId: socket.id,
     });
 
-    // Pass the namespace to handlers that need to broadcast to rooms or
-    // target specific sockets (hybrid and room handlers)
+    
     registerRoomHandlers(socket, state, roomManager, nsp);
     registerHybridHandlers(socket, nsp, roomManager);
 
-    // Transport handler also needs namespace for hybrid disconnect cleanup
+    
     registerTransportHandlers(socket, state, roomManager, nsp);
     registerProducerHandlers(socket, state, roomManager);
     registerConsumerHandlers(socket, state, roomManager);
 
-    // Chat is now handled entirely via mediasoup SCTP DataChannels
+    
     registerDataChannelHandlers(socket, nsp, roomManager);
   });
 }

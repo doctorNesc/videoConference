@@ -25,7 +25,7 @@ export class DraggableInputDirective {
   private isDragging = false;
   private startX = 0;
   private startValue = 0;
-  private dragSensitivity = 0.5; // pixels per unit
+  private dragSensitivity = 0.5; 
 
   constructor(private el: ElementRef<HTMLInputElement>) {}
 
@@ -46,10 +46,10 @@ export class DraggableInputDirective {
     const deltaValue = (deltaX / this.dragSensitivity) * this.step;
     const newValue = this.startValue + deltaValue;
 
-    // Update the input value
+    
     this.el.nativeElement.value = newValue.toFixed(2);
 
-    // Emit the change event to trigger ngModel update
+    
     this.el.nativeElement.dispatchEvent(new Event('input', { bubbles: true }));
     this.valueChange.emit(newValue);
   }
@@ -59,7 +59,7 @@ export class DraggableInputDirective {
     if (this.isDragging) {
       this.isDragging = false;
       this.el.nativeElement.style.cursor = 'default';
-      // Dispatch change event on mouse up to trigger final update
+      
       this.el.nativeElement.dispatchEvent(new Event('change', { bubbles: true }));
     }
   }

@@ -50,7 +50,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   loadError: string | null = null;
   selectedDisplayId: string | null = null;
 
-  // Three.js and GaussianSplats3D
+  
   private viewer: Viewer | null = null;
   private threeScene!: THREE.Scene;
 
@@ -87,36 +87,34 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       return;
     }
 
-    // ─── Single reactive subscription ────────────────────────────────────────
-    // Combines roomConfig + topology + participants into one stream.
-    // roomConfig drives plane creation (once); topology + participants drive state updates.
+    
     this.subs.add(
       combineLatest([
         this.videoService.roomConfig.pipe(filter(c => !!c)),
-        this.videoService.topology,          // may be null initially
-        this.videoService.getParticipants(), // fires whenever a stream is consumed
+        this.videoService.topology,          
+        this.videoService.getParticipants(), 
       ]).subscribe(([config, topology, participants]) => {
         this.roomConfig = config;
         this.topology = topology;
         this.latestParticipants = participants;
 
-        // Initialize viewer once we have room config (first time only)
+        
         if (!this.viewer) {
           this.initViewer();
-          return; // initViewer will call createDisplayPlanes() when ready
+          return; 
         }
 
         if (!this.planesCreated) {
-          // First time: create geometry for every display in the config
+          
           this.createDisplayPlanes();
         }
 
-        // Every update: refresh materials and stream attachments
+        
         this.updatePlaneStates(participants);
       })
     );
 
-    // Track assignment so we can highlight the chosen display
+    
     this.subs.add(
       this.videoService.assignment.pipe(
         filter(a => !!a),
@@ -130,8 +128,8 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   }
 
   ngAfterViewInit() {
-    // Viewer is initialised inside the roomConfig subscription once config arrives.
-    // Nothing to do here — avoids a race between AfterViewInit and the first config emission.
+    
+    
   }
 
   ngOnDestroy() {
@@ -143,8 +141,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     });
   }
 
-  // ─── Viewer initialization ────────────────────────────────────────────────
-
+  
   private async initViewer() {
     try {
       const camPos = this.roomConfig?.cameraPosition?.position;
@@ -177,11 +174,11 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.viewer.start();
 
-      // Disable the library's built-in click-to-set-orbit-target behaviour
+      
       (this.viewer as any).checkForFocalPointChange = () => { /* disabled */ };
       (this.viewer as any).transitioningCameraTarget = false;
 
-      // Restrict to orbit-only (no pan/zoom) — first-person look-around
+      
       const controls = (this.viewer as any).controls;
       if (controls) {
         controls.enablePan = false;
@@ -209,7 +206,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.loading = false;
 
-      // Now that the scene is ready, trigger plane creation if config + topology arrived already
+      
       if (this.roomConfig && !this.planesCreated) {
         this.createDisplayPlanes();
       }
@@ -223,8 +220,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     }
   }
 
-  // ─── Display plane management ─────────────────────────────────────────────
-
+  
   /**
    * Creates Three.js plane geometry for every display in the room config.
    * Called ONCE per room config. Subsequent topology/participant changes call
@@ -236,9 +232,9 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     const displays = this.roomConfig.displays || [];
 
     displays.forEach((display) => {
-      if (this.displayPlanes.has(display.displayId)) return; // already created
+      if (this.displayPlanes.has(display.displayId)) return; 
 
-      // Off-screen video element — needed for THREE.VideoTexture to work
+      
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.muted = true;
@@ -247,10 +243,10 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       videoElement.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:640px;height:480px;opacity:1;';
       this.containerRef.nativeElement.appendChild(videoElement);
 
-      // Geometry
+      
       const geometry = new THREE.PlaneGeometry(display.widthM, display.heightM);
 
-      // Start with a placeholder blue material — updatePlaneStates() will switch to video texture
+      
       const material = new THREE.MeshBasicMaterial({
         color: 0x0055cc,
         transparent: true,
@@ -265,7 +261,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       this.threeScene.add(mesh);
 
-      // Border mesh (updated in updatePlaneStates)
+      
       const borderMesh = this.buildBorderMesh(display, 'available');
       if (borderMesh) this.threeScene.add(borderMesh);
 
@@ -297,12 +293,12 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       const slot = this.topology?.slots.find(s => s.displayId === display.displayId);
       const newState = this.getDisplayState(slot);
 
-      // Update userData so raycasting reads the latest state
+      
       planeData.mesh.userData['displayState'] = newState;
       if (planeData.borderMesh) planeData.borderMesh.userData['displayState'] = newState;
 
       if (newState === 'unavailable') {
-        // Hide excluded planes entirely
+        
         planeData.mesh.visible = false;
         if (planeData.borderMesh) planeData.borderMesh.visible = false;
         continue;
@@ -311,17 +307,17 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       planeData.mesh.visible = true;
       if (planeData.borderMesh) planeData.borderMesh.visible = true;
 
-      // Update border colour when state changes
+      
       if (newState !== planeData.currentState) {
         this.updateBorderColor(planeData.borderMesh, newState);
         planeData.currentState = newState;
       }
 
-      // Attach stream if slot has a remote assigned
+      
       if (newState === 'has_remote' && slot) {
         this.tryAttachStream(display.displayId, slot, planeData, participants, mySocketId);
       } else if (newState !== 'has_remote') {
-        // Revert to colour material if no remote is assigned (e.g. remote left)
+        
         this.revertToColorMaterial(planeData.mesh, newState);
         if (planeData.videoElement.srcObject) {
           planeData.videoElement.pause();
@@ -331,8 +327,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     }
   }
 
-  // ─── Display state helpers ────────────────────────────────────────────────
-
+  
   /**
    * Determines the visual state of a display based on its linked slot.
    *
@@ -354,7 +349,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private revertToColorMaterial(mesh: THREE.Mesh, state: 'no_slot' | 'available' | 'has_remote') {
     const mat = mesh.material as THREE.MeshBasicMaterial | THREE.ShaderMaterial;
-    // Handle both MeshBasicMaterial (with VideoTexture) and ShaderMaterial
+    
     if (mat instanceof THREE.ShaderMaterial) {
       const texture = mat.uniforms?.['map']?.value;
       if (texture instanceof THREE.VideoTexture) {
@@ -423,8 +418,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     return borderMesh;
   }
 
-  // ─── Stream attachment ────────────────────────────────────────────────────
-
+  
   /**
    * Tries to attach a consumed remote stream to a display plane.
    * If the stream is already attached and live, this is a no-op.
@@ -439,14 +433,14 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
   ) {
     const { videoElement, mesh } = planeData;
 
-    // Skip if a live stream is already attached
+    
     if (videoElement.srcObject) {
       const existing = videoElement.srcObject as MediaStream;
       if (existing.getTracks().some(t => t.readyState === 'live')) return;
     }
 
     for (const remoteSocketId of slot.assignedRemoteIds) {
-      if (remoteSocketId === mySocketId) continue; // never show own stream
+      if (remoteSocketId === mySocketId) continue; 
 
       const participant = participants.find((p: any) => p.socketId === remoteSocketId);
       if (!participant?.stream) continue;
@@ -457,7 +451,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
       return;
     }
 
-    // Streams not yet consumed — next participant update will call updatePlaneStates again
+    
     console.log('[DisplayPicker] Slot', slot.slotId, 'has remote(s) but streams not yet available');
   }
 
@@ -468,17 +462,17 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private switchMeshToVideoTexture(mesh: THREE.Mesh, videoElement: HTMLVideoElement) {
     const oldMat = mesh.material as THREE.MeshBasicMaterial;
-    if (oldMat.map instanceof THREE.VideoTexture) return; // already showing video
+    if (oldMat.map instanceof THREE.VideoTexture) return; 
 
     const texture = new THREE.VideoTexture(videoElement);
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.flipY = false; // Fix upside-down video
+    texture.flipY = false; 
     texture.needsUpdate = true;
 
-    // Use a shader material to add margins around the video
-    const margin = 0.03; // 3% margin on each side
+    
+    const margin = 0.03; 
     const vertexShader = `
       varying vec2 vUv;
       void main() {
@@ -546,8 +540,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     }
   }
 
-  // ─── User interaction ─────────────────────────────────────────────────────
-
+  
   private onCanvasClick(event: MouseEvent) {
     if (!this.viewer || !this.threeScene) return;
 
@@ -610,8 +603,7 @@ export class DisplayPickerComponent implements OnInit, OnDestroy, AfterViewInit 
     this.displayChosen.emit();
   }
 
-  // ─── Fallback list view ───────────────────────────────────────────────────
-
+  
   get availableDisplays(): DisplayConfig[] {
     if (!this.roomConfig) return [];
     return this.roomConfig.displays.filter((d) => {

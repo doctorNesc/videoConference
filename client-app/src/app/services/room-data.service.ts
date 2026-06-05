@@ -10,7 +10,7 @@ export class RoomDataService {
 
   constructor(private http: HttpClient) {}
   private socket!: Socket;
-  private serverUrl = 'http://localhost:3000';  // Your server URL
+  private serverUrl = 'http://localhost:3000';  
 
   getRoomUsers(room: string): Observable<any[]> {
     return this.http.get<any[]>(`/api/roomUsers?room=${room}`);
