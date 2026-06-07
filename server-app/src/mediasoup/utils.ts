@@ -10,12 +10,6 @@ export const getWebRtcTransportOptionsForWorker = (workerIndex: number): WebRtcS
     listenInfos: [
       {
         portRange,
-        protocol: "udp",
-        ip: "0.0.0.0",
-        announcedIp: process.env.ANNOUNCED_IP || "127.0.0.1"
-      },
-      {
-        portRange,
         protocol: "tcp",
         ip: "0.0.0.0",
         announcedIp: process.env.ANNOUNCED_IP || "127.0.0.1"
@@ -32,9 +26,9 @@ export const createWebRtcTransport = async (
 ): Promise<WebRtcTransport> => {
   const transport = await router.createWebRtcTransport({
     webRtcServer: rtcServer,
-    enableUdp: true,
+    enableUdp: false,
     enableTcp: true,
-    preferUdp: true,
+    preferUdp: false,
     enableSctp: true,
     numSctpStreams: { OS: 1024, MIS: 1024 },
   });

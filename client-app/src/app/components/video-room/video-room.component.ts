@@ -103,6 +103,10 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.name = this.route.snapshot.queryParamMap.get('userName') || 'Guest';
     this.isRoomDevice = this.route.snapshot.queryParamMap.get('inTheRoom')?.toLowerCase() === 'true' || false;
 
+    // For room devices, generate a proper name based on screen information
+    if (this.isRoomDevice && this.name === 'Guest') {
+      this.initializeRoomDeviceName();
+    }
 
     this.setupRoomDeviceRegistration();
 
@@ -192,6 +196,25 @@ export class VideoRoomComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  /**
+   * Initializes the room device name based on screen information.
+   * Generates names like "Screen1", "Screen2" instead of using "Guest".
+   */
+  private async initializeRoomDeviceName() {
+    try {
+      await this.roomDeviceService.enumerateScreens();
+      const screens = this.roomDeviceService.screens;
+      if (screens.length > 0) {
+        // Use the first screen's label as the device name
+        this.name = screens[0].label || `Screen 1`;
+        console.log('[VideoRoomComponent] Room device name set to:', this.name);
+      }
+    } catch (err) {
+      console.warn('[VideoRoomComponent] Failed to initialize room device name:', err);
+      // Fall back to default if enumeration fails
+      this.name = 'Screen 1';
+    }
+  }
 
   /**
    * Monkey-patches registerAsRoomDevice to show the wizard after registration.

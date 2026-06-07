@@ -56,21 +56,21 @@
     <!-- ── Room-device checkbox ──────────────────────────────────────────── -->
     <div class="input-combined py-2 room-device-row">
       <span class="material-symbols-outlined input-icon">meeting_room</span>
-      <label class="room-device-label" for="inTheRoom">
-        <input
-          type="checkbox"
-          id="inTheRoom"
-          [(ngModel)]="inTheRoom"
-          (ngModelChange)="onRoomDeviceChange()"
-          class="room-device-checkbox"
-        />
-        Device is in the physical room
-      </label>
-      @if (inTheRoom) {
+      <div class="room-device-container">
+        <label class="room-device-label" for="inTheRoom">
+          <input
+            type="checkbox"
+            id="inTheRoom"
+            [(ngModel)]="inTheRoom"
+            (ngModelChange)="onRoomDeviceChange()"
+            class="room-device-checkbox"
+          />
+          Device is in the physical room
+        </label>
         <span class="room-device-hint">
           (screens &amp; cameras will be advertised to the server)
         </span>
-      }
+      </div>
     </div>
   </div>
 

@@ -3,7 +3,13 @@ import { io, Socket } from "socket.io-client";
 
 @Injectable({ providedIn: 'root' })
 export class SocketService {
-  private socket: Socket = io('http://localhost:3000/mediasoup');
+  private socket: Socket = io('http://localhost:3000/mediasoup', {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5
+  });
 
   /** The socket ID assigned by the server after connection */
   get socketId(): string | undefined {
@@ -25,5 +31,15 @@ export class SocketService {
 
   off(event: string, listener?: (...args: any[]) => void) {
     this.socket.off(event, listener);
+  }
+
+  disconnect() {
+    console.log('[SocketService] Disconnecting socket:', this.socket.id);
+    this.socket.disconnect();
+  }
+
+  connect() {
+    console.log('[SocketService] Connecting socket');
+    this.socket.connect();
   }
 }

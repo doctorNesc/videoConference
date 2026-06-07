@@ -34,12 +34,21 @@ main {
 }
 
 input {
-  padding-left: 40px;
+  padding-left: 12px;
+}
+
+.input-combined {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .input-icon {
-  position: absolute;
+  position: relative;
   padding: 9px;
+  flex-shrink: 0;
+  color: #666;
 }
 
 .join-btn {
@@ -67,6 +76,7 @@ input {
 /* ── Camera pre-selection ─────────────────────────────────────────────── */
 .camera-select-row {
   align-items: center;
+  position: relative;
 }
 
 .camera-select {
@@ -78,6 +88,7 @@ input {
 
   option {
     background-color: #1a1a2e;
+    color: #e0e0e0;
   }
 }
 
@@ -92,6 +103,13 @@ input {
 .room-device-row {
   align-items: center;
   gap: 8px;
+  position: relative;
+}
+
+.room-device-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .room-device-label {
@@ -115,4 +133,6 @@ input {
   font-size: 0.78rem;
   color: #718096;
   font-style: italic;
+  display: block;
+  margin-top: 4px;
 }

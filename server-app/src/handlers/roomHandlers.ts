@@ -22,10 +22,15 @@ export function registerRoomHandlers(
         try {
             const room = await roomManager.getOrCreateRoom(state, roomName);
 
+            // Check if there's already a peer with this socket ID and remove it
+            const existingPeer = room.peers.get(socket.id);
+            if (existingPeer) {
+                room.removePeer(socket.id);
+            }
+
             const peer = new Peer(socket.id, socket, userName, false, roomName, false, isRoomDevice);
             roomManager.socketToRoom.set(socket.id, roomName);
             room.addPeer(peer);
-
 
             socket.join(roomName);
 

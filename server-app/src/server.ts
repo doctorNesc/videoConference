@@ -36,7 +36,10 @@ httpServer.listen(process.env.PORT || 3000, () => {
   console.log("listening on port: " + process.env.PORT);
 });
 
-const io = new IOServer(httpServer, { cors: { origin: true } });
+const io = new IOServer(httpServer, {
+  cors: { origin: true },
+  transports: ['websocket', 'polling']
+});
 
 
 app.get("/api/roomUsers", (req: Request, res: Response): void => {
